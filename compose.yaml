@@ -1,0 +1,33 @@
+name: mycut
+services:
+  api:
+    build: .
+    image: mycut:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8321:8321"
+    volumes:
+      - ./.data:/data
+      - ./shorts/claude-cloud:/app/shorts/claude-cloud:ro
+      - models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8321/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+  worker:
+    image: mycut:local
+    init: true
+    restart: unless-stopped
+    command: ["python", "-m", "mycut.worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - ./.data:/data
+      - ./shorts/claude-cloud:/app/shorts/claude-cloud:ro
+      - models:/models
+volumes:
+  models:

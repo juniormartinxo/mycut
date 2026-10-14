@@ -1,0 +1,351 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-14T10:07:29.295455+00:00",
+  "title": "Design System: MyCut",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Terracota de ação"
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Terracota no hover"
+      },
+      "accent-on": {
+        "role": "neutral",
+        "displayName": "Texto da ação principal"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta verde"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Texto secundário"
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel de trabalho"
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Divisor"
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Verde de bastidor"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superfície de edição"
+      },
+      "field": {
+        "role": "neutral",
+        "displayName": "Superfície de campo"
+      },
+      "field-border": {
+        "role": "neutral",
+        "displayName": "Borda de campo"
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Papel da ação secundária"
+      },
+      "secondary-on": {
+        "role": "neutral",
+        "displayName": "Texto da ação secundária"
+      },
+      "secondary-hover": {
+        "role": "neutral",
+        "displayName": "Ação secundária no hover"
+      },
+      "nav-on": {
+        "role": "neutral",
+        "displayName": "Texto de navegação"
+      },
+      "nav-active": {
+        "role": "neutral",
+        "displayName": "Seleção da navegação"
+      },
+      "nav-active-on": {
+        "role": "neutral",
+        "displayName": "Texto da navegação ativa"
+      },
+      "draft": {
+        "role": "neutral",
+        "displayName": "Fundo em edição"
+      },
+      "draft-on": {
+        "role": "neutral",
+        "displayName": "Texto em edição"
+      },
+      "ready": {
+        "role": "neutral",
+        "displayName": "Fundo pronto para revisar"
+      },
+      "ready-on": {
+        "role": "neutral",
+        "displayName": "Texto pronto para revisar"
+      },
+      "working": {
+        "role": "neutral",
+        "displayName": "Fundo em produção"
+      },
+      "working-on": {
+        "role": "neutral",
+        "displayName": "Texto em produção"
+      },
+      "error": {
+        "role": "neutral",
+        "displayName": "Fundo de falha"
+      },
+      "error-on": {
+        "role": "neutral",
+        "displayName": "Texto de falha"
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Terracota suave das instruções do executor"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Título de página",
+        "purpose": "Biblioteca, fila e Conexões."
+      },
+      "editor-title": {
+        "displayName": "Título da produção",
+        "purpose": "Identificação do projeto aberto."
+      },
+      "section-title": {
+        "displayName": "Título de etapa",
+        "purpose": "Cabeçalho do painel de edição."
+      },
+      "card-title": {
+        "displayName": "Título na biblioteca",
+        "purpose": "Produção identificada pela capa."
+      },
+      "supporting-copy": {
+        "displayName": "Descrição de página",
+        "purpose": "Parágrafo sob o título; não define tamanho global de body."
+      },
+      "field-label": {
+        "displayName": "Rótulo de campo",
+        "purpose": "Identificação persistente de campos."
+      },
+      "button": {
+        "displayName": "Ação",
+        "purpose": "Botões principais e secundários."
+      },
+      "badge": {
+        "displayName": "Estado",
+        "purpose": "Indicadores operacionais compactos."
+      }
+    },
+    "shadows": [
+      {
+        "name": "project-card-hover",
+        "value": "0 8px 24px #2734210b",
+        "purpose": "Hover do cartão; styles.css .project-card:hover."
+      },
+      {
+        "name": "preview-stage",
+        "value": "0 12px 28px #26322015",
+        "purpose": "Elevação da prévia; styles.css .preview-stage."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Variável --ease, usada na sombra do cartão."
+      },
+      {
+        "name": "control-transition",
+        "value": "0.16s",
+        "purpose": "Fundo de botões e borda de campos."
+      },
+      {
+        "name": "card-transition",
+        "value": "0.22s",
+        "purpose": "Sombra e borda do cartão."
+      },
+      {
+        "name": "progress-transition",
+        "value": "0.4s",
+        "purpose": "Largura da barra de progresso WebKit."
+      },
+      {
+        "name": "loading-spin",
+        "value": "spin 1.4s linear infinite",
+        "purpose": "Indicador de carregamento; removido com movimento reduzido."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-editor-min",
+        "value": "1550px"
+      },
+      {
+        "name": "compact-sidebar-max",
+        "value": "1250px"
+      },
+      {
+        "name": "icon-sidebar-max",
+        "value": "1000px"
+      },
+      {
+        "name": "stacked-editor-max",
+        "value": "760px"
+      },
+      {
+        "name": "connections-single-column-max",
+        "value": "540px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão principal",
+      "kind": "button",
+      "description": "Criar ou gerar; hover, foco e indisponibilidade extraídos do CSS.",
+      "html": "<button type=\"button\" class=\"ds-primary\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg>Novo Short</button>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;border-radius:7px;padding:10px 15px;font-size:12px;line-height:1.4;font-weight:700;text-decoration:none;white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background .16s,box-shadow .16s;font-family:\"Manrope Variable\",sans-serif;background:var(--accent,#bd4b28);color:#fffaf2}.ds-primary:hover:not(:disabled){background:#a83d1b}.ds-primary:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;}.ds-primary:disabled{opacity:.48;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Botão secundário",
+      "kind": "button",
+      "description": "Salvar, assistir ou baixar, com borda fina e fundo claro.",
+      "html": "<button type=\"button\" class=\"ds-secondary\">Salvar alterações</button>",
+      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;border-radius:7px;padding:10px 15px;font-size:12px;line-height:1.4;font-weight:700;text-decoration:none;white-space:nowrap;border:1px solid transparent;cursor:pointer;transition:background .16s,box-shadow .16s;font-family:\"Manrope Variable\",sans-serif;border-color:#cdd2c5;background:#fffef8;color:#41493c}.ds-secondary:hover:not(:disabled){background:#e9eddf}.ds-secondary:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;}.ds-secondary:disabled{opacity:.48;cursor:not-allowed}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none}}",
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Ação textual",
+      "kind": "button",
+      "description": "Ação auxiliar sem contêiner; sublinhado aparece no hover.",
+      "html": "<button type=\"button\" class=\"ds-text-button\">Adicionar cena</button>",
+      "css": ".ds-text-button{font-family:\"Manrope Variable\",sans-serif;display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:8px 0;color:var(--accent,#bd4b28);font-size:12px;line-height:1.5;font-weight:650;text-align:left;cursor:pointer}.ds-text-button:hover{text-decoration:underline;text-underline-offset:4px}.ds-text-button:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;}.ds-text-button:disabled{opacity:.48;cursor:not-allowed}",
+      "refersTo": "button-text"
+    },
+    {
+      "name": "Campo de edição",
+      "kind": "input",
+      "description": "Campo textual e select nativo com rótulo, hover, foco e desabilitado. O select ilustra Padrão do CLI sem inventar IDs ou acesso a modelos; os testes e a validação de catálogo pertencem à aplicação.",
+      "html": "<label class=\"ds-label\">Título de trabalho (opcional)<input class=\"ds-field\" placeholder=\"O agente de roteiro criará o título para publicar\" maxlength=\"100\" /></label><label class=\"ds-label\">Modelo<select class=\"ds-field\" aria-label=\"Modelo de Pesquisa\" aria-describedby=\"ds-model-help\"><option value=\"\">Padrão do CLI</option></select></label><p class=\"ds-model-help\" id=\"ds-model-help\">O CLI escolhe o modelo padrão. Selecione um ID para fixar o modelo.</p>",
+      "css": ".ds-label{font-family:\"Manrope Variable\",sans-serif;display:block;font-size:13px;font-weight:650}.ds-field{font-family:\"Manrope Variable\",sans-serif;display:block;width:100%;margin-top:8px;border:1px solid #ced2c7;border-radius:7px;background:#fffefa;padding:11px 13px;color:var(--ink,#292e29);font-size:inherit;font-weight:inherit;caret-color:var(--accent,#bd4b28);transition:border-color .16s}.ds-field::placeholder{color:#626958}.ds-field:hover{border-color:#a5ad9e}.ds-field:disabled{background:#eeefe9}.ds-field:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;outline-offset:2px}.ds-field::selection{background:#f2c5a9;color:#292e29}@media(prefers-reduced-motion:reduce){.ds-field{transition:none}}.ds-field[aria-invalid=\"true\"]{border-color:#aa302c}.ds-model-help{font-family:\"Manrope Variable\",sans-serif;font-size:12px;line-height:1.8;color:var(--muted,#686d63);margin-top:5px;overflow-wrap:anywhere}",
+      "refersTo": "field"
+    },
+    {
+      "name": "Navegação principal",
+      "kind": "nav",
+      "description": "Produções ativa na navegação compartilhada por Produções, Fila de produção e Conexões; exemplo visual sem roteamento.",
+      "html": "<nav class=\"ds-navigation\" aria-label=\"Navegação principal\"><button class=\"ds-nav-item ds-nav-active\" type=\"button\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v1\"/></svg>Produções</button></nav>",
+      "css": ".ds-navigation{display:grid;gap:7px;background:var(--sidebar,#202621);padding:20px}.ds-nav-item{font-family:\"Manrope Variable\",sans-serif;display:flex;align-items:center;gap:12px;padding:13px 12px;border:0;border-radius:7px;background:none;color:#c4c9be;text-align:left;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer}.ds-nav-item:hover{background:#303b31;color:#fffaf0}.ds-nav-item.ds-nav-active{background:#3a4538;color:#fffaf0}.ds-nav-item:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;}",
+      "refersTo": "navigation"
+    },
+    {
+      "name": "Estados de produção",
+      "kind": "chip",
+      "description": "Indicadores sem interação; quatro variantes reais com texto e cor.",
+      "html": "<div class=\"ds-status-list\"><span class=\"ds-badge\"><span></span>Em edição</span><span class=\"ds-badge ds-working\"><span></span>Produzindo</span><span class=\"ds-badge ds-ready\"><span></span>Pronto para revisar</span><span class=\"ds-badge ds-error\"><span></span>Precisa de atenção</span></div>",
+      "css": ".ds-status-list{display:flex;gap:8px;flex-wrap:wrap}.ds-badge{font-family:\"Manrope Variable\",sans-serif;display:inline-flex;align-items:center;gap:6px;max-width:100%;border-radius:5px;padding:4px 7px;background:#eeeee6;color:#5d6256;font-size:10px;line-height:1.5;font-weight:700;white-space:nowrap}.ds-badge>span:empty{width:5px;height:5px;border-radius:50%;background:currentColor}.ds-ready{background:#e5ecd8;color:#465833}.ds-working{background:#f9e5d3;color:#92552c}.ds-error{background:#f7e0db;color:#a23320}",
+      "refersTo": "badge-draft"
+    },
+    {
+      "name": "Ficha de produção",
+      "kind": "card",
+      "description": "Exemplo de estrutura com título provisório; sem resultados ou datas fictícias.",
+      "html": "<button type=\"button\" class=\"ds-project\"><span class=\"ds-project-art\"><span class=\"ds-cover-placeholder\">Uma nova ideia</span><span class=\"ds-format\">9:16 <span>SHORT</span></span></span><span class=\"ds-project-body\"><span class=\"ds-project-status\">Em edição</span><span class=\"ds-project-title\">Título do Short</span><span class=\"ds-project-meta\">Adicionar voz</span></span></button>",
+      "css": ".ds-project{font-family:\"Manrope Variable\",sans-serif;display:block;width:100%;max-width:370px;min-width:0;text-align:left;padding:0;background:#fffef9;border:1px solid #d9dccf;border-radius:12px;overflow:hidden;color:var(--ink,#292e29);cursor:pointer;transition:box-shadow .22s var(--ease,cubic-bezier(.16,1,.3,1)),border-color .22s}.ds-project:hover{border-color:#a8b398;box-shadow:0 8px 24px #2734210b}.ds-project:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;}.ds-project-art{display:block;position:relative;aspect-ratio:1.17;background:#e8dfcd;overflow:hidden}.ds-cover-placeholder{display:flex;height:100%;align-items:center;justify-content:center;padding:32px;font-size:29px;font-weight:750;text-align:center;letter-spacing:-.03em;color:var(--project-accent,var(--accent,#bd4b28))}.ds-format{position:absolute;bottom:12px;left:12px;background:#222821e8;color:#fffaf0;padding:5px 8px;border-radius:4px;font-size:11px;font-weight:650;font-variant-numeric:tabular-nums}.ds-format>span{font-size:9px;margin-left:6px;color:#c7d0bd}.ds-project-body{display:block;padding:20px}.ds-project-status{display:inline-flex;border-radius:5px;padding:4px 7px;background:#eeeee6;color:#5d6256;font-size:10px;line-height:1.5;font-weight:700}.ds-project-title{display:block;font-size:16px;line-height:1.65;letter-spacing:-.018em;margin:13px 0 12px;font-weight:700;overflow-wrap:anywhere}.ds-project-meta{display:block;font-size:11px;color:var(--muted,#686d63)}@media(prefers-reduced-motion:reduce){.ds-project{transition:none}}",
+      "refersTo": "project-card"
+    },
+    {
+      "name": "Abas do editor",
+      "kind": "nav",
+      "description": "As seis etapas do editor, com Pauta e agentes selecionada; exemplo de aparência sem controlar painéis neste catálogo.",
+      "html": "<div class=\"ds-tabs\" aria-label=\"Exemplo visual das etapas\"><button class=\"ds-tab ds-selected\" type=\"button\">Pauta e agentes</button><button class=\"ds-tab\" type=\"button\">Roteiro</button><button class=\"ds-tab\" type=\"button\">Cenas</button><button class=\"ds-tab\" type=\"button\">Voz e capa</button><button class=\"ds-tab\" type=\"button\">Publicação</button><button class=\"ds-tab\" type=\"button\">Versões</button></div>",
+      "css": ".ds-tabs{display:flex;align-items:center;border-bottom:1px solid #d9ddcf;padding:0 20px;overflow-x:auto;gap:20px;background:#fffef9}.ds-tab{font-family:\"Manrope Variable\",sans-serif;display:flex;align-items:center;gap:6px;white-space:nowrap;background:transparent;color:#646d5a;border:0;border-bottom:2px solid transparent;font-size:11px;font-weight:700;padding:19px 0 16px;cursor:pointer}.ds-tab.ds-selected{color:var(--accent,#bd4b28);border-bottom-color:var(--accent,#bd4b28)}.ds-tab:hover{color:var(--accent,#bd4b28)}.ds-tab:focus-visible{outline:3px solid var(--accent,#bd4b28);outline-offset:4px;}"
+    },
+    {
+      "name": "Aviso de conexão",
+      "kind": "custom",
+      "description": "Mensagem de erro com recuperação, exibida quando a API não responde.",
+      "html": "<div class=\"ds-notice\" role=\"alert\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 8v4M12 16h.01\"/></svg><span>Não foi possível conectar ao estúdio. Confira se a API está em execução.</span></div>",
+      "css": ".ds-notice{font-family:\"Manrope Variable\",sans-serif;display:flex;align-items:flex-start;gap:10px;padding:14px 16px;margin:14px 0;border-radius:7px;background:#f8e4dc;color:#973918;font-size:12px;line-height:1.7}.ds-notice>svg{flex-shrink:0;margin-top:2px}"
+    },
+    {
+      "name": "Etapas dos agentes",
+      "kind": "custom",
+      "description": "Lista reutilizada no acompanhamento. Exemplo estático de etapas aguardando, sem representar uma execução real; as cores adicionais reproduzem estados do CSS.",
+      "html": "<ol class=\"ds-agent-steps\" aria-label=\"Etapas dos agentes\"><li><span class=\"ds-step-dot\"></span><div><strong>Pesquisa</strong><small>Aguardando</small></div></li><li><span class=\"ds-step-dot\"></span><div><strong>Roteiro</strong><small>Aguardando</small></div></li><li><span class=\"ds-step-dot\"></span><div><strong>Animações e capa</strong><small>Aguardando</small></div></li><li><span class=\"ds-step-dot\"></span><div><strong>Conferência</strong><small>Aguardando</small></div></li><li><span class=\"ds-step-dot\"></span><div><strong>Narração</strong><small>Aguardando</small></div></li><li><span class=\"ds-step-dot\"></span><div><strong>Vídeo</strong><small>Aguardando</small></div></li></ol>",
+      "css": ".ds-agent-steps{font-family:\"Manrope Variable\",sans-serif;color:var(--ink,#292e29);list-style:none;padding:0;margin:30px 0 0}.ds-agent-steps li{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--line,#dcded4)}.ds-agent-steps strong{font-size:13px}.ds-agent-steps small{font-size:12px;display:block;margin-top:5px;color:var(--muted,#686d63);line-height:1.6;overflow-wrap:anywhere}.ds-step-dot{width:9px;height:9px;border:1px solid var(--muted,#686d63);border-radius:50%;margin-top:5px;flex-shrink:0}.ds-agent-steps .ds-succeeded .ds-step-dot{background:#467348;border-color:#467348}.ds-agent-steps .ds-running .ds-step-dot{background:var(--accent,#bd4b28);border-color:var(--accent,#bd4b28)}.ds-agent-steps .ds-failed .ds-step-dot{background:#aa302c;border-color:#aa302c}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Folha de contato e mesa de revisão",
+    "overview": "MyCut organiza a produção por agentes a partir da pauta e de seus materiais: pesquisa, roteiro, cenas, capa, voz e versões. A navegação escura recua diante da área clara de acompanhamento, revisão e edição; o vídeo vertical recebe um lugar próprio de revisão. A densidade é de ferramenta de trabalho, com títulos diretos, controles compactos e separação entre etapas.\n\nEsta é a linguagem implementada com direção escolhida em código, agora estendida a Conexões e Pauta e agentes. O objetivo autorizado desde o início é a produção por agentes; a entrega inicial limitada ao editor manual foi uma decisão do implementador, não uma redução de escopo aprovada pelo usuário. A edição manual permanece disponível para ajustes. A interface mantém Manrope, superfícies quentes e ações terracota entre projetos; a capa e a cor do vídeo pertencem à produção, e o laranja do Short sobre Claude não constitui uma regra permanente da marca.",
+    "keyCharacteristics": [
+      "Conteúdo real como identidade de cada produção.",
+      "Navegação escura, superfícies claras e ações terracota.",
+      "Tipografia Manrope local e numeração funcional das cenas.",
+      "Edição e prévia vertical lado a lado no computador.",
+      "Estados textuais para conexões, etapas dos agentes, produção e revisão.",
+      "Histórico com acesso aos materiais existentes de cada execução."
+    ],
+    "rules": [
+      {
+        "name": "The Cor da Produção Rule",
+        "body": "A cor editável do vídeo fica restrita à capa provisória e à composição da cena; não substitui a cor de ação do aplicativo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Uma Família Rule",
+        "body": "Preserve Manrope e use os papéis tipográficos existentes para diferenciar conteúdo, controle e metadado.",
+        "section": "typography"
+      },
+      {
+        "name": "The Profundidade Local Rule",
+        "body": "Reserve a sombra persistente para a prévia e a sombra de resposta para o cartão de produção, conforme os usos atuais.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Modelo Reportado Rule",
+        "body": "Separe resposta válida, modelo reportado pelo CLI e acesso da conta; catálogo ou declaração do próprio modelo não confirma identidade nem permissão de uso.",
+        "section": "components"
+      },
+      {
+        "name": "The Estado com Evidência Rule",
+        "body": "Use o estado e a mensagem da execução ou conexão correspondente; não apresente disponibilidade de CLI, chave salva ou etapa concluída como prova de todo o fluxo concluído.",
+        "section": "components"
+      },
+      {
+        "name": "The Revisão Explícita Rule",
+        "body": "Mantenha visíveis a atualidade do resultado, a presença de narração e a necessidade de revisão; a aparência de um player pronto não substitui esses estados.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** preservar a capa real e a cor de cada produção no contexto do vídeo.",
+      "**Do** reutilizar Manrope, os papéis tipográficos e os pares de cor extraídos.",
+      "**Do** manter rótulos para fila, falha, resultado anterior e revisão pendente.",
+      "**Do** preservar o rascunho durante a navegação para Conexões e os materiais reais de cada execução no histórico.",
+      "**Do** distinguir executor, CLI disponível, voz configurada e estado das etapas.",
+      "**Do** mostrar origem do catálogo, seleção testada e limites dos metadados de modelo ao apresentar um resultado.",
+      "**Do** aplicar foco visível, estados desabilitados e preferência de movimento reduzido.",
+      "**Do** verificar a interface no navegador antes de afirmar aprovação visual."
+    ],
+    "donts": [
+      "**Don't** promover o laranja do conteúdo Claude a restrição permanente da marca MyCut.",
+      "**Don't** preencher a biblioteca com produções, datas ou métricas fictícias.",
+      "**Don't** apresentar a composição estática como reprodução do vídeo final.",
+      "**Don't** confundir resultado disponível com resultado revisado ou publicação automática.",
+      "**Don't** apresentar o editor manual como substituição autorizada do objetivo de produção por agentes.",
+      "**Don't** apresentar testes com serviços externos simulados como execução real qualificada desses serviços.",
+      "**Don't** tratar catálogo, ID salvo ou resposta escrita pelo modelo como prova de acesso ou identidade; Codex não confirma identidade nesta implementação.",
+      "**Don't** tratar screenshot do vídeo como evidência visual da interface."
+    ]
+  }
+}

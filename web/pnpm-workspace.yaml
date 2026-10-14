@@ -1,0 +1,3 @@
+# O esbuild valida/prepara seu executável nativo durante a instalação.
+allowBuilds:
+  esbuild: true

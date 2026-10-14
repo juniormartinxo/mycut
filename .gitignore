@@ -1,0 +1,91 @@
+# Gravações e perfis pessoais
+/audios/
+/experiments/narration/prepared/
+/experiments/narration/results/
+
+# Ambientes Python e caches
+.venv/
+.venv-*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+*.egg-info/
+
+# Pesos de modelos
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.gguf
+
+# Mídia de execução e exportação (a capa em brand/ é versionada)
+*.wav
+*.mp3
+*.m4a
+*.aac
+*.flac
+*.ogg
+*.mp4
+*.mov
+*.mkv
+*.webm
+
+# Derivados de cada Short
+/shorts/*/audio/
+/shorts/*/assets/
+/shorts/*/inspection/
+/shorts/*/versions/
+/shorts/*/voice-tests/
+/shorts/*/index.html
+/shorts/*/capa.png
+/shorts/*/storyboard.jpg
+/shorts/*/timing.json
+/shorts/*/alignment.raw.json
+/shorts/*/alignment-review.json
+/shorts/*/legendas.srt
+/shorts/*/render-manifest.json
+/shorts/*/preview-manifest.json
+/shorts/*/verification.json
+/shorts/*/brand/previous-version.txt
+
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+!.env.sample
+credentials.json
+client_secret*.json
+token.json
+*.pem
+*.key
+/.agents/
+/.codex/
+/.vscode/
+/.idea/
+
+# Arquivos temporários e metadados do sistema
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.Zone.Identifier
+*:Zone.Identifier
+
+# Aplicação e ferramentas de frontend
+/.data/
+/.pnpm-store/
+node_modules/
+dist/
+/test-results/
+/web/test-results/
+/web/playwright-report/
+/.impeccable/review/
+/.impeccable/mocks/
