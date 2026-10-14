@@ -22,8 +22,8 @@ const roles: { id: AgentRole; title: string; detail: string }[] = [
   },
   {
     id: "director",
-    title: "Direção visual e capa",
-    detail: "Planeja as animações, diagramas e a thumbnail.",
+    title: "Direção visual",
+    detail: "Planeja as animações e os diagramas das cenas.",
   },
   {
     id: "reviewer",

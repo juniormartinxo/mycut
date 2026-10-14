@@ -205,7 +205,7 @@ class AgentConnectionTests(unittest.TestCase):
 
     def test_research_prompt_explains_browser_or_its_absence(self):
         prompts = []
-        def capture(provider, model, folder, schema, web, navigator=None):
+        def capture(provider, model, folder, schema, web, navigator=None, images=None):
             prompts.append(((folder/'prompt.txt').read_text(), navigator))
             return [sys.executable, '-c', 'print(\'{"structured_output": {"ok": true}}\')']
         for prepared in ((None, 'Chrome não encontrado no Windows.'), ({'command': 'npx', 'args': []}, '')):

@@ -1,6 +1,7 @@
 import copy
 import io
 import json
+from PIL import PngImagePlugin
 import socket
 import subprocess
 import unittest
@@ -64,9 +65,9 @@ class VisualFormatTests(unittest.TestCase):
                     after = Image.open(io.BytesIO(self.client.post('/api/scene-preview', json=body).content))
                     headers.append(after.crop((0, 20, 360, 60)).tobytes())
                     self.assertEqual(before.crop((0, 60, 360, 640)).tobytes(), after.crop((0, 60, 360, 640)).tobytes())
-                    cover = visuals.cover_frame(body, fixtures.DIRECTION['cover'])
-                    expected = visuals.Composition({'title': fixtures.DIRECTION['cover']['headline'], 'layout': 'flow',
-                                                   'items': fixtures.DIRECTION['cover']['labels']}, body).frame()
+                    cover = visuals.cover_frame(body, fixtures.LEGACY_COVER)
+                    expected = visuals.Composition({'title': fixtures.LEGACY_COVER['headline'], 'layout': 'flow',
+                                                   'items': fixtures.LEGACY_COVER['labels']}, body).frame()
                     self.assertEqual(cover.crop((0, 60, 1080, 180)).tobytes(), expected.crop((0, 60, 1080, 180)).tobytes())
                 self.assertEqual(len(set(headers)), 3)
         response = self.edit(visual_style={'channel_name': '   '})
@@ -204,7 +205,11 @@ class VisualFormatTests(unittest.TestCase):
                   visual_style={'format_id': 'radar', 'media_mode': 'mixed', 'background': '#223344'})
         folder = DATA / 'projects' / self.project['id'] / 'test-cover'
         folder.mkdir(parents=True)
-        cover = pipeline.cover_image({**self.project, 'visual_style': {'format_id': 'editorial'}}, pipeline.Cover(**fixtures.DIRECTION['cover']), folder)
+        # Covers made by the former director keep following the project's current format.
+        info = PngImagePlugin.PngInfo()
+        info.add_text('mycut_provenance', json.dumps({'generator': 'MyCut format renderer', 'agent_concept': fixtures.LEGACY_COVER}))
+        visuals.cover_frame({**self.project, 'visual_style': {'format_id': 'editorial'}}, fixtures.LEGACY_COVER).save(folder / 'cover.png', pnginfo=info)
+        cover = {'name': 'Capa antiga', 'path': str((folder / 'cover.png').relative_to(DATA)), 'sha256': ''}
         current = store.update_project(self.project['id'], {'cover': cover}, self.project['revision'])
         job = store.enqueue(current['id'], 'preview', current['revision'])
         run_once()
@@ -243,8 +248,7 @@ class VisualFormatTests(unittest.TestCase):
         self.assertEqual(prompts['Script']['visual_style']['format_id'], 'impact')
         self.assertEqual(prompts['Direction']['visual_style']['font'], 'mono')
         self.assertEqual(saved['accent'], '#883311')
-        with Image.open(DATA / saved['cover']['path']) as cover:
-            self.assertEqual(cover.getpixel((0, 200)), (238, 221, 136))
+        self.assertNotIn('cover', saved)
 
     def test_each_format_has_animation_and_renders_a_real_video(self):
         scene = {'title': 'Uma ideia por vez', 'narration': 'Você escolhe. O agente executa.', 'layout': 'flow', 'items': ['Seu pedido', 'Resultado']}

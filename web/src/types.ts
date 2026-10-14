@@ -44,7 +44,7 @@ export type Job = {
   message: string;
   revision: number;
   created_at: number;
-  kind: "render" | "pipeline" | "plan" | "voice" | "scenes";
+  kind: "render" | "pipeline" | "plan" | "voice" | "scenes" | "cover";
   materials: string[];
   steps: { name: string; state: string; message: string; updated_at: number }[];
   output: null | {
@@ -62,6 +62,8 @@ export type Material = {
   sha256: string;
   duration?: number;
   script_hash?: string;
+  /** "<message id>/<image id>" when the cover was chosen in the cover chat. */
+  chat_image?: string;
 };
 export type Project = {
   id: string;
@@ -97,7 +99,7 @@ export type UsageTotal = {
   unpriced: number;
 };
 export type UsageCall = {
-  step: "research" | "writer" | "director" | "reviewer" | "voice";
+  step: "research" | "writer" | "director" | "reviewer" | "voice" | "cover";
   attempt: number;
   provider: AgentChoice["provider"] | "elevenlabs";
   requested_model: string;
@@ -228,4 +230,16 @@ export type Health = {
   status: string;
   worker_online: boolean;
   ffmpeg: boolean;
+};
+export type CoverMessage = {
+  id: string;
+  created_at: number;
+  state: Job["state"];
+  status: string;
+  provider: AgentChoice["provider"];
+  model: string;
+  text: string;
+  attachments: { name: string; url: string }[];
+  reply: string;
+  images: { id: string; url: string; width: number; height: number }[];
 };

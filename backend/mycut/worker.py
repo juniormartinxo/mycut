@@ -1,23 +1,30 @@
-"""One durable worker; each render runs in a cancellable process group."""
+"""One durable worker; each render runs in a cancellable process group.
+Cover chat generations use their own lane, so a long production never delays them."""
 import fcntl
 import json
 import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from . import store
 from .config import DATA, configure
 
 
-def run_once():
-    job = store.claim()
+MODULES = {'render': 'mycut.production', 'cover': 'mycut.covers'}
+MESSAGES = {'plan': 'Roteiro e cenas prontos', 'scenes': 'Cenas recriadas pelos agentes',
+            'voice': 'Narração gerada pela ElevenLabs', 'cover': 'Imagem pronta'}
+
+
+def run_once(covers=False):
+    job = store.claim(covers)
     if not job:
         return False
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
     with (folder / 'worker.log').open('wb') as log:
-        module = 'mycut.production' if job['kind'] == 'render' else 'mycut.pipeline'
+        module = MODULES.get(job['kind'], 'mycut.pipeline')
         process = subprocess.Popen([sys.executable, '-m', module, job['id']],
                                    stdout=log, stderr=log, start_new_session=True)
         try:
@@ -45,7 +52,7 @@ def run_once():
     if store.get_job(job['id'])['state'] != 'cancelled':
         if code == 0:
             output = json.loads((folder / 'result.json').read_text())
-            message = {'plan': 'Roteiro, cenas e capa prontos', 'scenes': 'Cenas e capa recriadas pelos agentes', 'voice': 'Narração gerada pela ElevenLabs'}.get(job['kind'], 'Pronto para revisar')
+            message = MESSAGES.get(job['kind'], 'Pronto para revisar')
             store.finish(job['id'], 'succeeded', message, output)
         else:
             message = (folder / 'worker.log').read_text(errors='replace').strip().splitlines()
@@ -64,10 +71,13 @@ def main():
         store.recover()
         print('MyCut worker pronto.', flush=True)
         signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-        while True:
-            store.heartbeat()
-            if not run_once():
-                time.sleep(1)
+        def lane(covers):
+            while True:
+                store.heartbeat()
+                if not run_once(covers):
+                    time.sleep(1)
+        threading.Thread(target=lane, args=(True,), daemon=True, name='covers').start()
+        lane(False)
 
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-"""Editorial agents -> verified script/design -> ElevenLabs -> animated Short."""
+"""Editorial agents -> verified script/design -> ElevenLabs -> animated Short. Covers are made in covers.py."""
 import json
 import shutil
 import sys
@@ -7,10 +7,9 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
-from PIL import Image, ImageDraw, PngImagePlugin
 from . import bridge, costs, integrations, elevenlabs, store, visuals, scene_images
 from .config import DATA
-from .media import digest, data_path
+from .media import data_path
 from .models import Scene
 
 
@@ -67,16 +66,9 @@ class Visual(Output):
         return self
 
 
-class Cover(Output):
-    headline: str = Field(min_length=1, max_length=65)
-    subtitle: str = Field(min_length=1, max_length=90)
-    labels: list[Annotated[str, Field(min_length=1, max_length=70)]] = Field(min_length=1, max_length=3)
-
-
 class Direction(Output):
     accent: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
     scenes: list[Visual] = Field(min_length=1, max_length=12)
-    cover: Cover
 
 
 class Review(Output):
@@ -117,7 +109,7 @@ Mantenha marcas com grafia correta, narração de leitura natural, sem tags teat
 
 def agent(job, role, instructions, payload, model, web=False, attempt=1):
     config = job['snapshot']['_agents'][role]
-    label = {'research': 'Pesquisa', 'writer': 'Roteiro', 'director': 'Cenas e capa', 'reviewer': 'Conferência'}[role]
+    label = {'research': 'Pesquisa', 'writer': 'Roteiro', 'director': 'Cenas', 'reviewer': 'Conferência'}[role]
     store.step(job['id'], role, 'running', f'{label} · {config["provider"]}')
     store.progress(job['id'], {'research': 5, 'writer': 15, 'director': 25, 'reviewer': 35}[role], f'{label}: agente {config["provider"]} trabalhando')
     prompt = RULES + '\n' + instructions + '\nDADOS:\n' + json.dumps(payload, ensure_ascii=False)
@@ -154,35 +146,6 @@ def validate_research(research):
         raise ValueError('O agente apresentou um fato sem uma fonte correspondente.')
 
 
-def cover_image(project, concept, folder):
-    if project.get('visual_style'):
-        image = visuals.cover_frame(project, concept.model_dump())
-        path = folder / 'generated-cover.png'
-        info = PngImagePlugin.PngInfo()
-        info.add_text('mycut_provenance', json.dumps({'generator': 'MyCut format renderer', 'agent_concept': concept.model_dump(),
-                                                    'visual_style': project['visual_style']}, ensure_ascii=False))
-        image.save(path, pnginfo=info)
-        return {'path': str(path.relative_to(DATA)), 'name': 'Capa criada pelo agente de direção', 'sha256': digest(path)}
-    from .production import graphics, wrapped
-    image = Image.new('RGB', (1080, 1920), '#f7f3eb')
-    draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 0, 1080, 38), fill=project['accent'])
-    graphics.text(draw, (90, 135), 'MYCUT', 34, '#29231f', True, anchor='lm')
-    wrapped(draw, concept.headline.upper(), 335, 96, project['accent'], width=880)
-    for i, label in enumerate(concept.labels):
-        y = 900+i*200
-        draw.rounded_rectangle((115, y, 965, y+145), radius=25, fill='#eee4d6')
-        wrapped(draw, label, y+72, 45, width=770, centered=True)
-        if i < len(concept.labels)-1:
-            graphics.arrow(draw, (540,y+155), (540,y+190), project['accent'], 6)
-    wrapped(draw, concept.subtitle, 1650, 43, width=850)
-    path = folder / 'generated-cover.png'
-    info = PngImagePlugin.PngInfo()
-    info.add_text('mycut_provenance', json.dumps({'generator': 'MyCut geometry renderer', 'agent_concept': concept.model_dump()}, ensure_ascii=False))
-    image.save(path, pnginfo=info)
-    return {'path': str(path.relative_to(DATA)), 'name': 'Capa criada pelo agente de direção', 'sha256': digest(path)}
-
-
 def create_direction(job, script, research, issues, attempt=1):
     """Reject empty visuals and give the director one bounded correction attempt."""
     snapshot = job['snapshot']
@@ -198,8 +161,8 @@ def create_direction(job, script, research, issues, attempt=1):
                 'comparison exige exatamente 2 opções; statement exige ao menos 1 destaque. '
                 'Nunca entregue items vazio, espaços em branco ou textos genéricos como "sua ideia em destaque". '
                 'Cada rótulo deve ter até 100 caracteres. Use somente as informações do roteiro e da pesquisa. '
-                'Se preferred_accent estiver definido, use exatamente essa cor nas cenas e na capa; caso contrário, '
-                'escolha uma cor com boa leitura em fundo creme. Crie uma capa com headline, subtítulo e 1 a 3 rótulos. '
+                'Se preferred_accent estiver definido, use exatamente essa cor nas cenas; caso contrário, '
+                'escolha uma cor com boa leitura em fundo creme. '
                 'Corrija os problemas em issues_to_fix. Não altere a narração. '
                 'Respeite visual_style: formato, fonte, fundo e texto já escolhidos. '
                 'Se available_images tiver imagens pertinentes à fala, use o id em image_id nas cenas que se beneficiam delas; '
@@ -235,7 +198,7 @@ def recreate_scenes(job, folder):
     for attempt in (1, 2):
         direction = create_direction(job, script, research, issues, attempt)
         review = agent(job, 'reviewer',
-            'Confira se cada cena e a capa explicam o roteiro fornecido, sem inventar afirmações. '
+            'Confira se cada cena explica o roteiro fornecido, sem inventar afirmações. '
             'Compare com a pesquisa quando disponível. Verifique os textos em items e a clareza dos diagramas. '
             'Reprove conteúdo ausente ou sem suporte. A narração deve permanecer intacta.',
             {'script': script, 'research': research, 'direction': direction.model_dump()}, Review, attempt=attempt)
@@ -249,7 +212,6 @@ def recreate_scenes(job, folder):
                          for visual, narration in zip(direction.scenes, script['narration'])],
               'accent': direction.accent, 'visual_review': review.model_dump(),
               'images': project.get('images', []), 'image_notes': project.get('image_notes', [])}
-    values['cover'] = cover_image({**project, **values}, direction.cover, folder)
     # Same narration, so the existing audio and its alignment remain valid.
     job = store.checkpoint(job['id'], values)
     save_editorial(job, folder)
@@ -302,7 +264,6 @@ def produce(job):
                   'sources': '\n'.join(s.url for s in research.sources), 'scenes': scenes, 'accent': direction.accent,
                   'research': research.model_dump(), 'agent_review': review.model_dump(),
                   'images': job['snapshot'].get('images', []), 'image_notes': job['snapshot'].get('image_notes', [])}
-        values['cover'] = cover_image({**job['snapshot'], **values}, direction.cover, folder)
         # A newly written script must never inherit the old project's narration.
         values['audio'] = None
         job = store.checkpoint(job['id'], values)

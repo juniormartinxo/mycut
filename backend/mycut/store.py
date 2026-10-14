@@ -56,8 +56,12 @@ def initialize():
                 mode TEXT NOT NULL, state TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0,
                 message TEXT NOT NULL, snapshot TEXT NOT NULL, output TEXT,
                 created_at REAL NOT NULL, updated_at REAL NOT NULL);
-            CREATE UNIQUE INDEX IF NOT EXISTS one_active_job_per_project
-                ON jobs(project_id) WHERE state IN ('queued','running');
+            -- Cover chat generations run beside a production, one of each per project.
+            DROP INDEX IF EXISTS one_active_job_per_project;
+            CREATE UNIQUE INDEX IF NOT EXISTS one_active_production_per_project
+                ON jobs(project_id) WHERE state IN ('queued','running') AND mode != 'cover';
+            CREATE UNIQUE INDEX IF NOT EXISTS one_active_cover_per_project
+                ON jobs(project_id) WHERE state IN ('queued','running') AND mode = 'cover';
             CREATE TABLE IF NOT EXISTS worker_status (id INTEGER PRIMARY KEY CHECK(id=1), heartbeat REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS job_steps (
                 job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -109,7 +113,7 @@ def update_project(project_id, changes, revision):
         current = project_row(db.execute('SELECT * FROM projects WHERE id=?', (project_id,)).fetchone())
         if current['revision'] != revision:
             raise Conflict('O projeto mudou em outra tela. Reabra-o antes de salvar.')
-        if db.execute("SELECT 1 FROM jobs WHERE project_id=? AND state IN ('queued','running')", (project_id,)).fetchone():
+        if db.execute("SELECT 1 FROM jobs WHERE project_id=? AND state IN ('queued','running') AND mode != 'cover'", (project_id,)).fetchone():
             raise Conflict('Espere a produção terminar ou cancele-a antes de editar.')
         current.update(changes, revision=revision + 1)
         for key in ('id', 'created_at', 'updated_at'):
@@ -127,7 +131,7 @@ def job_row(row, private=False):
     job['revision'] = snapshot['revision']
     job['kind'] = snapshot.get('_kind', 'render')
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
-    job['materials'] = (['input.json'] if job['kind'] != 'render' else []) + [
+    job['materials'] = [] if job['kind'] == 'cover' else (['input.json'] if job['kind'] != 'render' else []) + [
         name for name in ('roteiro.txt', 'publicacao.txt', 'capa.png', 'narracao.wav')
         if job['state'] in ('succeeded', 'failed', 'cancelled') and (folder / name).is_file()]
     with connect() as db:
@@ -138,10 +142,18 @@ def job_row(row, private=False):
     return job
 
 
-def jobs(project_id=None):
+def jobs(project_id=None, covers=False):
+    """Productions only; cover chat generations are listed by cover_jobs and, with covers=True, for costs."""
+    kinds = '' if covers else " AND mode != 'cover'"
     with connect() as db:
-        rows = db.execute('SELECT * FROM jobs WHERE project_id=? ORDER BY created_at DESC', (project_id,)) if project_id else db.execute('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 100')
+        rows = db.execute(f'SELECT * FROM jobs WHERE project_id=?{kinds} ORDER BY created_at DESC', (project_id,)) if project_id else db.execute(f'SELECT * FROM jobs WHERE 1{kinds} ORDER BY created_at DESC LIMIT 100')
         return [job_row(row) for row in rows]
+
+
+def cover_jobs(project_id, private=False):
+    with connect() as db:
+        rows = db.execute("SELECT * FROM jobs WHERE project_id=? AND mode='cover' ORDER BY created_at", (project_id,))
+        return [job_row(row, private) for row in rows]
 
 
 def get_job(job_id, private=False):
@@ -164,7 +176,7 @@ def enqueue(project_id, mode, revision, kind='render', settings=None):
         if kind == 'render' and mode == 'final' and not project.get('audio'):
             raise Conflict('Importe a narração antes de gerar o vídeo final.')
         if kind == 'render' and project.get('audio') and project['audio']['script_hash'] != script_hash(project):
-            raise Conflict('O roteiro mudou. Confira a narração na aba Voz e confirme a correspondência.')
+            raise Conflict('O roteiro mudou. Confira a narração na aba Áudio e confirme a correspondência.')
         if kind in ('pipeline', 'plan') and not project.get('brief', '').strip():
             raise Conflict('Informe a pauta ou o link na aba Pauta para iniciar os agentes.')
         if kind != 'render':
@@ -181,6 +193,23 @@ def enqueue(project_id, mode, revision, kind='render', settings=None):
     return get_job(job_id)
 
 
+def enqueue_cover(project_id, request, job_id=None):
+    """A cover chat turn: snapshot of the project plus the message, never blocked by edits."""
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        project = project_row(db.execute('SELECT * FROM projects WHERE id=?', (project_id,)).fetchone())
+        project['_kind'] = 'cover'
+        project['_cover'] = request
+        job_id, now = job_id or uid(), time.time()
+        try:
+            db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',
+                       (job_id, project_id, 'cover', 'queued', 0, 'Aguardando o worker', json.dumps(project, ensure_ascii=False), None, now, now))
+            db.execute('INSERT INTO job_inputs VALUES(?,?)', (job_id, json.dumps(project, ensure_ascii=False)))
+        except sqlite3.IntegrityError as exc:
+            raise Conflict('Espere a imagem atual ficar pronta antes de enviar outra mensagem.') from exc
+    return get_job(job_id)
+
+
 def job_input(job_id):
     with connect() as db:
         row = db.execute('SELECT snapshot FROM job_inputs WHERE job_id=?', (job_id,)).fetchone()
@@ -189,10 +218,11 @@ def job_input(job_id):
         return json.loads(row['snapshot'])
 
 
-def claim():
+def claim(covers=False):
+    """Productions and cover generations are claimed by separate worker lanes."""
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
-        row = db.execute("SELECT * FROM jobs WHERE state='queued' ORDER BY created_at LIMIT 1").fetchone()
+        row = db.execute(f"SELECT * FROM jobs WHERE state='queued' AND mode {'=' if covers else '!='} 'cover' ORDER BY created_at LIMIT 1").fetchone()
         if row is None:
             return None
         db.execute("UPDATE jobs SET state='running', message='Preparando produção', updated_at=? WHERE id=?", (time.time(), row['id']))

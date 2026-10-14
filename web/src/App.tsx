@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { ProductionDraft } from "./Automation";
 import { Connections } from "./Connections";
+import { CoverStudio } from "./CoverStudio";
 import { FormatPicker, RenderedScene, initialStyle } from "./FormatPicker";
 import { money, ProjectCosts, tokens } from "./ProjectCosts";
 import { SettingsMenu } from "./SettingsMenu";
@@ -68,7 +69,8 @@ const tabs: { id: Tab; name: string; icon: typeof FileText }[] = [
   { id: "brief", name: "Pauta e agentes", icon: Clapperboard },
   { id: "script", name: "Roteiro", icon: FileText },
   { id: "scenes", name: "Cenas", icon: Layers },
-  { id: "media", name: "Voz e capa", icon: Headphones },
+  { id: "audio", name: "Áudio", icon: Headphones },
+  { id: "cover", name: "Capa", icon: ImagePlus },
   { id: "publication", name: "Publicação", icon: Upload },
   { id: "versions", name: "Versões", icon: Film },
   { id: "costs", name: "Custos", icon: Coins },
@@ -871,9 +873,9 @@ function Editor({
                 </div>
                 <p className="connection-help">
                   Os agentes substituem o roteiro e as cenas atuais. As versões
-                  anteriores ficam preservadas. O fluxo completo também gera
-                  capa e voz ElevenLabs e renderiza o vídeo em 1080p. A voz
-                  consome créditos da sua conta.
+                  anteriores ficam preservadas. O fluxo completo também gera a
+                  voz ElevenLabs e renderiza o vídeo em 1080p. A voz consome
+                  créditos da sua conta. A capa é criada à parte, na aba Capa.
                 </p>
                 <AgentSteps job={running || project.jobs[0]} />
               </>
@@ -996,8 +998,8 @@ function Editor({
                     </button>
                   )}
                   <p>
-                    Direção visual e conferência recriam as cenas e a capa. O
-                    roteiro e a voz são preservados. Usa a cota dos CLIs.
+                    Direção visual e conferência recriam as cenas. O roteiro, a
+                    voz e a capa são preservados. Usa a cota dos CLIs.
                   </p>
                   {project.jobs[0]?.kind === "scenes" && (
                     <AgentSteps job={project.jobs[0]} />
@@ -1230,7 +1232,7 @@ function Editor({
                 </div>
               </>
             )}
-            {tab === "media" && (
+            {tab === "audio" && (
               <>
                 <div className="section-heading">
                   <div>
@@ -1331,36 +1333,35 @@ function Editor({
                     não é enviada a um serviço externo.
                   </p>
                 </div>
-                <div className="media-block">
-                  <h3>
-                    <ImagePlus size={18} />
-                    Capa do Short
-                  </h3>
-                  <div className="cover-upload">
-                    {draft.cover ? (
-                      <img src={draft.cover.url} alt="Capa selecionada" />
-                    ) : (
-                      <div className="mini-placeholder">
-                        <ImagePlus size={30} />
-                      </div>
-                    )}
-                    <div>
-                      <p>
-                        {draft.cover
-                          ? "Sua capa será incluída no pacote de publicação."
-                          : "Sem capa importada, usamos a primeira cena."}
-                      </p>
-                      <UploadControl
-                        kind="cover"
-                        label={draft.cover ? "Trocar capa" : "Importar capa"}
-                        disabled={locked}
-                        onFile={(file) => upload("cover", file)}
-                      />
-                      <small>PNG, JPG ou WebP · até 15 MB · formato 9:16</small>
-                    </div>
-                  </div>
-                </div>
               </>
+            )}
+            {tab === "cover" && (
+              <CoverStudio
+                project={draft}
+                locked={locked}
+                settings={settings}
+                onConnect={onConnect}
+                onUpload={(file) => upload("cover", file)}
+                onChoose={(job, image) =>
+                  void action(async () => {
+                    const current = dirty ? await save() : draft;
+                    accept(
+                      await request<Project>(
+                        `/projects/${project.id}/cover/select`,
+                        {
+                          method: "POST",
+                          body: JSON.stringify({
+                            job_id: job,
+                            image_id: image,
+                            revision: current.revision,
+                          }),
+                        },
+                      ),
+                    );
+                    setNotice("Capa atualizada.");
+                  })
+                }
+              />
             )}
             {tab === "publication" && (
               <>
@@ -1442,7 +1443,7 @@ function Editor({
                             {j.kind === "plan"
                               ? "Roteiro e cenas"
                               : j.kind === "scenes"
-                                ? "Cenas e capa"
+                                ? "Cenas"
                                 : j.kind === "voice"
                                   ? "Narração"
                                   : j.mode === "final"
@@ -1720,7 +1721,7 @@ function Queue({
                   {j.kind === "plan"
                     ? "Roteiro e cenas"
                     : j.kind === "scenes"
-                      ? "Cenas e capa"
+                      ? "Cenas"
                       : j.kind === "voice"
                         ? "Narração"
                         : j.mode === "final"

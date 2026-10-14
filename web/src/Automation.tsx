@@ -82,7 +82,7 @@ export function ConnectionHint({
 const stepNames: Record<string, string> = {
   research: "Pesquisa",
   writer: "Roteiro",
-  director: "Animações e capa",
+  director: "Animações",
   reviewer: "Conferência",
   voice: "Narração",
   render: "Vídeo",

@@ -5,7 +5,8 @@ export type Tab =
   | "brief"
   | "script"
   | "scenes"
-  | "media"
+  | "audio"
+  | "cover"
   | "publication"
   | "versions"
   | "costs";
@@ -34,7 +35,8 @@ const tabs = new Set<Tab>([
   "brief",
   "script",
   "scenes",
-  "media",
+  "audio",
+  "cover",
   "publication",
   "versions",
   "costs",
@@ -63,10 +65,12 @@ export function readRoute(hash: string): Route {
       };
   }
   if (section === "producoes" && id && projectId.test(id) && !extra) {
+    // "media" was the combined voice and cover tab; its links now open Áudio.
+    const known = tab === "media" ? "audio" : tab;
     return {
       ...home,
       projectId: id,
-      ...(tabs.has(tab as Tab) ? { tab: tab as Tab } : {}),
+      ...(tabs.has(known as Tab) ? { tab: known as Tab } : {}),
     };
   }
   if (!id) {

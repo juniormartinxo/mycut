@@ -149,3 +149,10 @@ class AgentRunRequest(BaseModel):
     kind: Literal['pipeline', 'plan', 'voice', 'scenes'] = 'pipeline'
     mode: Literal['preview', 'final'] = 'final'
     revision: int = Field(ge=1)
+
+
+class CoverChoice(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    job_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    image_id: str = Field(pattern=r'^[0-9]{1,2}$')
+    revision: int = Field(ge=1)

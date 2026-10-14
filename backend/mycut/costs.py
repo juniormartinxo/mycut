@@ -159,6 +159,6 @@ def project(project_id, pricing):
         settle(usage_id)
     if pending:
         rows = store.usage_rows(project_id)
-    jobs = store.jobs(project_id)
+    jobs = store.jobs(project_id, covers=True)
     running = {job['id'] for job in jobs if job['state'] in ('queued', 'running')}
     return summary(jobs, rows, pricing, running)

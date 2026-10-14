@@ -5,7 +5,7 @@ import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, HTTPException, Request, Query
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -14,9 +14,9 @@ from fastapi.exceptions import RequestValidationError
 from PIL import UnidentifiedImageError, Image
 from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
-from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings
+from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
-from . import voice_tests
+from . import voice_tests, covers
 from . import visuals
 from .models import ScenePreview
 from .seed import blank, claude, initialize_example
@@ -377,6 +377,73 @@ def upload(project_id: str, kind: str, file: UploadFile, revision: int = Query(g
         raise
     finally:
         file.file.close()
+
+
+@app.get('/api/projects/{project_id}/cover/messages')
+def cover_messages(project_id: str):
+    store.get_project(project_id)
+    return covers.messages(project_id)
+
+
+@app.post('/api/projects/{project_id}/cover/messages', status_code=202)
+def send_cover_message(project_id: str, text: str = Form(max_length=2000), provider: str = Form(),
+                       model: str = Form('', max_length=150), files: list[UploadFile] | None = File(None)):
+    """One chat turn: the chosen agent creates one image; nothing in the project changes until one is chosen."""
+    files = files or []
+    try:
+        store.get_project(project_id)
+        if not text.strip():
+            raise ValueError('Escreva o que você quer na capa.')
+        if provider not in bridge.PROVIDERS:
+            raise ValueError('Escolha um agente válido.')
+        choice = {'provider': provider, 'model': model.strip()}
+        agent_models.validate(choice)
+        bridge.require_images()
+        bridge.require([provider])
+        if len(files) > covers.MAX_ATTACHMENTS:
+            raise ValueError(f'Envie até {covers.MAX_ATTACHMENTS} imagens por mensagem.')
+        job_id = store.uid()
+        folder = DATA / 'projects' / project_id / 'renders' / job_id
+        try:
+            attachments = []
+            for index, upload in enumerate(files, 1):
+                path = folder / 'attachments' / f'{index}.png'
+                covers.import_attachment(upload.file.read(15 * 1024 * 1024 + 1), path)
+                attachments.append({'name': (upload.filename or f'Imagem {index}')[:200], 'path': str(path.relative_to(DATA))})
+            turns, reference = covers.history(project_id)
+            store.enqueue_cover(project_id, {'text': text.strip(), **choice, 'attachments': attachments,
+                                             'history': turns, 'reference': reference}, job_id)
+        except BaseException:
+            shutil.rmtree(folder, ignore_errors=True)
+            raise
+        return covers.public(store.get_job(job_id, private=True))
+    finally:
+        for upload in files:
+            upload.file.close()
+
+
+@app.get('/api/projects/{project_id}/cover/{job_id}/{kind}/{name}')
+def cover_file(project_id: str, job_id: str, kind: str, name: str):
+    if kind not in ('attachments', 'images'):
+        raise HTTPException(404, 'Imagem não encontrada.')
+    return FileResponse(covers.file(project_id, job_id, kind, name), media_type='image/png')
+
+
+@app.post('/api/projects/{project_id}/cover/select')
+def select_cover(project_id: str, body: CoverChoice):
+    job, record = covers.image(project_id, body.job_id, body.image_id)
+    folder = DATA / 'projects' / project_id / 'uploads'
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / (store.uid() + '-cover.png')
+    try:
+        media.cover(media.data_path(record['path']), target)
+        provider = job['snapshot']['_cover']['provider']
+        cover = {'name': f'Capa criada no chat · {covers.NAMES[provider]}', 'path': str(target.relative_to(DATA)),
+                 'sha256': media.digest(target), 'chat_image': f'{body.job_id}/{body.image_id}'}
+        return present(store.update_project(project_id, {'cover': cover}, body.revision))
+    except BaseException:
+        target.unlink(missing_ok=True)
+        raise
 
 
 @app.post('/api/projects/{project_id}/confirm-audio')

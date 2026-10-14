@@ -10,6 +10,7 @@ const steps: Record<UsageCall["step"], string> = {
   director: "Direção visual",
   reviewer: "Conferência",
   voice: "Narração",
+  cover: "Capa",
 };
 const providers: Record<UsageCall["provider"], string> = {
   codex: "Codex",
@@ -20,7 +21,8 @@ const providers: Record<UsageCall["provider"], string> = {
 const kinds: Record<ProjectUsage["versions"][number]["kind"], string> = {
   pipeline: "Produção com agentes",
   plan: "Roteiro e cenas",
-  scenes: "Cenas e capa",
+  scenes: "Cenas",
+  cover: "Capa",
   voice: "Narração",
   render: "Renderização",
 };

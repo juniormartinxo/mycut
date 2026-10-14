@@ -275,7 +275,7 @@ Codex permanece em `unknown` nesta implementação, mesmo quando responde corret
 
 ### Navigation
 
-A navegação principal contém Produções, Fila de produção e Conexões. Seleção e hover usam superfícies próprias. Pauta e agentes, Roteiro, Cenas, Voz e capa, Publicação e Versões têm linha terracota na aba selecionada. O markup declara `tablist`, `tab`, `tabpanel` e suas relações; isso não comprova navegação completa por setas. Foco e operação por teclado exigem teste no navegador.
+A navegação principal contém Produções, Fila de produção e Conexões. Seleção e hover usam superfícies próprias. Pauta e agentes, Roteiro, Cenas, Áudio, Capa, Publicação e Versões têm linha terracota na aba selecionada. O markup declara `tablist`, `tab`, `tabpanel` e suas relações; isso não comprova navegação completa por setas. Foco e operação por teclado exigem teste no navegador.
 
 ### Pauta, conexões e etapas
 
@@ -283,7 +283,7 @@ Novo Short começa em “Da pauta ao Short.” e oferece Short completo, Roteiro
 
 O rascunho da nova produção — pauta, título e opção escolhida — fica no estado de App e sobrevive à ida a Conexões e ao retorno pela navegação interna. É limpo depois da criação bem-sucedida; não há persistência desse rascunho após recarregar ou fechar a aba. No editor de projeto existente, sair com alterações não salvas continua sujeito à confirmação de descarte.
 
-Etapas apresentam Pesquisa, Roteiro, Animações e capa, Conferência, Narração e Vídeo conforme o tipo de execução. Nome, ponto de estado e mensagem formam uma linha. Etapas sem registro mostram “Aguardando”, ou “Não executada” depois de falha/cancelamento. Trabalho apenas de narração mostra a etapa de voz; render isolado não mostra essa lista. O fluxo implementado conecta agentes CLI, ElevenLabs e render; agendamento diário e envio ao YouTube continuam pendentes, como partes do objetivo original.
+Etapas apresentam Pesquisa, Roteiro, Animações, Conferência, Narração e Vídeo conforme o tipo de execução. Nome, ponto de estado e mensagem formam uma linha. Etapas sem registro mostram “Aguardando”, ou “Não executada” depois de falha/cancelamento. Trabalho apenas de narração mostra a etapa de voz; render isolado não mostra essa lista. O fluxo implementado conecta agentes CLI, ElevenLabs e render; agendamento diário e envio ao YouTube continuam pendentes, como partes do objetivo original.
 
 **The Estado com Evidência Rule.** Use o estado e a mensagem da execução ou conexão correspondente; não apresente disponibilidade de CLI, chave salva ou etapa concluída como prova de todo o fluxo concluído.
 

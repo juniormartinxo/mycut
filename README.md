@@ -76,16 +76,16 @@ Os seletores recebem IDs do cache local de modelos do Codex/Grok e da inicializa
 ## Fluxo de produção
 
 1. Pesquisa abre fontes e reúne fatos com referências. Se não conseguir verificar a pauta, o fluxo para.
-2. Roteiro cria narração, título, descrição e tags. Direção visual cria cenas de animação/fluxo e o conceito da capa, desenhada pelo renderizador geométrico local.
+2. Roteiro cria narração, título, descrição e tags. Direção visual cria cenas de animação/fluxo. A capa não faz parte deste fluxo: ela é criada à parte, na aba **Capa**.
 3. Conferência compara as afirmações com a pesquisa. Pode pedir uma correção; se reprovar novamente, o fluxo para antes da voz.
 4. ElevenLabs gera a narração usando a voz salva. Pillow/FFmpeg renderizam o Short em 1080 × 1920, com cenas animadas e legendas.
 5. Você acompanha as etapas, assiste ao resultado e baixa vídeo, capa, legendas, roteiro, publicação e manifesto.
 
-A conferência automática é uma etapa editorial, não uma garantia de verdade. A revisão final continua disponível antes de publicar. O agente de direção usa cenas de fluxo, comparação e destaque; no modo com imagens, pode selecionar uma imagem pertinente da biblioteca ou das fontes verificadas. Esta versão não gera ilustrações raster, mascotes ou logos novos por modelo de imagem.
+A conferência automática é uma etapa editorial, não uma garantia de verdade. A revisão final continua disponível antes de publicar. O agente de direção usa cenas de fluxo, comparação e destaque; no modo com imagens, pode selecionar uma imagem pertinente da biblioteca ou das fontes verificadas. As cenas não usam ilustrações geradas por modelo de imagem; isso acontece somente no chat da capa.
 
-O editor permanece para ajustar o material, importar voz/capa, gerar apenas a narração ou renderizar novamente sem pagar por outra voz. Comparações têm dois lados. Limites de edição: 12 cenas, 500 palavras, áudio até 3 minutos e 100 MB; capa até 15 MB. A geração ElevenLabs aceita até 4.000 caracteres. O agente de roteiro trabalha com até 180 palavras e 3 a 8 cenas.
+O editor permanece para ajustar o material, importar voz (aba **Áudio**) ou capa (aba **Capa**), gerar apenas a narração ou renderizar novamente sem pagar por outra voz. Comparações têm dois lados. Limites de edição: 12 cenas, 500 palavras, áudio até 3 minutos e 100 MB; capa até 15 MB. A geração ElevenLabs aceita até 4.000 caracteres. O agente de roteiro trabalha com até 180 palavras e 3 a 8 cenas.
 
-Na aba **Cenas**, **Criar cenas com agentes** recupera cenas incompletas; quando preenchidas, a ação aparece como **Refazer cenas com agentes**. Ela salva os ajustes abertos, chama apenas Direção visual e Conferência e recria os diagramas e a capa, preservando o roteiro e o áudio. Usa a cota dos CLIs, sem gerar outra voz. Fluxos exigem de dois a quatro textos, comparações exatamente dois e destaques ao menos um; respostas vazias recebem uma tentativa automática de correção e não são publicadas se continuarem inválidas.
+Na aba **Cenas**, **Criar cenas com agentes** recupera cenas incompletas; quando preenchidas, a ação aparece como **Refazer cenas com agentes**. Ela salva os ajustes abertos, chama apenas Direção visual e Conferência e recria os diagramas, preservando o roteiro, o áudio e a capa. Usa a cota dos CLIs, sem gerar outra voz. Fluxos exigem de dois a quatro textos, comparações exatamente dois e destaques ao menos um; respostas vazias recebem uma tentativa automática de correção e não são publicadas se continuarem inválidas.
 
 Projetos e fila persistem em SQLite. Cada tentativa tem diretório próprio; etapas concluídas salvam checkpoints no projeto, e o job atualiza sua revisão. Edições concorrentes ficam bloqueadas durante a produção. Após cancelamento, resultados atrasados não podem substituir novas alterações. Ao reiniciar o worker, jobs em execução ficam marcados como interrompidos e não são repetidos automaticamente.
 
@@ -110,7 +110,16 @@ Em **Personalizar aparência › Nome do canal no vídeo**, substitua “MYCUT�
 
 Em **Cenas**, selecione uma imagem por cena ou mantenha a animação. Você também pode importar PNG, JPG ou WebP de até 15 MB, com limite de 24 imagens por produção, e escolher entre mostrar a imagem inteira ou preencher a área com corte. Para usar sua biblioteca antes dos agentes, crie a produção sem iniciar a geração, importe as imagens em Cenas e execute os agentes em Pauta e agentes. Refazer apenas as cenas reutiliza a pesquisa existente; uma nova busca de imagens acontece na produção completa.
 
-Após mudar o visual, **Renderizar cenas atuais** aplica as alterações e atualiza a capa gerada pelo MyCut, reutilizando a narração existente. Capas importadas permanecem como enviadas. Alterar formato ou cores não solicita uma nova voz nem consome créditos ElevenLabs.
+Após mudar o visual, **Renderizar cenas atuais** aplica as alterações reutilizando a narração existente. Capas importadas ou criadas no chat permanecem como estão; capas compostas pelo antigo agente de direção seguem o visual atual.
+
+### Capa
+
+A aba **Capa** é um chat: descreva a capa, anexe até 4 imagens de referência (PNG, JPG ou WebP, até 15 MB cada) e escolha o agente e o modelo no topo do chat. Cada mensagem gera uma imagem 9:16, e o pedido seguinte recebe a conversa e a última imagem, para ajustes como “deixe o fundo mais escuro”. A imagem só vira capa quando você clica em **Usar como capa**. Também é possível importar uma capa pronta.
+
+- **Grok** usa `image_gen`/`image_edit` e **Codex** usa a geração de imagens do próprio CLI; os CLIs recebem somente essas ferramentas.
+- **Claude Code** não tem gerador de imagens: desenha a capa em SVG (formas, gradientes, texto e os anexos), que o MyCut converte em PNG com `resvg`. O SVG não pode usar scripts nem referenciar arquivos além dos anexos.
+
+O chat roda numa fila própria do worker: gerar uma imagem não bloqueia a edição nem uma produção em andamento, e há uma geração por vez por produção. O custo aparece em **Custos** como versão “Capa”. É preciso reiniciar `bash scripts/agents.sh` depois de atualizar o MyCut, porque o executor passou a trocar anexos e imagens com os CLIs. Alterar formato ou cores não solicita uma nova voz nem consome créditos ElevenLabs.
 
 ## Executar sem Docker
 

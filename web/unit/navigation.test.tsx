@@ -85,7 +85,8 @@ test("new production and every editor tab survive serializing the address", () =
     "brief",
     "script",
     "scenes",
-    "media",
+    "audio",
+    "cover",
     "publication",
     "versions",
   ] as const) {
@@ -96,6 +97,12 @@ test("new production and every editor tab survive serializing the address", () =
 
 test("legacy project links remain valid and unknown addresses recover to the library", () => {
   assert.deepEqual(readRoute(`#${id}`), { page: "projects", projectId: id });
+  // The former combined "Voz e capa" tab now opens Áudio.
+  assert.deepEqual(readRoute(`#/producoes/${id}/media`), {
+    page: "projects",
+    projectId: id,
+    tab: "audio",
+  });
   for (const hash of [
     "",
     "#%invalid",

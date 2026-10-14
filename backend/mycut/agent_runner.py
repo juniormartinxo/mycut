@@ -2,16 +2,24 @@
 import fcntl
 import json
 import os
+import re
+import shutil
 import signal
 import subprocess
 import tempfile
 import time
 from pathlib import Path
-from .bridge import BRIDGE, PROVIDERS, atomic_json
+from .bridge import BRIDGE, IMAGES_PROTOCOL, PROVIDERS, atomic_json
 from . import agent_models, browser, commands, costs
 
 
-def command(provider, model, folder, schema, web, navigator=None):
+ATTACHMENT = re.compile(r'anexo-\d{1,2}\.(png|jpg|jpeg|webp)')
+SESSION = re.compile(r'[A-Za-z0-9-]{8,80}')
+IMAGE_SUFFIXES = ('.png', '.jpg', '.jpeg', '.webp')
+
+
+def command(provider, model, folder, schema, web, navigator=None, images=None):
+    """images: None for text agents; for an image request, the attachment paths inside folder."""
     if provider not in PROVIDERS:
         raise ValueError('Provedor de agente desconhecido.')
     launch = commands.launcher(provider)
@@ -19,6 +27,8 @@ def command(provider, model, folder, schema, web, navigator=None):
         raise ValueError(f'O comando do {provider} não foi encontrado no PATH do executor. Confira o comando em Conexões.')
     schema_text = json.dumps(schema, ensure_ascii=False)
     (folder / 'schema.json').write_text(schema_text)
+    if images is not None:
+        return image_command(launch, provider, model, folder, schema_text, images)
     if provider == 'codex':
         args = [*launch, 'exec', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only',
                 '-c', 'approval_policy="never"', '-c', 'features.shell_tool=false',
@@ -69,6 +79,60 @@ def command(provider, model, folder, schema, web, navigator=None):
     return args
 
 
+def image_command(launch, provider, model, folder, schema_text, attachments):
+    """Only the CLI's own image tools (and, for Claude, reading the attachments) are available."""
+    if provider == 'codex':
+        args = [*launch, 'exec', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only',
+                '-c', 'approval_policy="never"', '-c', 'features.shell_tool=false', '-c', 'features.apps=false',
+                '-c', 'mcp_servers={}', '-c', 'web_search="disabled"', '--enable', 'image_generation',
+                '--output-schema', str(folder / 'schema.json'), '--output-last-message', str(folder / 'result.json'),
+                '--color', 'never', '--json', *(f'--image={path}' for path in attachments)]
+        return args+(['--model', model] if model else [])+['-']
+    if provider == 'claude':
+        # Claude Code has no image tool: it answers with an SVG that the worker rasterizes.
+        args = [*launch, '-p', '--output-format', 'json', '--json-schema', schema_text,
+                '--no-session-persistence', '--restricted', '--strict-mcp-config', '--mcp-config', '{"mcpServers": {}}',
+                '--permission-mode', 'dontAsk', '--tools', 'Read' if attachments else '']
+        if attachments:
+            # "//" anchors the permission rule at an absolute path.
+            args += ['--allowedTools', f'Read(/{folder / "inputs"}/**)']
+    else:
+        args = [*launch, '--prompt-file', str(folder / 'prompt.txt'), '--output-format', 'json',
+                '--json-schema', schema_text, '--no-subagents', '--no-plan', '--max-turns', '12',
+                '--permission-mode', 'dontAsk', '--tools', 'image_gen,image_edit',
+                '--allow', 'image_gen', '--allow', 'image_edit', '--deny', 'MCPTool', '--disable-web-search']
+    return args+(['--model', model] if model else [])
+
+
+def generated(provider, stdout):
+    """Files the CLI's image tool saved for this run, oldest first."""
+    if provider == 'codex':
+        thread = None
+        for line in stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get('type') == 'thread.started':
+                thread = event.get('thread_id')
+                break
+        home = commands.environment('codex').get('CODEX_HOME') or os.environ.get('CODEX_HOME') or str(Path.home() / '.codex')
+        folders = [Path(home) / 'generated_images' / thread] if isinstance(thread, str) and SESSION.fullmatch(thread) else []
+    elif provider == 'grok':
+        try:
+            session = last_object(stdout).get('sessionId')
+        except (ValueError, AttributeError):
+            session = None
+        home = commands.environment('grok').get('GROK_HOME') or os.environ.get('GROK_HOME') or str(Path.home() / '.grok')
+        folders = list((Path(home) / 'sessions').glob(f'*/{session}/images')) if isinstance(session, str) and SESSION.fullmatch(session) else []
+    else:
+        return []
+    files = [path for folder in folders if folder.is_dir() for path in folder.iterdir()
+             if path.is_file() and not path.is_symlink() and path.suffix.lower() in IMAGE_SUFFIXES
+             and path.stat().st_size <= 25 * 1024 * 1024]
+    return sorted(files, key=lambda path: path.stat().st_mtime)[:4]
+
+
 def last_object(text):
     """Grok may stream an interim object before the final one: keep the last complete object."""
     decoder, index, found = json.JSONDecoder(), 0, None
@@ -102,7 +166,7 @@ def parse_result(provider, folder, stdout):
 
 
 def heartbeat():
-    atomic_json(BRIDGE / 'heartbeat.json', {'time': time.time(), 'protocol': 3,
+    atomic_json(BRIDGE / 'heartbeat.json', {'time': time.time(), 'protocol': IMAGES_PROTOCOL,
                                          'providers': {p: bool(commands.launcher(p)) for p in PROVIDERS},
                                          'browser': browser.status()})
 
@@ -148,12 +212,23 @@ def run_request(request_file):
             raise ValueError('Solicitação cancelada ou worker desconectado.')
         with tempfile.TemporaryDirectory(prefix='mycut-agent-') as directory:
             folder = Path(directory)
+            images = request.get('kind') == 'image'
+            attachments = []
+            for name in request.get('attachments', []) if images else []:
+                if not ATTACHMENT.fullmatch(name):
+                    raise ValueError('Anexo inválido na solicitação do agente.')
+                (folder / 'inputs').mkdir(exist_ok=True)
+                shutil.copyfile(location / 'inputs' / name, folder / 'inputs' / name)
+                attachments.append(folder / 'inputs' / name)
             navigator, unavailable = browser.prepare() if request['web'] else (None, '')
             note = browser.GUIDANCE if navigator else (
                 f'\nNAVEGADOR INDISPONÍVEL: {unavailable} Use WebSearch/WebFetch e registre em limitations '
                 'que o navegador real não estava disponível.\n' if unavailable else '')
+            if attachments:
+                note += '\nARQUIVOS ANEXADOS (caminhos absolutos): ' + ', '.join(map(str, attachments)) + '\n'
             (folder / 'prompt.txt').write_text(request['prompt']+note)
-            args = command(request['provider'], request.get('model', ''), folder, request['schema'], request['web'], navigator)
+            args = command(request['provider'], request.get('model', ''), folder, request['schema'], request['web'], navigator,
+                           attachments if images else None)
             # File output avoids pipe deadlocks for verbose CLIs. These logs stay local.
             with (location / 'cli.log').open('w+') as output, (location / 'cli-error.log').open('w+') as error, (folder / 'prompt.txt').open() as input_file:
                 process = subprocess.Popen(args, cwd=folder, stdin=input_file, stdout=output, stderr=error, start_new_session=True)
@@ -171,6 +246,10 @@ def run_request(request_file):
                         error.seek(0)
                         raise ValueError(failure_message(request['provider'], stdout, error.read(1_000_000), location.name))
                     result = parse_result(request['provider'], folder, stdout)
+                    if images:
+                        (location / 'outputs').mkdir(exist_ok=True)
+                        for index, path in enumerate(generated(request['provider'], stdout), 1):
+                            shutil.copyfile(path, location / 'outputs' / f'{index}{path.suffix.lower()}')
                 finally:
                     if process.poll() is None:
                         os.killpg(process.pid, signal.SIGTERM)

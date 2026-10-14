@@ -1,6 +1,7 @@
 """File queue between the Docker worker and authenticated CLIs on the host."""
 import json
 import os
+import shutil
 import tempfile
 import time
 import uuid
@@ -10,6 +11,8 @@ from .config import DATA
 BRIDGE = DATA / 'agent-bridge'
 PROVIDERS = ('codex', 'claude', 'grok')
 BROWSER_OFFLINE = {'enabled': False, 'available': False, 'version': ''}
+# Protocol 4: image requests carry attachments and return the files the CLI generated.
+IMAGES_PROTOCOL = 4
 
 
 def atomic_json(path, value):
@@ -47,14 +50,38 @@ def response(request_id):
         return None
 
 
-def invoke(config, prompt, schema, web=False, timeout=900, request_id=None):
+def require_images():
+    require([])
+    if status()['protocol'] < IMAGES_PROTOCOL:
+        raise ValueError('Reinicie bash scripts/agents.sh no WSL para gerar imagens com os agentes.')
+
+
+def attachment_name(index, path):
+    """How the agent sees the n-th attachment (1-based); uploaded names never reach the CLI."""
+    return f'anexo-{index}{Path(path).suffix.lower()}'
+
+
+def outputs(request_id):
+    """Image files the runner collected from the CLI, in generation order."""
+    folder = BRIDGE / 'requests' / request_id / 'outputs'
+    return sorted(folder.iterdir(), key=lambda path: path.name) if folder.is_dir() else []
+
+
+def invoke(config, prompt, schema, web=False, timeout=900, request_id=None, attachments=(), images=False):
     require([config['provider']])
     folder = BRIDGE / 'requests' / (request_id or uuid.uuid4().hex)
     folder.mkdir(parents=True)
     lease = folder / 'lease'
     lease.touch()
+    names = []
+    for index, path in enumerate(attachments, 1):
+        name = attachment_name(index, path)
+        (folder / 'inputs').mkdir(exist_ok=True)
+        shutil.copy2(path, folder / 'inputs' / name)
+        names.append(name)
     atomic_json(folder / 'request.json', {'provider': config['provider'], 'model': config['model'],
-                 'prompt': prompt, 'schema': schema, 'web': web, 'expires': time.time()+timeout})
+                 'prompt': prompt, 'schema': schema, 'web': web, 'expires': time.time()+timeout,
+                 **({'kind': 'image', 'attachments': names} if images else {})})
     try:
         deadline = time.monotonic()+timeout
         while time.monotonic() < deadline:

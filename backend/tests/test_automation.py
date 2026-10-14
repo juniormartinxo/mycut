@@ -23,8 +23,9 @@ RESEARCH = {'accessible':True, 'summary':'Exemplo de teste, não uma notícia re
             'sources':[{'title':'Fonte de teste', 'url':'https://example.com/news'}],
             'facts':[{'claim':'Tarefas na nuvem.', 'source_url':'https://example.com/news', 'evidence':'Exemplo verificado pela fixture.'}]}
 SCRIPT = {'title':'Trabalho na nuvem #IA', 'description':'Exemplo para teste.', 'tags':'IA, nuvem', 'narration':PARAGRAPHS}
-DIRECTION = {'accent':'#bd4b28', 'scenes':[{'title':t,'layout':'flow','items':['Pauta','Tarefa','Revisão']} for t in ['Trabalho na nuvem','Ambiente próprio','Você revisa']],
-             'cover':{'headline':'Trabalho na nuvem','subtitle':'Acompanhe e revise','labels':['Inicie','Acompanhe','Revise']}}
+DIRECTION = {'accent':'#bd4b28', 'scenes':[{'title':t,'layout':'flow','items':['Pauta','Tarefa','Revisão']} for t in ['Trabalho na nuvem','Ambiente próprio','Você revisa']]}
+# Concept of a cover made by the director before covers moved to their own chat.
+LEGACY_COVER = {'headline':'Trabalho na nuvem','subtitle':'Acompanhe e revise','labels':['Inicie','Acompanhe','Revise']}
 
 class AutomationTests(unittest.TestCase):
     setUp = test_studio.StudioTests.setUp
@@ -267,7 +268,7 @@ class AutomationTests(unittest.TestCase):
             process.assert_not_called()
 
 
-    def test_plan_versions_keep_downloadable_text_and_cover_without_video(self):
+    def test_plan_versions_keep_downloadable_text_without_cover_or_video(self):
         job=self.start('plan')
         with patch.object(bridge,'invoke',side_effect=[RESEARCH,SCRIPT,DIRECTION,{'approved':True,'issues':[]}]):
             self.assertIsNone(pipeline.produce(job))
@@ -275,7 +276,9 @@ class AutomationTests(unittest.TestCase):
         result=store.get_job(job['id'])
         self.assertIsNone(result['output'])
         self.assertIn('roteiro.txt',result['materials'])
-        self.assertIn('capa.png',result['materials'])
+        # Covers are a separate process: the script agents never create one.
+        self.assertNotIn('capa.png',result['materials'])
+        self.assertNotIn('cover',store.get_project(self.project['id']))
         self.assertNotIn('narracao.wav',result['materials'])
         url=f'/api/jobs/{job["id"]}/materials/roteiro.txt'
         previous=self.client.get(url)
