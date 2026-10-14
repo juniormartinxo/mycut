@@ -7,6 +7,7 @@ export type Tab =
   | "scenes"
   | "audio"
   | "cover"
+  | "ending"
   | "publication"
   | "versions"
   | "costs";
@@ -37,6 +38,7 @@ const tabs = new Set<Tab>([
   "scenes",
   "audio",
   "cover",
+  "ending",
   "publication",
   "versions",
   "costs",

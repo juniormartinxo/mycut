@@ -112,6 +112,12 @@ Em **Cenas**, selecione uma imagem por cena ou mantenha a animação. Você tamb
 
 Após mudar o visual, **Renderizar cenas atuais** aplica as alterações reutilizando a narração existente. Capas importadas ou criadas no chat permanecem como estão; capas compostas pelo antigo agente de direção seguem o visual atual.
 
+### Encerramento
+
+Na aba **Encerramento**, importe um MP4, MOV ou WebM de até 100 MB e 60 segundos, ou escolha um vídeo da biblioteca compartilhada entre as produções. A prévia da aba reproduz somente o encerramento. O vídeo preserva a imagem inteira no formato vertical e usa seu próprio áudio, quando houver.
+
+Marque **Incluir no final deste Short** para acrescentá-lo após a última cena. A inclusão começa desativada, para que cada produção receba o clipe somente após sua escolha; importar um vídeo o disponibiliza na biblioteca. Desmarcar mantém o arquivo para uso posterior. Clique em **Salvar alterações** para guardar a escolha ou em **Renderizar cenas atuais** para salvar e gerar o Short com ela, reutilizando a narração existente. O vídeo já renderizado permanece como estava até a nova renderização. Cenas e encerramento juntos devem ter no máximo 180 segundos; se ultrapassarem, encurte as cenas ou desative a inclusão.
+
 ### Capa
 
 A aba **Capa** é um chat: descreva a capa, anexe até 4 imagens de referência (PNG, JPG ou WebP, até 15 MB cada) e escolha o agente e o modelo no topo do chat. Cada mensagem gera uma imagem 9:16, e o pedido seguinte recebe a conversa e a última imagem, para ajustes como “deixe o fundo mais escuro”. A imagem só vira capa quando você clica em **Usar como capa**. Também é possível importar uma capa pronta.

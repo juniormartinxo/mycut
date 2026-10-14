@@ -54,7 +54,19 @@ export type Job = {
     height: number;
     timing: string;
     imported?: boolean;
+    has_narration?: boolean;
+    ending?: (Omit<EndingClip, "url" | "poster_url"> & { start_seconds: number; total_duration: number }) | null;
   };
+};
+export type EndingClip = {
+  id: string;
+  name: string;
+  duration: number;
+  width: number;
+  height: number;
+  has_audio: boolean;
+  url: string;
+  poster_url: string;
 };
 export type Material = {
   name: string;
@@ -75,6 +87,7 @@ export type Project = {
   accent: string;
   accent_locked?: boolean;
   visual_style?: VisualStyle | null;
+  ending_id?: string | null;
   images?: ProjectImage[];
   image_notes?: string[];
   scenes: Scene[];

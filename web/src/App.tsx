@@ -28,6 +28,7 @@ import {
 import type { ProductionDraft } from "./Automation";
 import { Connections } from "./Connections";
 import { CoverStudio } from "./CoverStudio";
+import { EndingStudio } from "./EndingStudio";
 import { FormatPicker, RenderedScene, initialStyle } from "./FormatPicker";
 import { money, ProjectCosts, tokens } from "./ProjectCosts";
 import { SettingsMenu } from "./SettingsMenu";
@@ -71,6 +72,7 @@ const tabs: { id: Tab; name: string; icon: typeof FileText }[] = [
   { id: "scenes", name: "Cenas", icon: Layers },
   { id: "audio", name: "Áudio", icon: Headphones },
   { id: "cover", name: "Capa", icon: ImagePlus },
+  { id: "ending", name: "Encerramento", icon: Film },
   { id: "publication", name: "Publicação", icon: Upload },
   { id: "versions", name: "Versões", icon: Film },
   { id: "costs", name: "Custos", icon: Coins },
@@ -85,7 +87,7 @@ function status(project: Project) {
   const done = completedJob(project);
   if (done && done.revision === project.revision)
     return {
-      label: done.output?.has_audio ? "Pronto para revisar" : "Prévia sem voz",
+      label: (done.output?.has_narration ?? done.output?.has_audio) ? "Pronto para revisar" : "Prévia sem voz",
       tone: "ready",
     };
   if (done) return { label: "Alterações para produzir", tone: "draft" };
@@ -602,6 +604,7 @@ function Editor({
       accent,
       accent_locked = true,
       visual_style = null,
+      ending_id = null,
       scenes,
       revision,
     } = draft;
@@ -616,6 +619,7 @@ function Editor({
         accent,
         accent_locked,
         visual_style,
+        ending_id,
         scenes,
         revision,
       }),
@@ -1363,6 +1367,13 @@ function Editor({
                 }
               />
             )}
+            {tab === "ending" && (
+              <EndingStudio
+                value={draft.ending_id || null}
+                disabled={locked}
+                onChange={(ending_id) => change({ ending_id })}
+              />
+            )}
             {tab === "publication" && (
               <>
                 <div className="section-heading">
@@ -1544,6 +1555,8 @@ function Editor({
               {previewJob
                 ? previewJob.revision !== project.revision
                   ? "Versão anterior. Gere novamente após salvar."
+                  : previewJob.output?.has_narration === false && previewJob.output?.ending?.has_audio
+                    ? "Cenas sem narração · encerramento com áudio"
                   : previewJob.output?.has_audio
                     ? "Com narração · revisão final pendente"
                     : "Sem narração · tempos estimados"

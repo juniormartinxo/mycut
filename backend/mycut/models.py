@@ -52,6 +52,7 @@ class ProjectInput(BaseModel):
     accent: str = Field(default='#c85e37', pattern=r'^#[0-9a-fA-F]{6}$')
     accent_locked: bool = True
     visual_style: VisualStyle | None = None
+    ending_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     scenes: list[Scene] = Field(min_length=1, max_length=12)
     revision: int = Field(default=0, ge=0)
 

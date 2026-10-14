@@ -16,7 +16,7 @@ from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
 from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
-from . import voice_tests, covers
+from . import voice_tests, covers, endings
 from . import visuals
 from .models import ScenePreview
 from .seed import blank, claude, initialize_example
@@ -71,6 +71,7 @@ def present(project):
     project = dict(project)
     project.setdefault('brief', '')
     project.setdefault('visual_style', None)
+    project.setdefault('ending_id', None)
     project['jobs'] = store.jobs(project['id'])
     for key in ['audio', 'cover']:
         if project.get(key):
@@ -329,10 +330,34 @@ def project(project_id: str):
 def update(project_id: str, body: ProjectInput):
     values = body.model_dump()
     revision = values.pop('revision')
+    if body.ending_id:
+        endings.get(body.ending_id)
     images = {item['id'] for item in store.get_project(project_id).get('images', [])}
     if any(scene.image_id and scene.image_id not in images for scene in body.scenes):
         raise ValueError('Escolha uma imagem desta produção ou use somente animação.')
     return present(store.update_project(project_id, values, revision))
+
+
+@app.get('/api/endings')
+def list_endings():
+    return endings.catalog()
+
+
+@app.post('/api/endings', status_code=201)
+def import_ending(file: UploadFile):
+    try:
+        return endings.import_clip(file.file, file.filename or 'video.mp4')
+    finally:
+        file.file.close()
+
+
+@app.get('/api/endings/{ending_id}/{kind}')
+def ending_asset(ending_id: str, kind: str):
+    endings.get(ending_id)
+    if kind not in ('video', 'poster'):
+        raise HTTPException(404, 'Material do encerramento não encontrado.')
+    return FileResponse(DATA / 'endings' / ending_id / ('clip.mp4' if kind == 'video' else 'poster.jpg'),
+                        media_type='video/mp4' if kind == 'video' else 'image/jpeg')
 
 
 @app.post('/api/projects/{project_id}/assets/{kind}')

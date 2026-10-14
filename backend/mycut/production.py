@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
-from . import visuals
+from . import visuals, endings
 from .config import ROOT, DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
 
@@ -131,6 +131,7 @@ def transcribe(audio, folder, job):
 
 def make_video(job):
     project, job_id = job['snapshot'], job['id']
+    ending = endings.get(project['ending_id']) if project.get('ending_id') else None
     folder = DATA / 'projects' / project['id'] / 'renders' / job_id
     folder.mkdir(parents=True, exist_ok=True)
     script = store.script(project)
@@ -158,6 +159,8 @@ def make_video(job):
         timing = estimated_timing(project)
     if not 1 <= timing['duration_seconds'] <= 180:
         raise ValueError('A duração deve ficar entre 1 e 180 segundos. Encurte o roteiro.')
+    if ending and timing['duration_seconds'] + ending['duration'] > 180:
+        raise ValueError('O Short com encerramento ultrapassa 3 minutos. Encurte as cenas ou desative o encerramento.')
     (folder / 'timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=2))
     graphics.HERE = folder
     graphics.write_subtitles(timing)
@@ -252,15 +255,22 @@ def make_video(job):
                 process.kill()
             process.wait()
             raise
+    if ending:
+        store.progress(job_id, 96, 'Acrescentando o vídeo de encerramento')
+        ending = endings.append_clip(target, ending, width, height, fps, bool(audio))
+        duration = ending['total_duration']
     publication = f'TÍTULO\n{project["title"]}\n\nDESCRIÇÃO\n{project["description"]}\n\nFONTES\n{project["sources"]}\n\nTAGS\n{project["tags"]}\n'
     (folder / 'publicacao.txt').write_text(publication)
     manifest = {'project_id': project['id'], 'job_id': job_id, 'revision': project['revision'],
                 'visual_style': project.get('visual_style'), 'accent': project['accent'],
                 'audio_sha256': digest(audio) if audio else None, 'script_sha256': store.script_hash(project),
                 'video_sha256': digest(target), 'duration_seconds': duration, 'width': width, 'height': height,
+                'ending': ending,
                 'timing_source': timing['timing_source'], 'status': 'pending_human_review'}
     (folder / 'render-manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
-    result = {'directory': str(folder.relative_to(DATA)), 'duration': duration, 'has_audio': bool(audio),
+    result = {'directory': str(folder.relative_to(DATA)), 'duration': duration,
+              'has_audio': bool(audio) or bool(ending and ending['has_audio']), 'has_narration': bool(audio),
+              'ending': ending,
               'width': width, 'height': height, 'timing': 'aligned' if audio else 'estimated'}
     (folder / 'result.json').write_text(json.dumps(result))
     store.progress(job_id, 99, 'Finalizando os arquivos')
