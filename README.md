@@ -1,10 +1,98 @@
+<div align="center">
+
+<img src="web/public/mark.svg" alt="" width="72" height="72">
+
 # MyCut
 
-Produção de Shorts sobre inteligência artificial em português brasileiro, com animações, fluxos, diagramas e narração.
+**Da pauta ao Short, com agentes de IA trabalhando no seu computador.**
 
-O objetivo é automatizar a descoberta de pautas, a pesquisa, o roteiro, a voz, as imagens, a montagem e a publicação de **dois Shorts por dia** usando agentes de IA. O estúdio web local agora conecta Codex CLI, Claude Code CLI e Grok CLI para transformar uma pauta em roteiro, cenas, capa, narração ElevenLabs e vídeo. A coleta recorrente de tendências, o calendário de duas produções diárias e a publicação automática no YouTube ainda precisam ser implementados; continuam sendo parte do objetivo do produto.
+Estúdio local para produzir Shorts sobre inteligência artificial em português brasileiro:<br>
+pesquisa, roteiro, cenas animadas, narração, capa e vídeo final em 1080 × 1920.
 
-## Abrir o aplicativo
+![Python 3.12](https://img.shields.io/badge/Python-3.12-3a4538?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.143-3a4538?logo=fastapi&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-3a4538?logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-3a4538?logo=vite&logoColor=white)
+![FFmpeg](https://img.shields.io/badge/FFmpeg-render-3a4538?logo=ffmpeg&logoColor=white)
+![Docker Compose](https://img.shields.io/badge/Docker-Compose-3a4538?logo=docker&logoColor=white)
+
+[Começar](#começar) · [Como funciona](#como-funciona) · [Capa com agentes](#capa) · [Executar sem Docker](#executar-sem-docker) · [Verificação](#verificação)
+
+<br>
+
+<img src="docs/screenshots/producoes.webp" alt="Tela Suas produções do MyCut com três Shorts: um em edição, uma prévia sem voz e um pronto para revisar" width="100%">
+
+</div>
+
+<br>
+
+O objetivo é automatizar a descoberta de pautas, a pesquisa, o roteiro, a voz, as imagens, a montagem e a publicação de **dois Shorts por dia** usando agentes de IA. O estúdio web local conecta **Codex CLI**, **Claude Code CLI** e **Grok CLI** para transformar uma pauta em roteiro, cenas, capa, narração ElevenLabs e vídeo.
+
+> [!NOTE]
+> A coleta recorrente de tendências, o calendário de duas produções diárias e a publicação automática no YouTube ainda precisam ser implementados. Continuam sendo parte do objetivo do produto.
+
+## Em destaque
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Agentes que você já usa
+Pesquisa, Roteiro, Direção visual e Conferência rodam nos CLIs autenticados no seu WSL. Escolha o CLI e o modelo de cada papel e teste antes de salvar.
+
+</td>
+<td width="50%" valign="top">
+
+### Cenas que explicam
+Fluxos, comparações e destaques animados em quatro formatos visuais, com fonte, cores e nome do canal ajustáveis. A prévia usa o mesmo renderizador do vídeo.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### Capa em conversa
+Um chat com Grok, Codex ou Claude Code gera imagens 9:16. Anexe referências, peça ajustes e escolha a melhor como capa.
+
+</td>
+<td width="50%" valign="top">
+
+### Tudo fica na sua máquina
+SQLite, arquivos e fila locais, sem login. Cada versão guarda vídeo, capa, legendas, roteiro e manifesto para baixar como pacote.
+
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/cenas.webp" alt="Aba Cenas do editor com a lista de cenas, o formulário da cena 5 em comparação e a prévia vertical ao lado" width="100%">
+  <br><sub><b>Cenas</b> · cada cena tem título, formato visual e textos do diagrama, com a prévia vertical ao lado.</sub>
+</p>
+
+<table>
+<tr>
+<td width="42%" valign="top">
+  <img src="docs/screenshots/capa-chat.webp" alt="Chat da capa: o Grok cria uma primeira versão a partir de um quadrado laranja anexado e o Codex refina com robôs e o texto NA NUVEM em ciano, marcada como capa atual">
+  <br><sub><b>Capa</b> · o Grok cria a primeira versão a partir do anexo e o Codex refina na mensagem seguinte.</sub>
+</td>
+<td width="58%" valign="top">
+  <img src="docs/screenshots/novo.webp" alt="Tela Da pauta ao Short com o campo de pauta preenchido e os quatro formatos de Short">
+  <br><sub><b>Novo Short</b> · cole a pauta ou o link e escolha o formato antes de chamar os agentes.</sub>
+  <br><br>
+  <img src="docs/screenshots/agentes.webp" alt="Configurações de agentes com executor conectado e CLI e modelo escolhidos para Pesquisa, Roteiro e Direção visual">
+  <br><sub><b>Agentes</b> · um CLI e um modelo por papel, com teste curto antes de salvar.</sub>
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/celular.webp" alt="O editor do MyCut no celular, nas abas Roteiro e Capa" width="62%">
+  <br><sub>A interface também funciona no celular.</sub>
+</p>
+
+<sub>Capturas feitas com o Short de exemplo do repositório e produções de demonstração. As imagens da capa foram geradas pelo Grok e pelo Codex nos testes do chat.</sub>
+
+## Começar
 
 No Linux ou WSL, a partir da raiz do repositório, com Docker e Docker Compose disponíveis:
 
@@ -13,7 +101,9 @@ mkdir -p .data
 docker compose up --build -d
 ```
 
-Abra **http://localhost:8321**. A primeira construção baixa as dependências. A API serve a interface compilada e o worker processa a fila em outro container. Fechar a aba não interrompe uma produção; os serviços e o computador precisam continuar ligados.
+Abra **http://localhost:8321**. Para os agentes funcionarem, conecte os CLIs em outro terminal, como explica [Conectar os agentes](#conectar-os-agentes-e-a-elevenlabs).
+
+A primeira construção baixa as dependências. A API serve a interface compilada e o worker processa a fila em outro container. Fechar a aba não interrompe uma produção; os serviços e o computador precisam continuar ligados.
 
 A navegação fica no endereço: `#/configuracoes/agentes`, `#/configuracoes/vozes`, `#/configuracoes/ambiente`, `#/fila`, `#/novo` e `#/producoes`. No editor, a URL também identifica a produção e a aba. Atualizar a página preserva essa localização; Voltar e Avançar acompanham a navegação. Links antigos `#/conexoes` e `#<id-da-produção>` continuam funcionando. Alterações não salvas no editor mantêm o aviso de descarte ao sair.
 
@@ -46,7 +136,13 @@ Mantenha esse executor aberto junto com os containers. Ele usa o login local de 
 
 Por padrão, o executor chama `codex`, `claude` e `grok`. Em **Configurações › Ambiente › Comandos dos CLIs**, você pode trocar o comando de cada um para usar outro perfil ou login. Por exemplo, `CLAUDE_CONFIG_DIR=~/.config/cloak/profiles/amjr/claude claude` ou `cloak exec --profile amjr claude`. Variáveis `NOME=valor` antes do executável, `~` e `$VAR` são expandidas no WSL. O comando roda sem shell, então aliases, funções e pipes não funcionam. O executor relê os comandos a cada chamada, sem reiniciar, e atualiza a lista de modelos depois de salvar. Esses comandos são executados no seu computador; a API aceita a alteração apenas da própria interface local.
 
-### Navegador para a pesquisa
+1. No aplicativo, abra **Configurações › Agentes**. Distribua os CLIs entre Pesquisa, Roteiro, Direção visual e Conferência. Escolha o modelo na lista e clique **Testar agente** em cada papel. O teste usa a seleção atual sem salvá-la; clique **Salvar agentes** quando terminar. **Padrão do CLI** deixa a escolha a cargo do CLI.
+2. Abra **Configurações › Vozes**. Na seção **ElevenLabs**, cole uma chave de API da sua conta e clique **Conectar ElevenLabs**. A chave precisa permitir listar vozes/modelos e gerar fala. Não coloque a chave no roteiro, Git ou chat. [Documentação de autenticação](https://elevenlabs.io/docs/api-reference/authentication).
+3. Selecione a voz **Junior**, ou outra da sua conta, o modelo e os ajustes. Clique **Salvar voz**. A lista vem da conta conectada.
+4. Em **Novo Short**, informe a **Pauta ou link**, escolha um formato e personalize fonte, fundo, texto e destaque. Defina se quer somente animações ou também imagens. Os agentes recebem essas escolhas antes de criar o roteiro e as cenas. Escolha **Produzir com agentes** ou, para conferir o roteiro antes de gastar voz, **Roteiro e cenas primeiro**.
+
+<details>
+<summary><strong>Navegador para a pesquisa (Chrome DevTools MCP)</strong></summary>
 
 Alguns sites, como o `openai.com`, respondem 403 à leitura automática dos CLIs. Nesse caso, a etapa de Pesquisa pode abrir a página no Chrome do Windows, como uma pessoa faria. Isso vale para Claude Code, Codex e Grok. O executor abre o Chrome Canary (ou o Chrome) com a porta de depuração `9222` e um perfil próprio em `%LOCALAPPDATA%\MyCut\ChromeProfile`, sem os seus logins. Cada CLI recebe o [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) com uma versão fixa e apenas as ferramentas de navegar, ler (snapshot), clicar, rolar e fechar abas. Formulários, digitação, uploads e execução de JavaScript ficam fora. O texto das páginas é tratado como dado, não como instrução.
 
@@ -54,10 +150,10 @@ Configure em **Configurações › Ambiente › Navegador para pesquisa**: ative
 
 Se o Chrome ou o MCP falharem, a pesquisa continua com a busca e a leitura dos próprios CLIs e registra a falta do navegador nas limitações. Sem fonte verificada, o fluxo continua parando antes do roteiro. No Grok, as execuções com navegador usam `--trust` na pasta temporária e desligam os MCPs importados do Claude e do Cursor. Nesse modo, chamar outro servidor MCP encerra a execução.
 
-1. No aplicativo, abra **Configurações › Agentes**. Distribua os CLIs entre Pesquisa, Roteiro, Direção visual e Conferência. Escolha o modelo na lista e clique **Testar agente** em cada papel. O teste usa a seleção atual sem salvá-la; clique **Salvar agentes** quando terminar. **Padrão do CLI** deixa a escolha a cargo do CLI.
-2. Abra **Configurações › Vozes**. Na seção **ElevenLabs**, cole uma chave de API da sua conta e clique **Conectar ElevenLabs**. A chave precisa permitir listar vozes/modelos e gerar fala. Não coloque a chave no roteiro, Git ou chat. [Documentação de autenticação](https://elevenlabs.io/docs/api-reference/authentication).
-3. Selecione a voz **Junior**, ou outra da sua conta, o modelo e os ajustes. Clique **Salvar voz**. A lista vem da conta conectada.
-4. Em **Novo Short**, informe a **Pauta ou link**, escolha um formato e personalize fonte, fundo, texto e destaque. Defina se quer somente animações ou também imagens. Os agentes recebem essas escolhas antes de criar o roteiro e as cenas. Escolha **Produzir com agentes** ou, para conferir o roteiro antes de gastar voz, **Roteiro e cenas primeiro**.
+</details>
+
+<details>
+<summary><strong>Vozes ElevenLabs: amostras, filtro de idioma e testes</strong></summary>
 
 Conectar/listar vozes não sintetiza áudio. Produzir a voz usa créditos da conta ElevenLabs. Não há repetição automática da requisição paga após erro. O texto completo vai em uma única requisição para preservar a continuidade da narração. Os [tempos de fala retornados pelo provedor](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps) alimentam a sincronização de cenas e legendas. O MP3 de transporte fica como intermediário; a trilha usada no render é WAV normalizado.
 
@@ -67,13 +163,20 @@ Antes de escolher a voz, use **Idioma da voz**. O filtro inicia em **Português*
 
 **Testar com meu texto** aceita até 300 caracteres e usa a seleção atual, sem alterar a voz padrão salva nem criar uma produção. O botão **Gerar teste (usa créditos)** informa a cobrança antes do clique; não é uma prévia gratuita de texto personalizado. Os últimos cinco testes aparecem com texto, voz, modelo e ajustes e podem ser reouvidos após recarregar a página. Repetir texto, voz, modelo e ajustes reutiliza o MP3 local, sem nova geração. O cache fica em `.data/voice-tests/`, separado por chave conectada, e não é versionado. [Regras de consumo e limites das regenerações gratuitas no site](https://elevenlabs.io/docs/help-center/product/core-capabilities/text-to-speech/is-there-a-way-to-preview-audio-without-losing-quota-before-downloading).
 
+</details>
+
+<details>
+<summary><strong>Testes de agente e catálogo de modelos</strong></summary>
+
 A indicação “executor conectado” comprova o processo ativo e os executáveis disponíveis no PATH; não comprova login, saldo ou acesso a cada modelo. **Testar agente** executa uma solicitação curta pelo mesmo adaptador usado na produção, valida um desafio e mostra resposta, duração, ID solicitado e modelo informado nos metadados do CLI. O teste usa a cota do CLI; não gera voz ou vídeo. Há um teste por vez, cancelamento e limite de três minutos, incluindo espera na fila. O último resultado de cada papel permanece disponível após recarregar a página.
 
 Claude e Grok podem informar `modelUsage`: o app distingue confirmação, modelo diferente e resolução do padrão. No adaptador Codex atual, a resposta pode ser validada, mas o modelo efetivamente usado **não é confirmado**. Uma declaração do próprio modelo nunca serve como confirmação de identidade.
 
 Os seletores recebem IDs do cache local de modelos do Codex/Grok e da inicialização do Claude Code, sem copiar credenciais. O catálogo não comprova acesso nem login. **Atualizar modelos** relê essas fontes quando o executor está livre; se a lista faltar ou estiver antiga, abra o CLI no WSL antes de atualizar. Trocar de CLI limpa o modelo selecionado. Nomes antigos digitados à mão precisam ser selecionados novamente. Após atualizar o MyCut, reconstrua os containers e reinicie também `bash scripts/agents.sh` para carregar o novo executor.
 
-## Fluxo de produção
+</details>
+
+## Como funciona
 
 1. Pesquisa abre fontes e reúne fatos com referências. Se não conseguir verificar a pauta, o fluxo para.
 2. Roteiro cria narração, título, descrição e tags. Direção visual cria cenas de animação/fluxo. A capa não faz parte deste fluxo: ela é criada à parte, na aba **Capa**.
@@ -219,6 +322,9 @@ shorts/claude-cloud/
 
 ## Fluxo original por linha de comando
 
+<details>
+<summary><strong>Renderizar o primeiro Short sem o estúdio</strong></summary>
+
 Execute a partir da raiz do projeto, em Linux ou WSL. Requisitos: Python 3.12, `uv`, FFmpeg com `ffprobe` e fontes DejaVu. Em Ubuntu, as dependências de sistema podem ser instaladas com:
 
 ```bash
@@ -238,7 +344,7 @@ Em uma cópia nova, sem áudio nem `timing.json`, esse comando cria uma **prévi
 
 As saídas são locais e ignoradas pelo Git. O renderizador não sobrescreve um MP4 existente: mova a versão anterior antes de renderizar novamente. Se já houver `timing.json`, ele exigirá o áudio correspondente e usará os tempos reais.
 
-## Produção com narração
+#### Produção com narração
 
 No ambiente já preparado, com a narração selecionada em `shorts/claude-cloud/audio/` e seu manifesto:
 
@@ -263,7 +369,10 @@ Saídas principais:
 
 Nenhum desses comandos publica no YouTube. A revisão final e o envio ainda são manuais.
 
-## Experimentos de voz local
+</details>
+
+<details>
+<summary><strong>Experimentos de voz local (Qwen3-TTS)</strong></summary>
 
 Os experimentos usam Qwen3-TTS e foram executados pelo proprietário em uma RTX 5070 Ti de 16 GB. Eles dependem de gravações, recortes, transcrições e perfis locais que não estão no Git.
 
@@ -274,6 +383,8 @@ bash experiments/narration/run.sh
 ```
 
 `--cpu` permite executar a comparação sem CUDA. O refinamento e a geração com o perfil pessoal reutilizam versões e pesos já disponíveis; não são um assistente de configuração para uma instalação nova. Consulte o [histórico de experimentos](docs/visao-e-experimentos.md) para os requisitos e as avaliações de cada rodada.
+
+</details>
 
 ## Arquivos versionados e arquivos locais
 
