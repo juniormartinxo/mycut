@@ -16,6 +16,7 @@ from . import agent_models, browser, commands, costs
 ATTACHMENT = re.compile(r'anexo-\d{1,2}\.(png|jpg|jpeg|webp)')
 SESSION = re.compile(r'[A-Za-z0-9-]{8,80}')
 IMAGE_SUFFIXES = ('.png', '.jpg', '.jpeg', '.webp')
+HOME_VARIABLES = {'codex': 'CODEX_HOME', 'grok': 'GROK_HOME'}
 
 
 def command(provider, model, folder, schema, web, navigator=None, images=None):
@@ -104,8 +105,35 @@ def image_command(launch, provider, model, folder, schema_text, attachments):
     return args+(['--model', model] if model else [])
 
 
-def generated(provider, stdout):
-    """Files the CLI's image tool saved for this run, oldest first."""
+def cli_homes(group, provider):
+    """CLI home set by a wrapper (e.g. a profile manager) only in the child's environment.
+
+    Read from /proc for every process of the run's group while it is alive."""
+    variable = HOME_VARIABLES.get(provider, '').encode()
+    homes = set()
+    if not variable:
+        return homes
+    for stat in Path('/proc').glob('[0-9]*/stat'):
+        try:
+            if int(stat.read_text().rsplit(')', 1)[1].split()[2]) != group:
+                continue
+            for entry in (stat.parent / 'environ').read_bytes().split(b'\0'):
+                if entry.startswith(variable + b'='):
+                    homes.add(entry.split(b'=', 1)[1].decode())
+        except (OSError, ValueError, IndexError, UnicodeDecodeError):
+            continue
+    return homes
+
+
+def candidate_homes(provider, seen=()):
+    variable = HOME_VARIABLES[provider]
+    default = Path.home() / ('.codex' if provider == 'codex' else '.grok')
+    found = [*seen, commands.environment(provider).get(variable), os.environ.get(variable), str(default)]
+    return [Path(home) for home in dict.fromkeys(home for home in found if home)]
+
+
+def generated(provider, stdout, homes=()):
+    """Files the CLI's image tool saved for this run, oldest first. `homes`: CLI homes seen in the run's processes."""
     if provider == 'codex':
         thread = None
         for line in stdout.splitlines():
@@ -116,15 +144,15 @@ def generated(provider, stdout):
             if isinstance(event, dict) and event.get('type') == 'thread.started':
                 thread = event.get('thread_id')
                 break
-        home = commands.environment('codex').get('CODEX_HOME') or os.environ.get('CODEX_HOME') or str(Path.home() / '.codex')
-        folders = [Path(home) / 'generated_images' / thread] if isinstance(thread, str) and SESSION.fullmatch(thread) else []
+        folders = [home / 'generated_images' / thread for home in candidate_homes('codex', homes)] \
+            if isinstance(thread, str) and SESSION.fullmatch(thread) else []
     elif provider == 'grok':
         try:
             session = last_object(stdout).get('sessionId')
         except (ValueError, AttributeError):
             session = None
-        home = commands.environment('grok').get('GROK_HOME') or os.environ.get('GROK_HOME') or str(Path.home() / '.grok')
-        folders = list((Path(home) / 'sessions').glob(f'*/{session}/images')) if isinstance(session, str) and SESSION.fullmatch(session) else []
+        folders = [folder for home in candidate_homes('grok', homes) for folder in (home / 'sessions').glob(f'*/{session}/images')] \
+            if isinstance(session, str) and SESSION.fullmatch(session) else []
     else:
         return []
     files = [path for folder in folders if folder.is_dir() for path in folder.iterdir()
@@ -233,8 +261,11 @@ def run_request(request_file):
             with (location / 'cli.log').open('w+') as output, (location / 'cli-error.log').open('w+') as error, (folder / 'prompt.txt').open() as input_file:
                 process = subprocess.Popen(args, cwd=folder, stdin=input_file, stdout=output, stderr=error, start_new_session=True)
                 try:
+                    homes = set()
                     while process.poll() is None:
                         heartbeat()
+                        if images:
+                            homes |= cli_homes(process.pid, request['provider'])
                         if disconnected(location, request) or time.time() > request['expires']:
                             raise ValueError('Agente interrompido: produção cancelada, expirada ou worker desconectado.')
                         time.sleep(1)
@@ -248,7 +279,7 @@ def run_request(request_file):
                     result = parse_result(request['provider'], folder, stdout)
                     if images:
                         (location / 'outputs').mkdir(exist_ok=True)
-                        for index, path in enumerate(generated(request['provider'], stdout), 1):
+                        for index, path in enumerate(generated(request['provider'], stdout, homes), 1):
                             shutil.copyfile(path, location / 'outputs' / f'{index}{path.suffix.lower()}')
                 finally:
                     if process.poll() is None:

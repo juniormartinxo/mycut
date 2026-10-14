@@ -183,7 +183,7 @@ class RunnerImageTests(unittest.TestCase):
 
     def test_runner_copies_attachments_and_collects_generated_images(self):
         with tempfile.TemporaryDirectory() as home:
-            session = '01a13ad0-766f-7ac2-a383-09332ae1ccf8'
+            session = '00000000-test-0000-0000-000000000001'
             images = Path(home)/'grok'/'sessions'/'%2Ftmp%2Fx'/session/'images'
             images.mkdir(parents=True)
             (images/'1.jpg').write_bytes(png())
@@ -219,6 +219,29 @@ class RunnerImageTests(unittest.TestCase):
                 (folder/name).unlink()
             agent_runner.run_request(request)
             self.assertIn('Anexo inválido', json.loads((folder/'response.json').read_text())['error'])
+
+    def test_runner_finds_images_when_a_wrapper_sets_the_cli_home_only_for_the_child(self):
+        # Profile managers (e.g. `cloak exec grok --profile x`) export GROK_HOME/CODEX_HOME only to the CLI.
+        session = '01a13b3c-3189-72d2-8554-96ff3a590364'
+        with tempfile.TemporaryDirectory() as home:
+            script = ('import json, os, pathlib, time; time.sleep(2.5); '
+                      f'folder = pathlib.Path(os.environ["GROK_HOME"])/"sessions"/"%2Ftmp%2Fx"/"{session}"/"images"; '
+                      'folder.mkdir(parents=True); '
+                      f'folder.joinpath("1.jpg").write_bytes(bytes.fromhex("{png().hex()}")); '
+                      f'print(json.dumps({{"sessionId": "{session}", "text": json.dumps({{"message": "ok"}})}}))')
+            wrapper = [sys.executable, '-c', 'import os, sys; os.execvpe(sys.argv[1], sys.argv[1:], {**os.environ, "GROK_HOME": sys.argv[-1]})',
+                       sys.executable, '-c', script, home]
+            folder = bridge.BRIDGE/'requests'/'wrapped-home'
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder/'lease').touch()
+            request = folder/'request.json'
+            request.write_text(json.dumps({'provider': 'grok', 'model': '', 'prompt': 'capa', 'schema': {'type': 'object'},
+                                           'web': False, 'expires': time.time()+30, 'kind': 'image', 'attachments': []}))
+            environment = {k: v for k, v in os.environ.items() if k != 'GROK_HOME'}
+            with patch.dict(os.environ, environment, clear=True), patch.object(agent_runner, 'command', return_value=wrapper):
+                agent_runner.run_request(request)
+            self.assertEqual(json.loads((folder/'response.json').read_text())['result'], {'message': 'ok'})
+            self.assertEqual([path.name for path in bridge.outputs('wrapped-home')], ['1.jpg'])
 
 
 if __name__ == '__main__':
