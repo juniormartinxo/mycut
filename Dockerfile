@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app/backend \
     MYCUT_DATA_DIR=/data MYCUT_WEB_DIR=/app/web/dist HF_HOME=/models \
     HF_HUB_DISABLE_TELEMETRY=1
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core \
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core fonts-dejavu-extra \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 studio \
     && mkdir /data /models && chown studio:studio /data /models

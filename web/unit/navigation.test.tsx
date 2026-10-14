@@ -117,7 +117,7 @@ test("navigation, reload, Back and Forward retain the selected page", () => {
     },
   );
   navigation.navigate({ page: "environment", projectId: null });
-  assert.equal(browser.location.hash, "#/conexoes");
+  assert.equal(browser.location.hash, "#/configuracoes/agentes");
   assert.equal(browser.location.search, "?workspace=local");
   navigation.dispose();
   route = readRoute(browser.location.hash); // Fresh app initialization after reload.
@@ -204,7 +204,7 @@ test("manually editing the hash synchronizes the route and respects the leave gu
 // Fresh mounts reproduce the state initialization used after a browser refresh.
 // Browser interactions and layout are covered separately by Playwright.
 for (const [hash, label] of [
-  ["#/conexoes", "Conexões"],
+  ["#/conexoes", "Configurações"],
   ["#/fila", "Fila de produção"],
   ["#/producoes", "Produções"],
 ]) {
@@ -217,3 +217,41 @@ for (const [hash, label] of [
     assert.equal(active, label);
   });
 }
+
+test("settings sections have distinct persistent addresses and preserve legacy links", () => {
+  for (const settings of ["agents", "voices", "environment"] as const) {
+    const route: Route = { page: "environment", projectId: null, settings };
+    assert.deepEqual(readRoute(routeHash(route)), route);
+  }
+  assert.equal(routeHash(readRoute("#/conexoes")), "#/configuracoes/agentes");
+  assert.equal(
+    routeHash(readRoute("#/configuracoes")),
+    "#/configuracoes/agentes",
+  );
+  assert.equal(readRoute("#/configuracoes/inexistente").page, "projects");
+  const browser = new BrowserHistory("#/configuracoes/agentes");
+  let route = readRoute(browser.location.hash);
+  const navigation = createNavigation(
+    browser,
+    () => true,
+    (next) => {
+      route = next;
+    },
+  );
+  navigation.navigate({
+    page: "environment",
+    projectId: null,
+    settings: "voices",
+  });
+  navigation.navigate({
+    page: "environment",
+    projectId: null,
+    settings: "environment",
+  });
+  browser.history.go(-1);
+  assert.equal(route.settings, "voices");
+  assert.equal(browser.location.hash, "#/configuracoes/vozes");
+  browser.history.go(1);
+  assert.equal(route.settings, "environment");
+  navigation.dispose();
+});

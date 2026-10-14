@@ -3,13 +3,13 @@ import json
 import os
 import re
 import selectors
-import shutil
 import signal
 import subprocess
 import tempfile
 import time
 from pathlib import Path
 from .bridge import BRIDGE, PROVIDERS, atomic_json
+from . import commands
 
 MODEL_ID = re.compile(r'^[a-zA-Z0-9._:/-]{1,150}$')
 _refreshed = 0
@@ -38,10 +38,10 @@ def cached_models(provider, path):
 
 def claude_models():
     """Initialize the CLI's control protocol without sending a user/inference prompt."""
-    executable = shutil.which('claude')
-    if not executable:
+    launch = commands.launcher('claude')
+    if not launch:
         return []
-    args = [executable, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json',
+    args = [*launch, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json',
             '--verbose', '--restricted', '--no-session-persistence', '--strict-mcp-config',
             '--mcp-config', '{"mcpServers":{}}', '--tools', '']
     with tempfile.TemporaryDirectory(prefix='mycut-catalog-') as directory:
@@ -108,7 +108,8 @@ def refresh():
     marker.unlink(missing_ok=True)
     _refreshed = time.monotonic()
     data = catalog()
-    paths = {'codex': Path(os.environ.get('CODEX_HOME', str(Path.home()/'.codex'))) / 'models_cache.json',
+    codex_home = commands.environment('codex').get('CODEX_HOME') or os.environ.get('CODEX_HOME')
+    paths = {'codex': Path(codex_home or Path.home()/'.codex') / 'models_cache.json',
              'grok': Path.home()/'.grok/models_cache.json'}
     for provider in PROVIDERS:
         try:

@@ -1,0 +1,70 @@
+.voice-preview {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  min-width: 0;
+}
+.voice-preview .button {
+  justify-self: start;
+}
+.voice-preview audio,
+.voice-tests audio {
+  display: block;
+  width: 100%;
+  max-width: 440px;
+}
+.voice-tests {
+  margin-top: 32px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.voice-tests h3 {
+  font-size: 16px;
+}
+.voice-tests p {
+  max-width: 72ch;
+  overflow-wrap: anywhere;
+}
+.voice-tests textarea {
+  resize: vertical;
+  min-height: 100px;
+  line-height: 1.7;
+}
+.voice-test-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
+.voice-tests .voice-test-quote {
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.voice-test-results {
+  margin-top: 18px;
+  display: grid;
+  gap: 8px;
+}
+.voice-test-results article {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 20px 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.voice-test-results strong {
+  font-size: 14px;
+}
+.voice-preview .voice-error {
+  color: var(--accent);
+}
+@media (max-width: 540px) {
+  .voice-test-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

@@ -65,6 +65,9 @@ token.json
 *.key
 /.agents/
 /.codex/
+/.grok/
+/.claude/skills/*
+!/.claude/skills/gitnexus/
 /.vscode/
 /.idea/
 
@@ -87,5 +90,6 @@ dist/
 /test-results/
 /web/test-results/
 /web/playwright-report/
+/web/playwright.*-tmp.config.ts
 /.impeccable/review/
 /.impeccable/mocks/

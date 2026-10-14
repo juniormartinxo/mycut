@@ -7,7 +7,8 @@ import {
   Settings2,
 } from "lucide-react";
 import { request } from "./api";
-import type { Integrations, Job, Project } from "./types";
+import { FormatPicker } from "./FormatPicker";
+import type { Integrations, Job, Project, VisualStyle } from "./types";
 
 export function useIntegrations() {
   const [settings, setSettings] = useState<Integrations | null>(null);
@@ -91,9 +92,11 @@ export function AgentSteps({ job }: { job?: Job }) {
   const names =
     job.kind === "voice"
       ? ["voice"]
-      : job.kind === "plan"
-        ? ["research", "writer", "director", "reviewer"]
-        : Object.keys(stepNames);
+      : job.kind === "scenes"
+        ? ["director", "reviewer"]
+        : job.kind === "plan"
+          ? ["research", "writer", "director", "reviewer"]
+          : Object.keys(stepNames);
   return (
     <ol className="agent-steps" aria-label="Etapas dos agentes">
       {names.map((name) => {
@@ -122,6 +125,8 @@ export type ProductionDraft = {
   title: string;
   brief: string;
   automation: "pipeline" | "plan" | "none";
+  accent: string | null;
+  visual_style: VisualStyle;
 };
 
 export function NewProduction({
@@ -137,7 +142,7 @@ export function NewProduction({
   onCancel: () => void;
   onConnect: () => void;
 }) {
-  const { title, brief, automation } = draft;
+  const { title, brief, automation, accent, visual_style } = draft;
   const setTitle = (title: string) => onDraftChange({ ...draft, title });
   const setBrief = (brief: string) => onDraftChange({ ...draft, brief });
   const setAutomation = (automation: ProductionDraft["automation"]) =>
@@ -175,6 +180,8 @@ export function NewProduction({
                   title: title.trim() || "Nova pauta",
                   brief,
                   automation,
+                  accent,
+                  visual_style,
                 }),
               }),
             );
@@ -207,6 +214,14 @@ export function NewProduction({
             required={automation === "none"}
           />
         </label>
+        <FormatPicker
+          value={visual_style}
+          accent={accent || "#BE4D2A"}
+          onChange={(visual_style, accent) =>
+            onDraftChange({ ...draft, visual_style, accent })
+          }
+          disabled={busy}
+        />
         <fieldset className="template-choice" disabled={busy}>
           <legend>O que produzir</legend>
           {(

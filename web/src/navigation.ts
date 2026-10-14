@@ -2,13 +2,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type Page = "projects" | "queue" | "environment" | "new";
 export type Tab =
-  "brief" | "script" | "scenes" | "media" | "publication" | "versions";
-export type Route = { page: Page; projectId: string | null; tab?: Tab };
+  | "brief"
+  | "script"
+  | "scenes"
+  | "media"
+  | "publication"
+  | "versions"
+  | "costs";
+export type SettingsSection = "agents" | "voices" | "environment" | "costs";
+export type Route = {
+  page: Page;
+  projectId: string | null;
+  tab?: Tab;
+  settings?: SettingsSection;
+};
+
+const settingsPaths: Record<SettingsSection, string> = {
+  agents: "agentes",
+  voices: "vozes",
+  environment: "ambiente",
+  costs: "custos",
+};
 
 const pages: Record<Page, string> = {
   projects: "producoes",
   queue: "fila",
-  environment: "conexoes",
+  environment: "configuracoes",
   new: "novo",
 };
 const tabs = new Set<Tab>([
@@ -18,6 +37,7 @@ const tabs = new Set<Tab>([
   "media",
   "publication",
   "versions",
+  "costs",
 ]);
 const projectId = /^[a-f0-9]{32}$/;
 const home: Route = { page: "projects", projectId: null };
@@ -27,6 +47,21 @@ export function readRoute(hash: string): Route {
   // Preserve links created before navigation used named routes.
   if (projectId.test(path)) return { ...home, projectId: path };
   const [section, id, tab, extra] = path.split("/");
+  if (
+    (section === "configuracoes" || section === "conexoes") &&
+    !tab &&
+    !extra
+  ) {
+    const settings = (Object.keys(settingsPaths) as SettingsSection[]).find(
+      (key) => settingsPaths[key] === id,
+    );
+    if (!id || settings)
+      return {
+        page: "environment",
+        projectId: null,
+        settings: settings ?? "agents",
+      };
+  }
   if (section === "producoes" && id && projectId.test(id) && !extra) {
     return {
       ...home,
@@ -46,7 +81,9 @@ export function readRoute(hash: string): Route {
 export function routeHash(route: Route): string {
   return route.projectId
     ? `#/producoes/${route.projectId}${route.tab ? `/${route.tab}` : ""}`
-    : `#/${pages[route.page]}`;
+    : route.page === "environment"
+      ? `#/configuracoes/${settingsPaths[route.settings ?? "agents"]}`
+      : `#/${pages[route.page]}`;
 }
 
 export interface NavigationHost {

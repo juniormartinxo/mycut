@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 import test_studio  # Sets isolated DATA before the application modules are imported.
-from mycut import agent_runner, bridge, elevenlabs, integrations, pipeline, store
+from mycut import agent_runner, bridge, commands, costs, elevenlabs, integrations, pipeline, store
 from mycut.config import DATA
 
 CATALOG = {'voices': [{'id':'junior123','name':'Junior','category':'cloned'}],
@@ -115,6 +115,80 @@ class AutomationTests(unittest.TestCase):
                 pipeline.produce(job)
         self.assertEqual(invoke.call_count,1)
 
+    def test_project_costs_are_itemized_by_version_step_attempt_and_model(self):
+        integrations.save_section('agents', {'research': {'provider': 'grok', 'model': ''},
+            'writer': {'provider': 'claude', 'model': 'claude-sonnet-5-5'},
+            'director': {'provider': 'codex', 'model': 'gpt-6-astra'}, 'reviewer': {'provider': 'codex', 'model': 'unpriced-model'}})
+        job=self.start()
+        envelopes={'grok': {'modelUsage': {'grok-4.7-build': {'inputTokens': 1000, 'outputTokens': 200, 'cacheReadInputTokens': 500, 'costUSD': .01}},
+                            'usage': {'reasoning_tokens': 150}},
+                   'claude': {'modelUsage': {'claude-sonnet-5-5': {'inputTokens': 10, 'outputTokens': 900, 'cacheReadInputTokens': 4000,
+                                                                   'cacheCreationInputTokens': 2000, 'webSearchRequests': 1, 'costUSD': .05},
+                                             'claude-haiku-5-5': {'inputTokens': 3000, 'outputTokens': 100, 'costUSD': .004}}}}
+        outputs=iter([RESEARCH,SCRIPT,DIRECTION,{'approved':True,'issues':[]}])
+        def runner(config, prompt, schema, web=False, request_id=None):
+            if config['provider']=='codex':
+                stdout='{"type":"turn.completed","usage":{"input_tokens":1000000,"cached_input_tokens":400000,"output_tokens":20000,"reasoning_output_tokens":5000}}'
+            else:
+                stdout=json.dumps(envelopes[config['provider']])
+            bridge.atomic_json(bridge.BRIDGE/'requests'/request_id/'response.json',
+                               {'result': {}, 'usage': costs.extract(config['provider'], config['model'], stdout)})
+            return next(outputs)
+        mp3=DATA/'fixture-costs.mp3'
+        subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=220:duration=8','-codec:a','libmp3lame',str(mp3)],check=True)
+        text='\n\n'.join(PARAGRAPHS)
+        step=7.5/len(text)
+        chars={'characters':list(text),'character_start_times_seconds':[i*step for i in range(len(text))],'character_end_times_seconds':[(i+1)*step for i in range(len(text))]}
+        def api(key, method, path, meta=None, **kwargs):
+            meta['credits']=321.0
+            return {'audio_base64':base64.b64encode(mp3.read_bytes()).decode(),'normalized_alignment':chars}
+        with patch.object(bridge,'invoke',side_effect=runner), patch.object(elevenlabs,'api',side_effect=api):
+            pipeline.produce(job)
+        store.finish(job['id'],'succeeded','Pronto')
+        # An older version from before the feature has no usage rows.
+        old=store.enqueue(self.project['id'],'preview',store.get_project(self.project['id'])['revision'],'plan',integrations.read())
+        store.claim(); store.finish(old['id'],'failed','Antiga')
+        usage=self.client.get(f'/api/projects/{self.project["id"]}/usage').json()
+        version=next(v for v in usage['versions'] if v['id']==job['id'])
+        lines={(c['step'],c['model']): c for c in version['calls']}
+        self.assertEqual(set(lines),{('research','grok-4.7-build'),('writer','claude-sonnet-5-5'),('writer','claude-haiku-5-5'),
+                                     ('director','gpt-6-astra'),('reviewer','unpriced-model'),('voice','eleven_multilingual_v2')})
+        self.assertEqual(lines[('research','grok-4.7-build')]['reasoning'],150)
+        self.assertEqual(lines[('writer','claude-sonnet-5-5')]['cost_source'],'cli')
+        self.assertEqual(lines[('writer','claude-sonnet-5-5')]['web_searches'],1)
+        director=lines[('director','gpt-6-astra')]
+        self.assertEqual((director['input'],director['cache_read'],director['output']),(600000,400000,20000))
+        self.assertAlmostEqual(director['usd'],.6*10+.4*1+.02*50)
+        self.assertEqual(director['cost_source'],'tabela')
+        self.assertIsNone(lines[('reviewer','unpriced-model')]['usd'])
+        voice=lines[('voice','eleven_multilingual_v2')]
+        self.assertEqual((voice['credits'],voice['usd'],voice['credits_estimated']),(321.0,None,False))
+        self.assertEqual(version['total']['unpriced'],2)
+        self.assertAlmostEqual(version['total']['usd'],.01+.05+.004+7.4)
+        self.assertFalse(next(v for v in usage['versions'] if v['id']==old['id'])['recorded'])
+        pricing={**integrations.read()['pricing'],'elevenlabs_usd_per_1k_credits':.3,'usd_brl':5}
+        pricing['models']={**pricing['models'],'unpriced-model':{'input':1,'cache_read':.1,'output':2}}
+        self.assertEqual(self.client.put('/api/integrations/pricing',json={k:pricing[k] for k in ('usd_brl','elevenlabs_usd_per_1k_credits','models')}).status_code,200)
+        usage=self.client.get(f'/api/projects/{self.project["id"]}/usage').json()
+        self.assertEqual(usage['total']['unpriced'],0)
+        self.assertAlmostEqual(usage['total']['usd'],.064+7.4+(.6*1+.4*.1+.02*2)+.321*.3)
+        self.assertEqual(usage['usd_brl'],5)
+        listed=next(p for p in self.client.get('/api/projects').json() if p['id']==self.project['id'])
+        self.assertAlmostEqual(listed['usage_total']['usd'],usage['total']['usd'])
+        self.assertEqual(self.client.put('/api/integrations/pricing',json={'usd_brl':0,'models':{}}).status_code,422)
+
+    def test_interrupted_call_is_reconciled_from_the_runner_answer(self):
+        job=self.start('plan')
+        store.usage_start('late-answer',job['id'],'research',1,'grok','')
+        store.cancel(job['id'])
+        usage=costs.project(self.project['id'],integrations.read()['pricing'])
+        self.assertEqual(usage['versions'][0]['calls'][0]['state'],'interrupted')
+        self.assertTrue(usage['versions'][0]['calls'][0]['unreported'])
+        bridge.atomic_json(bridge.BRIDGE/'requests'/'late-answer'/'response.json', {'error':'Agente interrompido.','usage':[
+            {'model':'grok-4.7-build','input':10,'cache_read':0,'cache_write':0,'output':5,'reasoning':0,'web_searches':0,'cost_usd':.002}]})
+        call=costs.project(self.project['id'],integrations.read()['pricing'])['versions'][0]['calls'][0]
+        self.assertEqual((call['state'],call['usd'],call['output']),('failed',.002,5))
+
     def test_real_pipeline_renders_provider_audio_with_timestamps(self):
         job=self.start()
         mp3=DATA/'fixture.mp3'
@@ -151,7 +225,7 @@ class AutomationTests(unittest.TestCase):
             elevenlabs.transcript_from_characters({'characters':['a'],'character_start_times_seconds':[], 'character_end_times_seconds':[]},audio)
 
     def test_cli_adapters_parse_structured_outputs_and_disable_approval_prompts(self):
-        with tempfile.TemporaryDirectory() as temp, patch.object(agent_runner.shutil,'which',side_effect=lambda name:'/bin/'+name):
+        with tempfile.TemporaryDirectory() as temp, patch.object(commands.shutil,'which',side_effect=lambda name:'/bin/'+name):
             folder=Path(temp)
             for provider in bridge.PROVIDERS:
                 args=agent_runner.command(provider,'test-model',folder,{'type':'object'},False)
@@ -185,7 +259,7 @@ class AutomationTests(unittest.TestCase):
         with patch.object(agent_runner,'command',return_value=args):
             agent_runner.run_request(request)
         response=json.loads((folder/'response.json').read_text())
-        self.assertEqual(response,{'result':{'approved':True}})
+        self.assertEqual(response,{'result':{'approved':True},'usage':[]})
         self.assertTrue((folder/'started').is_file())
         # A second scan must not execute or overwrite a completed request.
         with patch.object(agent_runner.subprocess,'Popen') as process:

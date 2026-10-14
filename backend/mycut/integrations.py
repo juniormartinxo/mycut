@@ -5,6 +5,8 @@ import json
 import os
 import tempfile
 from .config import DATA, configure
+from .commands import DEFAULTS as COMMANDS
+from .costs import DEFAULTS as PRICING
 
 ROLES = ('research', 'writer', 'director', 'reviewer')
 DEFAULTS = {
@@ -13,12 +15,19 @@ DEFAULTS = {
     'elevenlabs': {'api_key': '', 'voice_id': '', 'voice_name': '',
                   'model_id': 'eleven_multilingual_v2', 'stability': .5,
                   'similarity_boost': .75, 'speed': 1.0},
+    'commands': COMMANDS,
+    'browser': {'enabled': True, 'chrome_path': '', 'port': 9222},
+    'pricing': PRICING,
 }
 
 
 def read():
     path = DATA / 'private/integrations.json'
-    return json.loads(path.read_text()) if path.exists() else copy.deepcopy(DEFAULTS)
+    settings = copy.deepcopy(DEFAULTS)
+    # Sections added after the file was written keep their defaults.
+    for name, values in (json.loads(path.read_text()) if path.exists() else {}).items():
+        settings.setdefault(name, {}).update(values)
+    return settings
 
 
 def save_section(name, values):
@@ -39,11 +48,16 @@ def save_section(name, values):
 
 
 def public():
-    from .bridge import status
+    from .bridge import BRIDGE, status
     from .agent_models import catalog
     settings = read()
     eleven = settings['elevenlabs']
-    return {'agents': settings['agents'], 'runner': status(), 'agent_models': catalog(),
+    try:
+        browser_test = json.loads((BRIDGE / 'browser-test.json').read_text())
+    except (OSError, ValueError):
+        browser_test = None
+    return {'agents': settings['agents'], 'commands': settings['commands'], 'runner': status(),
+            'browser': settings['browser'], 'browser_test': browser_test, 'pricing': settings['pricing'], 'agent_models': catalog(),
             'elevenlabs': {**{k: v for k, v in eleven.items() if k != 'api_key'},
                           'connected': bool(eleven['api_key'])}}
 

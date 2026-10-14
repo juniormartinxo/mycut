@@ -45,7 +45,7 @@ def run_once():
     if store.get_job(job['id'])['state'] != 'cancelled':
         if code == 0:
             output = json.loads((folder / 'result.json').read_text())
-            message = {'plan': 'Roteiro, cenas e capa prontos', 'voice': 'Narração gerada pela ElevenLabs'}.get(job['kind'], 'Pronto para revisar')
+            message = {'plan': 'Roteiro, cenas e capa prontos', 'scenes': 'Cenas e capa recriadas pelos agentes', 'voice': 'Narração gerada pela ElevenLabs'}.get(job['kind'], 'Pronto para revisar')
             store.finish(job['id'], 'succeeded', message, output)
         else:
             message = (folder / 'worker.log').read_text(errors='replace').strip().splitlines()

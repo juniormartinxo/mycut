@@ -10,6 +10,7 @@ import {
   Clapperboard,
   Download,
   FileText,
+  Coins,
   Film,
   FolderOpen,
   Headphones,
@@ -26,6 +27,9 @@ import {
 } from "lucide-react";
 import type { ProductionDraft } from "./Automation";
 import { Connections } from "./Connections";
+import { FormatPicker, RenderedScene, initialStyle } from "./FormatPicker";
+import { money, ProjectCosts, tokens } from "./ProjectCosts";
+import { SettingsMenu } from "./SettingsMenu";
 import {
   AgentSteps,
   ConnectionHint,
@@ -67,6 +71,7 @@ const tabs: { id: Tab; name: string; icon: typeof FileText }[] = [
   { id: "media", name: "Voz e capa", icon: Headphones },
   { id: "publication", name: "Publicação", icon: Upload },
   { id: "versions", name: "Versões", icon: Film },
+  { id: "costs", name: "Custos", icon: Coins },
 ];
 
 function status(project: Project) {
@@ -136,6 +141,8 @@ export default function App() {
     title: "",
     brief: "",
     automation: "pipeline",
+    accent: null,
+    visual_style: initialStyle,
   });
   const [projects, setProjects] = useState<Project[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
@@ -230,10 +237,24 @@ export default function App() {
           <button
             className={page === "environment" ? "nav-item active" : "nav-item"}
             onClick={() => select(null, "environment")}
+            aria-expanded={page === "environment"}
+            aria-controls={
+              page === "environment" ? "settings-sidebar-menu" : undefined
+            }
+            title="Configurações"
           >
             <Settings2 size={19} />
-            Conexões
+            Configurações
           </button>
+          {page === "environment" && (
+            <SettingsMenu
+              placement="sidebar"
+              section={route.settings ?? "agents"}
+              onNavigate={(settings) =>
+                navigate({ page: "environment", projectId: null, settings })
+              }
+            />
+          )}
         </nav>
         <div className="sidebar-note">
           <Clapperboard size={24} strokeWidth={1.3} />
@@ -299,7 +320,13 @@ export default function App() {
             onConnect={() => select(null, "environment")}
             onCancel={() => select(null)}
             onCreated={(p) => {
-              setNewDraft({ title: "", brief: "", automation: "pipeline" });
+              setNewDraft({
+                title: "",
+                brief: "",
+                automation: "pipeline",
+                accent: null,
+                visual_style: initialStyle,
+              });
               update(p);
               select(p.id);
             }}
@@ -312,7 +339,13 @@ export default function App() {
             onUpdate={update}
           />
         ) : page === "environment" ? (
-          <Connections health={health} />
+          <Connections
+            health={health}
+            section={route.settings ?? "agents"}
+            onNavigate={(settings) =>
+              navigate({ page: "environment", projectId: null, settings })
+            }
+          />
         ) : (
           <section className="library">
             <div className="page-heading">
@@ -413,6 +446,16 @@ export default function App() {
                             <span>
                               {p.audio ? "Com narração" : "Adicionar voz"}
                             </span>
+                            {tokens(p.usage_total) + p.usage_total.credits >
+                              0 && (
+                              <span
+                                className="project-cost"
+                                title="Valor aproximado em preço de tabela das APIs"
+                              >
+                                ≈ {money(p.usage_total.usd)}
+                                {p.usage_total.unpriced > 0 && " + sem preço"}
+                              </span>
+                            )}
                           </div>
                           <div className="project-card-footer">
                             <span>{date(p.updated_at)}</span>
@@ -474,6 +517,11 @@ function Editor({
   const [draft, setDraft] = useState({ ...project, brief: initialBrief });
   const { settings, error: connectionError } = useIntegrations();
   const ready = readiness(settings);
+  const visualReady =
+    !!settings?.runner.online &&
+    [settings.agents.director, settings.agents.reviewer].every(
+      (a) => settings.runner.providers[a.provider],
+    );
   const [dirty, setDirty] = useState(false);
   const [selectedScene, setSceneIndex] = useState(0);
   const sceneIndex = Math.min(selectedScene, draft.scenes.length - 1);
@@ -492,6 +540,8 @@ function Editor({
         (j) => j.id === viewedJob && j.state === "succeeded" && j.output,
       )) ||
     completedJob(project);
+  const previewJob =
+    !dirty && tab !== "brief" && tab !== "scenes" ? done : null;
   const wordCount = draft.scenes.reduce(
     (n, s) => n + s.narration.trim().split(/\s+/).filter(Boolean).length,
     0,
@@ -548,6 +598,8 @@ function Editor({
       sources,
       brief,
       accent,
+      accent_locked = true,
+      visual_style = null,
       scenes,
       revision,
     } = draft;
@@ -560,6 +612,8 @@ function Editor({
         sources,
         brief,
         accent,
+        accent_locked,
+        visual_style,
         scenes,
         revision,
       }),
@@ -567,7 +621,7 @@ function Editor({
     accept(saved);
     return saved;
   };
-  const runAgents = (kind: "pipeline" | "plan" | "voice") =>
+  const runAgents = (kind: "pipeline" | "plan" | "voice" | "scenes") =>
     void action(async () => {
       const current =
         dirty || draft.brief !== project.brief ? await save() : draft;
@@ -603,6 +657,12 @@ function Editor({
     });
   };
   const scene = draft.scenes[sceneIndex] || draft.scenes[0];
+  const incompleteScenes = draft.scenes.filter((s) => {
+    const count = s.items.filter((item) => item.trim()).length;
+    return s.layout === "comparison"
+      ? count !== 2
+      : count < (s.layout === "flow" ? 2 : 1);
+  }).length;
   const reset = () => {
     setDraft(project);
     setDirty(false);
@@ -772,6 +832,18 @@ function Editor({
                     placeholder="Link da notícia, vídeo ou assunto do Short…"
                   />
                 </label>
+                <FormatPicker
+                  value={draft.visual_style || null}
+                  accent={draft.accent}
+                  onChange={(visual_style, accent) =>
+                    change({
+                      visual_style,
+                      accent,
+                      accent_locked: true,
+                    })
+                  }
+                  disabled={locked}
+                />
                 <ConnectionHint settings={settings} onConnect={onConnect} />
                 {connectionError && <Notice error>{connectionError}</Notice>}
                 <div className="automation-actions">
@@ -876,8 +948,11 @@ function Editor({
               <>
                 <div className="section-heading">
                   <div>
-                    <h2>Dê forma à explicação</h2>
-                    <p>Textos curtos e uma ideia visual por cena.</p>
+                    <h2>Revise as cenas do seu Short</h2>
+                    <p>
+                      Os agentes criam os diagramas. Aqui você confere e ajusta
+                      o resultado.
+                    </p>
                   </div>
                   <label className="color-field">
                     <input
@@ -885,10 +960,48 @@ function Editor({
                       aria-label="Cor de destaque do vídeo"
                       value={draft.accent}
                       disabled={locked}
-                      onChange={(e) => change({ accent: e.target.value })}
+                      onChange={(e) =>
+                        change({ accent: e.target.value, accent_locked: true })
+                      }
                     />
                     Cor do vídeo
                   </label>
+                </div>
+                <div className="scene-agent-actions">
+                  {incompleteScenes > 0 && (
+                    <Notice>
+                      {incompleteScenes === 1
+                        ? "Uma cena está sem o conteúdo visual completo."
+                        : `${incompleteScenes} cenas estão sem o conteúdo visual completo.`}{" "}
+                      Os agentes podem completá-las a partir do roteiro.
+                    </Notice>
+                  )}
+                  <button
+                    className="button secondary"
+                    disabled={
+                      locked ||
+                      !visualReady ||
+                      draft.scenes.some((s) => !s.narration.trim())
+                    }
+                    onClick={() => runAgents("scenes")}
+                  >
+                    <Layers size={17} />
+                    {incompleteScenes
+                      ? "Criar cenas com agentes"
+                      : "Refazer cenas com agentes"}
+                  </button>
+                  {!visualReady && (
+                    <button className="text-button" onClick={onConnect}>
+                      Configurar agentes
+                    </button>
+                  )}
+                  <p>
+                    Direção visual e conferência recriam as cenas e a capa. O
+                    roteiro e a voz são preservados. Usa a cota dos CLIs.
+                  </p>
+                  {project.jobs[0]?.kind === "scenes" && (
+                    <AgentSteps job={project.jobs[0]} />
+                  )}
                 </div>
                 <div className="scene-selector" aria-label="Selecionar cena">
                   {draft.scenes.map((s, i) => (
@@ -904,6 +1017,95 @@ function Editor({
                   ))}
                 </div>
                 <fieldset className="scene-form" disabled={locked}>
+                  {draft.visual_style?.media_mode === "mixed" && (
+                    <div className="scene-image-controls">
+                      <label>
+                        Conteúdo desta cena
+                        <select
+                          value={scene.image_id || ""}
+                          onChange={(e) =>
+                            changeScene(sceneIndex, {
+                              image_id: e.target.value || null,
+                            })
+                          }
+                        >
+                          <option value="">Animação e diagrama</option>
+                          {(draft.images || []).map((image) => (
+                            <option key={image.id} value={image.id}>
+                              {image.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="button secondary scene-image-upload">
+                        <ImagePlus size={16} aria-hidden="true" />
+                        Adicionar imagem à cena
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (!file) return;
+                            void action(async () => {
+                              const current = dirty ? await save() : draft;
+                              const data = new FormData();
+                              data.append("file", file);
+                              const saved = await request<Project>(
+                                `/projects/${project.id}/images?revision=${current.revision}`,
+                                { method: "POST", body: data },
+                              );
+                              const uploaded = saved.images?.at(-1);
+                              accept(saved);
+                              if (uploaded) {
+                                setDraft({
+                                  ...saved,
+                                  scenes: saved.scenes.map((s, index) =>
+                                    index === sceneIndex
+                                      ? {
+                                          ...s,
+                                          image_id: uploaded.id,
+                                          image_fit: "contain",
+                                        }
+                                      : s,
+                                  ),
+                                });
+                                setDirty(true);
+                              }
+                            });
+                          }}
+                        />
+                      </label>
+                      {scene.image_id && (
+                        <label>
+                          Enquadramento da imagem
+                          <select
+                            value={scene.image_fit || "contain"}
+                            onChange={(e) =>
+                              changeScene(sceneIndex, {
+                                image_fit: e.target.value as
+                                  "contain" | "cover",
+                              })
+                            }
+                          >
+                            <option value="contain">
+                              Mostrar imagem inteira
+                            </option>
+                            <option value="cover">
+                              Preencher área (pode cortar)
+                            </option>
+                          </select>
+                        </label>
+                      )}
+                      <p>
+                        PNG, JPG ou WebP · até 15 MB. Os agentes também podem
+                        reutilizar as imagens desta produção.
+                      </p>
+                      {(draft.image_notes || []).map((note, i) => (
+                        <p key={i}>{note}</p>
+                      ))}
+                    </div>
+                  )}
                   <label>
                     Título em tela
                     <input
@@ -1214,6 +1416,7 @@ function Editor({
                 </div>
               </>
             )}
+            {tab === "costs" && <ProjectCosts project={project} />}
             {tab === "versions" && (
               <>
                 <div className="section-heading">
@@ -1238,11 +1441,13 @@ function Editor({
                           <strong>
                             {j.kind === "plan"
                               ? "Roteiro e cenas"
-                              : j.kind === "voice"
-                                ? "Narração"
-                                : j.mode === "final"
-                                  ? "Vídeo final"
-                                  : "Prévia"}{" "}
+                              : j.kind === "scenes"
+                                ? "Cenas e capa"
+                                : j.kind === "voice"
+                                  ? "Narração"
+                                  : j.mode === "final"
+                                    ? "Vídeo final"
+                                    : "Prévia"}{" "}
                             <span>· versão {project.jobs.length - i}</span>
                           </strong>
                           <p>{j.message}</p>
@@ -1292,15 +1497,22 @@ function Editor({
             <span>9:16</span>
           </div>
           <div className="preview-stage">
-            {done ? (
+            {previewJob ? (
               <video
-                key={done.id}
+                key={previewJob.id}
                 controls
                 playsInline
                 preload="metadata"
-                poster={fileUrl(done.id, "capa.png")}
-                src={fileUrl(done.id, "short.mp4")}
+                poster={fileUrl(previewJob.id, "capa.png")}
+                src={fileUrl(previewJob.id, "short.mp4")}
                 aria-label="Prévia do Short"
+              />
+            ) : draft.visual_style ? (
+              <RenderedScene
+                scene={scene}
+                style={draft.visual_style}
+                accent={draft.accent}
+                projectId={project.id}
               />
             ) : (
               <div
@@ -1320,16 +1532,18 @@ function Editor({
           </div>
           <div className="preview-details">
             <span>
-              {done?.output
-                ? `${done.output.width} × ${done.output.height}`
+              {previewJob?.output
+                ? `${previewJob.output.width} × ${previewJob.output.height}`
                 : "Composição da cena"}
-              {done?.output ? ` · ${seconds(done.output.duration)}` : ""}
+              {previewJob?.output
+                ? ` · ${seconds(previewJob.output.duration)}`
+                : ""}
             </span>
             <small>
-              {done
-                ? dirty || done.revision !== project.revision
+              {previewJob
+                ? previewJob.revision !== project.revision
                   ? "Versão anterior. Gere novamente após salvar."
-                  : done.output?.has_audio
+                  : previewJob.output?.has_audio
                     ? "Com narração · revisão final pendente"
                     : "Sem narração · tempos estimados"
                 : "Gere uma prévia para assistir à animação."}
@@ -1380,19 +1594,21 @@ function Editor({
 }
 
 function SceneDiagram({ scene }: { scene: Scene }) {
-  const values = scene.items.filter(Boolean);
+  const values = scene.items.filter((item) => item.trim());
   const items =
     scene.layout === "statement" && values.length ? [values.join(" ")] : values;
   return (
     <div className={`scene-diagram ${scene.layout}`}>
-      {(items.length ? items : ["Sua ideia em destaque"]).map((item, i) => (
-        <div key={i}>
-          <span>{item}</span>
-          {scene.layout === "flow" && i < items.length - 1 && (
-            <ArrowDown size={20} />
-          )}
-        </div>
-      ))}
+      {(items.length ? items : ["Aguardando conteúdo visual"]).map(
+        (item, i) => (
+          <div key={i}>
+            <span>{item}</span>
+            {scene.layout === "flow" && i < items.length - 1 && (
+              <ArrowDown size={20} />
+            )}
+          </div>
+        ),
+      )}
     </div>
   );
 }
@@ -1503,11 +1719,13 @@ function Queue({
                   {date(j.created_at)} ·{" "}
                   {j.kind === "plan"
                     ? "Roteiro e cenas"
-                    : j.kind === "voice"
-                      ? "Narração"
-                      : j.mode === "final"
-                        ? "1080p"
-                        : "540p"}
+                    : j.kind === "scenes"
+                      ? "Cenas e capa"
+                      : j.kind === "voice"
+                        ? "Narração"
+                        : j.mode === "final"
+                          ? "1080p"
+                          : "540p"}
                 </small>
               </div>
               <span

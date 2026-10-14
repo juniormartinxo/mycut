@@ -1,20 +1,24 @@
 import os
 import shutil
 import tempfile
+import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from PIL import UnidentifiedImageError, Image
 from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
-from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentTestRequest, ElevenConnect, ElevenSettings
-from . import integrations, elevenlabs, bridge, agent_models, agent_tests
+from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings
+from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
+from . import voice_tests
+from . import visuals
+from .models import ScenePreview
 from .seed import blank, claude, initialize_example
 
 
@@ -66,13 +70,70 @@ async def validation(request, exc):
 def present(project):
     project = dict(project)
     project.setdefault('brief', '')
+    project.setdefault('visual_style', None)
     project['jobs'] = store.jobs(project['id'])
     for key in ['audio', 'cover']:
         if project.get(key):
             project[key] = {k: v for k, v in project[key].items() if k not in ('path', 'alignment')}
             project[key]['url'] = f'/api/projects/{project["id"]}/assets/{key}?v={project["revision"]}'
+    project['usage_total'] = costs.project(project['id'], integrations.read()['pricing'])['total']
     project['audio_matches_script'] = bool(project.get('audio') and project['audio']['script_hash'] == store.script_hash(project))
+    project['images'] = [{k: v for k, v in item.items() if k != 'path'} |
+                         {'url': f'/api/projects/{project["id"]}/images/{item["id"]}'}
+                         for item in project.get('images', [])]
     return project
+
+
+@app.get('/api/short-formats')
+def short_formats():
+    return {'formats': [{k: v for k, v in item.items() if k != 'direction'} |
+                        {'preview_url': f'/api/short-formats/{item["id"]}/preview.png'}
+                        for item in visuals.FORMATS], 'fonts': visuals.FONT_NAMES}
+
+
+@app.get('/api/short-formats/{format_id}/preview.png')
+def format_preview(format_id: str):
+    if format_id not in {item['id'] for item in visuals.FORMATS}:
+        raise HTTPException(404, 'Formato não encontrado.')
+    sample = {'title': 'Da ideia à ação', 'layout': 'flow',
+              'items': ['Você define a tarefa', 'O agente executa', 'Você revisa o resultado'], 'narration': ''}
+    selected = visuals.preset(format_id)
+    return Response(visuals.preview_png(sample, {'visual_style': {'format_id': format_id}, 'accent': selected['accent']}, 270),
+                    media_type='image/png', headers={'Cache-Control': 'public, max-age=3600'})
+
+
+@app.post('/api/scene-preview')
+def scene_preview(body: ScenePreview):
+    document = body.model_dump()
+    if body.project_id:
+        document['images'] = store.get_project(body.project_id).get('images', [])
+    return Response(visuals.preview_png(body.scene.model_dump(), document), media_type='image/png')
+
+
+@app.post('/api/projects/{project_id}/images')
+def upload_scene_image(project_id: str, file: UploadFile, revision: int = Query(ge=1)):
+    from .scene_images import import_image
+    project = store.get_project(project_id)
+    if len(project.get('images', [])) >= 24:
+        raise ValueError('Use até 24 imagens por produção.')
+    try:
+        content = file.file.read(15 * 1024 * 1024 + 1)
+        record = import_image(content, project_id, file.filename or 'Imagem')
+        try:
+            return present(store.update_project(project_id, {'images': [*project.get('images', []), record]}, revision))
+        except BaseException:
+            media.data_path(record['path']).unlink(missing_ok=True)
+            raise
+    finally:
+        file.file.close()
+
+
+@app.get('/api/projects/{project_id}/images/{image_id}')
+def project_image(project_id: str, image_id: str):
+    record = next((item for item in store.get_project(project_id).get('images', []) if item['id'] == image_id), None)
+    if record is None:
+        raise HTTPException(404, 'Imagem não encontrada.')
+    return FileResponse(media.data_path(record['path']), media_type='image/png')
 
 
 @app.get('/api/health')
@@ -94,6 +155,13 @@ def create(body: CreateProject):
     document = claude() if body.template == 'claude-cloud' else blank(body.title)
     document['title'] = body.title.strip() or 'Novo Short'
     document['brief'] = body.brief
+    document['accent_locked'] = body.accent is not None
+    if body.visual_style is not None:
+        document['visual_style'] = body.visual_style.model_dump()
+        document['accent'] = body.accent or visuals.preset(body.visual_style.format_id)['accent']
+        document['accent_locked'] = True
+    if body.accent is not None:
+        document['accent'] = body.accent
     result = store.create_project(document)
     if body.automation != 'none':
         store.enqueue(result['id'], 'final', result['revision'], body.automation, settings)
@@ -104,6 +172,8 @@ def ready_for(kind):
     settings = integrations.read()
     if kind in ('pipeline', 'plan'):
         bridge.require(v['provider'] for v in settings['agents'].values())
+    if kind == 'scenes':
+        bridge.require(settings['agents'][role]['provider'] for role in ('director', 'reviewer'))
     if kind in ('pipeline', 'voice'):
         integrations.require_voice()
     return settings
@@ -119,6 +189,49 @@ def configure_agents(body: AgentSettings):
     for choice in body.model_dump().values():
         agent_models.validate(choice)
     return integrations.save_section('agents', body.model_dump())
+
+
+@app.put('/api/integrations/commands')
+def configure_commands(body: AgentCommands):
+    # Runs on the host as the user's own shell would; origin checks above keep it local.
+    values = {provider: text.strip() for provider, text in body.model_dump().items()}
+    for text in values.values():
+        commands.parse(text)
+    result = integrations.save_section('commands', values)
+    bridge.BRIDGE.mkdir(parents=True, exist_ok=True)
+    # Another login or config dir may expose another model list.
+    (bridge.BRIDGE / 'refresh-models').touch()
+    return result
+
+
+@app.put('/api/integrations/pricing')
+def configure_pricing(body: PricingSettings):
+    return integrations.save_section('pricing', body.model_dump())
+
+
+@app.get('/api/projects/{project_id}/usage')
+def project_usage(project_id: str):
+    store.get_project(project_id)
+    return costs.project(project_id, integrations.read()['pricing'])
+
+
+@app.put('/api/integrations/browser')
+def configure_browser(body: BrowserSettings):
+    values = body.model_dump()
+    values['chrome_path'] = values['chrome_path'].strip()
+    return integrations.save_section('browser', values)
+
+
+@app.post('/api/integrations/browser/test', status_code=202)
+def test_browser():
+    bridge.require([])
+    if not integrations.read()['browser']['enabled']:
+        raise ValueError('Ative o navegador antes de testar.')
+    if bridge.status().get('protocol', 0) < 3:
+        raise ValueError('Reinicie bash scripts/agents.sh no WSL para habilitar o navegador.')
+    test_id = uuid.uuid4().hex
+    bridge.atomic_json(bridge.BRIDGE / 'browser-test', {'id': test_id})
+    return {'id': test_id, 'message': 'O executor vai abrir o Chrome e testar o navegador quando estiver livre.'}
 
 
 @app.post('/api/integrations/agents/models/refresh', status_code=202)
@@ -185,6 +298,22 @@ def disconnect_elevenlabs():
     return integrations.save_section('elevenlabs', {'api_key': '', 'voice_id': '', 'voice_name': ''})
 
 
+@app.get('/api/integrations/elevenlabs/tests')
+def latest_voice_tests():
+    return voice_tests.latest()
+
+
+@app.post('/api/integrations/elevenlabs/tests')
+def test_voice(body: voice_tests.VoiceTestRequest):
+    return voice_tests.generate(body)
+
+
+@app.get('/api/integrations/elevenlabs/tests/{test_id}/audio')
+def voice_test_audio(test_id: str):
+    return FileResponse(voice_tests.audio(test_id), media_type='audio/mpeg',
+                        headers={'Cache-Control': 'private, no-store'})
+
+
 @app.post('/api/projects/{project_id}/run', status_code=202)
 def run_agents(project_id: str, body: AgentRunRequest):
     settings = ready_for(body.kind)
@@ -200,6 +329,9 @@ def project(project_id: str):
 def update(project_id: str, body: ProjectInput):
     values = body.model_dump()
     revision = values.pop('revision')
+    images = {item['id'] for item in store.get_project(project_id).get('images', [])}
+    if any(scene.image_id and scene.image_id not in images for scene in body.scenes):
+        raise ValueError('Escolha uma imagem desta produção ou use somente animação.')
     return present(store.update_project(project_id, values, revision))
 
 

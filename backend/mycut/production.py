@@ -8,6 +8,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
+from . import visuals
 from .config import ROOT, DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
 
@@ -161,10 +162,28 @@ def make_video(job):
     graphics.HERE = folder
     graphics.write_subtitles(timing)
     frames = [scene_image(scene, project['accent']) for scene in project['scenes']]
+    compositions = None
+    if project.get('visual_style'):
+        compositions = [visuals.Composition(scene, project, 540 if job['mode'] == 'preview' else 1080,
+                                           visuals.scene_asset(scene, project)) for scene in project['scenes']]
     if project.get('cover'):
-        shutil.copy2(data_path(project['cover']['path']), folder / 'capa.png')
+        source_cover = data_path(project['cover']['path'])
+        concept = None
+        if project.get('visual_style'):
+            with Image.open(source_cover) as cover:
+                provenance = json.loads(cover.info.get('mycut_provenance', '{}'))
+                if provenance.get('generator') in ('MyCut geometry renderer', 'MyCut format renderer'):
+                    concept = provenance.get('agent_concept')
+        if concept:
+            visuals.save_png(visuals.cover_frame(project, concept), folder / 'capa.png', project, agent_concept=concept)
+        else:
+            shutil.copy2(source_cover, folder / 'capa.png')
     else:
-        frames[0].save(folder / 'capa.png')
+        if compositions:
+            visuals.save_png(compositions[0].frame().resize((1080, 1920)), folder / 'capa.png', project,
+                             scene=project['scenes'][0])
+        else:
+            frames[0].save(folder / 'capa.png')
     scale, fps = (0.5, 24) if job['mode'] == 'preview' else (1, 30)
     width, height = int(1080*scale), int(1920*scale)
     frames = [f.resize((width,height), Image.Resampling.LANCZOS) for f in frames]
@@ -192,6 +211,18 @@ def make_video(job):
                 scene = project['scenes'][scene_index]
                 bounds = timing['scenes'][scene_index]
                 phase = min(.999, max(0, (now-bounds['start']) / max(.1, bounds['end']-bounds['start'])))
+                if compositions:
+                    caption = timing['captions'][caption_index]
+                    text = caption['text'] if caption['start'] <= now < caption['end'] else ''
+                    frame = compositions[scene_index].frame(now-bounds['start'], phase, text)
+                    if not audio:
+                        draw = ImageDraw.Draw(frame)
+                        draw.text((width/2, 1840*scale), 'PRÉVIA SEM NARRAÇÃO',
+                                  font=visuals.font('sans', round(24*scale)), fill=visuals.resolve(project)['text_color'], anchor='mm')
+                    process.stdin.write(frame.tobytes())
+                    if number % (fps*2) == 0:
+                        store.progress(job_id, 25+int(70*number/count), f'Renderizando {now:.0f} de {duration:.0f} segundos')
+                    continue
                 labels = [item for item in scene['items'] if item.strip()]
                 if scene['layout'] == 'flow':
                     centers = flow_centers(len(labels) or 1)
@@ -224,6 +255,7 @@ def make_video(job):
     publication = f'TÍTULO\n{project["title"]}\n\nDESCRIÇÃO\n{project["description"]}\n\nFONTES\n{project["sources"]}\n\nTAGS\n{project["tags"]}\n'
     (folder / 'publicacao.txt').write_text(publication)
     manifest = {'project_id': project['id'], 'job_id': job_id, 'revision': project['revision'],
+                'visual_style': project.get('visual_style'), 'accent': project['accent'],
                 'audio_sha256': digest(audio) if audio else None, 'script_sha256': store.script_hash(project),
                 'video_sha256': digest(target), 'duration_seconds': duration, 'width': width, 'height': height,
                 'timing_source': timing['timing_source'], 'status': 'pending_human_review'}

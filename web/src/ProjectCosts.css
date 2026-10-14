@@ -1,0 +1,160 @@
+.project-costs {
+  min-width: 0;
+}
+.cost-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 14px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cost-summary > div {
+  padding: 16px 18px;
+  background: #fffdf8;
+  min-width: 0;
+}
+.cost-summary dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.cost-summary dd {
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.cost-summary small,
+.cost-table small,
+.cost-version header small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: normal;
+}
+.cost-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 90ch;
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.cost-version {
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+}
+.cost-version header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.cost-version h3 {
+  font-size: 14px;
+}
+.cost-version header p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.cost-version header strong {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.cost-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cost-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.cost-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.cost-table th,
+.cost-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+.cost-table thead th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cost-table th:first-child,
+.cost-table td:nth-child(2) {
+  text-align: left;
+}
+.cost-table td[colspan] {
+  text-align: left;
+}
+.cost-table tbody th {
+  font-weight: 650;
+}
+.cost-table code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.cost-missing {
+  color: var(--muted);
+  font-style: italic;
+}
+.cost-failed th,
+.cost-interrupted th {
+  color: #aa302c;
+}
+.pricing-form .cost-table {
+  min-width: 520px;
+}
+.pricing-form .cost-table input {
+  max-width: 120px;
+  margin-left: auto;
+  text-align: right;
+}
+.pricing-rates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin: 18px 0 24px;
+}
+.pricing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+.project-cost {
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .cost-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pricing-rates {
+    grid-template-columns: 1fr;
+  }
+}
+.cost-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

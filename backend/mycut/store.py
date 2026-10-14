@@ -67,6 +67,13 @@ def initialize():
                 job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
                 snapshot TEXT NOT NULL);
             INSERT OR IGNORE INTO job_inputs SELECT id,snapshot FROM jobs;
+            CREATE TABLE IF NOT EXISTS usage (
+                id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                step TEXT NOT NULL, attempt INTEGER NOT NULL, provider TEXT NOT NULL,
+                requested_model TEXT NOT NULL, state TEXT NOT NULL, entries TEXT NOT NULL DEFAULT '[]',
+                credits REAL, credits_estimated INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL);
+            CREATE INDEX IF NOT EXISTS usage_by_job ON usage(job_id, created_at);
         ''')
 
 
@@ -150,6 +157,8 @@ def enqueue(project_id, mode, revision, kind='render', settings=None):
             raise Conflict('Salve e atualize o projeto antes de produzir.')
         if kind in ('render', 'voice') and any(not s['narration'].strip() or not s['title'].strip() for s in project['scenes']):
             raise Conflict('Preencha o título e a narração de todas as cenas.')
+        if kind == 'scenes' and any(not s['narration'].strip() for s in project['scenes']):
+            raise Conflict('Gere ou salve o roteiro antes de criar as cenas com agentes.')
         if len(script(project).split()) > 500:
             raise Conflict('Use até 500 palavras por Short nesta versão.')
         if kind == 'render' and mode == 'final' and not project.get('audio'):
@@ -250,3 +259,23 @@ def checkpoint(job_id, changes):
         db.execute('UPDATE projects SET document=?,updated_at=? WHERE id=?', (json.dumps(document,ensure_ascii=False),time.time(),current['id']))
         db.execute('UPDATE jobs SET snapshot=?,updated_at=? WHERE id=?', (json.dumps(snapshot,ensure_ascii=False),time.time(),job_id))
     return get_job(job_id, private=True)
+
+
+def usage_start(usage_id, job_id, step, attempt, provider, model):
+    """Recorded before the call, so a killed production still shows that it spent something."""
+    with connect() as db:
+        db.execute("INSERT INTO usage(id,job_id,step,attempt,provider,requested_model,state,created_at,updated_at) "
+                   "VALUES(?,?,?,?,?,?, 'running', ?, ?)", (usage_id, job_id, step, attempt, provider, model or '', time.time(), time.time()))
+
+
+def usage_finish(usage_id, state, entries=None, credits=None, estimated=False):
+    with connect() as db:
+        db.execute("UPDATE usage SET state=?, entries=?, credits=?, credits_estimated=?, updated_at=? WHERE id=? AND state='running'",
+                   (state, json.dumps(entries or []), credits, int(estimated), time.time(), usage_id))
+
+
+def usage_rows(project_id):
+    with connect() as db:
+        return [dict(row) for row in db.execute(
+            'SELECT usage.* FROM usage JOIN jobs ON jobs.id=usage.job_id WHERE jobs.project_id=? ORDER BY usage.created_at',
+            (project_id,))]

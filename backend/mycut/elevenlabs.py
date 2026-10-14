@@ -2,8 +2,10 @@
 import base64
 import json
 import math
+import re
 import subprocess
 from pathlib import Path
+from urllib.parse import urlsplit
 import httpx
 from .media import digest, probe
 from .config import DATA
@@ -12,7 +14,8 @@ from . import store
 BASE = 'https://api.elevenlabs.io'
 
 
-def api(key, method, path, **kwargs):
+def api(key, method, path, meta=None, **kwargs):
+    """`meta` receives only the billed credits header, never the rest of the provider headers."""
     try:
         with httpx.Client(base_url=BASE, timeout=180, follow_redirects=False) as client:
             response = client.request(method, path, headers={'xi-api-key': key}, **kwargs)
@@ -25,10 +28,47 @@ def api(key, method, path, **kwargs):
         raise ValueError('A ElevenLabs informou limite de créditos ou de solicitações. Confira sua conta antes de tentar novamente.')
     if response.is_error:
         raise ValueError(f'A ElevenLabs recusou a operação (HTTP {response.status_code}). Confira voz, modelo e permissões.')
+    if meta is not None:
+        try:
+            meta['credits'] = float(response.headers.get('character-cost', ''))
+        except ValueError:
+            pass
     try:
         return response.json()
     except ValueError:
         raise ValueError('A ElevenLabs retornou uma resposta inválida.') from None
+
+
+def preview_url(value):
+    """Only expose HTTPS audio links; the browser never receives our API key."""
+    if not isinstance(value, str):
+        return None
+    try:
+        url = urlsplit(value)
+        if url.scheme == 'https' and url.hostname and not url.username and not url.password:
+            return value
+    except ValueError:
+        pass
+    return None
+
+
+def voice_language(value):
+    # Use the voice's registered language, not every language a model can speak.
+    if not isinstance(value, str):
+        return None
+    code = value.strip().lower().replace('_', '-')
+    if re.fullmatch(r'[a-z]{2,3}(?:-[a-z0-9]{2,8})*', code):
+        return code.split('-')[0]
+    return None
+
+
+def voice_summary(voice):
+    labels = voice.get('labels') or {}
+    accent = labels.get('accent')
+    return {'id': voice['voice_id'], 'name': voice['name'], 'category': voice.get('category', ''),
+            'preview_url': preview_url(voice.get('preview_url')),
+            'language': voice_language(labels.get('language')),
+            'accent': accent.strip()[:100] if isinstance(accent, str) and accent.strip() else None}
 
 
 def catalog(key):
@@ -38,8 +78,7 @@ def catalog(key):
         if cursor:
             params['next_page_token'] = cursor
         page = api(key, 'GET', '/v2/voices', params=params)
-        voices.extend({'id': v['voice_id'], 'name': v['name'], 'category': v.get('category', '')}
-                      for v in page.get('voices', []))
+        voices.extend(voice_summary(v) for v in page.get('voices', []))
         cursor = page.get('next_page_token')
         if not page.get('has_more') or not cursor:
             break
@@ -82,15 +121,19 @@ def transcript_from_characters(value, audio):
          'text': ' '.join(w['word'] for w in words), 'words': words}]}
 
 
-def synthesize(project, settings, folder):
+def synthesize(project, settings, folder, spent=None):
     text = store.script(project)
     if not text.strip() or len(text) > 4000:
         raise ValueError('A narração deve ter de 1 a 4.000 caracteres para gerar voz.')
     body = {'text': text, 'model_id': settings['model_id'], 'voice_settings': {
         k: settings[k] for k in ('stability', 'similarity_boost', 'speed')}}
     # One request for the complete script preserves natural phrase transitions.
+    meta = {}
     result = api(settings['api_key'], 'POST', f'/v1/text-to-speech/{settings["voice_id"]}/with-timestamps',
-                 params={'output_format': 'mp3_44100_128'}, json=body)
+                 meta=meta, params={'output_format': 'mp3_44100_128'}, json=body)
+    if spent:
+        # Without the header, one credit per character is the usual rate for the multilingual models.
+        spent(meta.get('credits', float(len(text))), 'credits' not in meta)
     folder.mkdir(parents=True, exist_ok=True)
     raw = folder / 'elevenlabs.mp3'
     try:

@@ -1,0 +1,164 @@
+.sidebar nav.settings-submenu {
+  gap: 3px;
+  margin: 2px 0 12px 17px;
+  padding-left: 15px;
+  border-left: 1px solid oklch(42% 0.02 140);
+}
+.settings-submenu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+.settings-submenu-sidebar button {
+  color: oklch(79% 0.02 110);
+}
+.settings-submenu-sidebar button:hover {
+  background: oklch(28% 0.02 140);
+}
+.settings-submenu-sidebar button[aria-current="page"] {
+  background: oklch(34% 0.025 140);
+  color: oklch(96% 0.02 75);
+}
+.settings-submenu-page {
+  display: none;
+}
+.connections-page.settings-page {
+  max-width: 1100px;
+}
+.settings-page .page-heading {
+  margin-bottom: 18px;
+}
+.settings-eyebrow {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.settings-page .connection-section:last-child {
+  border-bottom: 0;
+}
+.settings-page .environment-tools .cli-commands-form {
+  margin-top: 0;
+}
+.settings-page .browser-settings .browser-toggle input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  margin: 0;
+}
+.settings-page .connection-title p {
+  max-width: 70ch;
+}
+.elevenlabs-connection {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+}
+.elevenlabs-connection summary {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding-block: 6px;
+}
+.elevenlabs-connection[open] summary {
+  margin-bottom: 16px;
+}
+.settings-page .voice-catalog-actions {
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 24px 0 0;
+}
+.voice-catalog-actions h3 {
+  font-size: 15px;
+}
+.settings-page .voice-selectors {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 240px;
+  align-items: start;
+  gap: 16px;
+  margin: 16px 0 10px;
+}
+.settings-page .voice-selectors label {
+  min-width: 0;
+}
+.settings-page .voice-selectors select {
+  height: 42px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 11px;
+  text-overflow: ellipsis;
+}
+.settings-page .voice-filter-help p {
+  font-size: 12px;
+  max-width: 75ch;
+}
+.settings-page .voice-filter-help p + p {
+  margin-top: 8px;
+  color: var(--accent);
+}
+.settings-page .voice-tuning {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  padding-top: 24px;
+  margin: 24px 0;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 1000px) {
+  .settings-page .voice-selectors {
+    grid-template-columns: 160px minmax(0, 1.5fr) minmax(165px, 1fr);
+  }
+  .sidebar nav.settings-submenu-sidebar {
+    display: none;
+  }
+  .settings-page .settings-submenu-page {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 0 0 16px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .settings-submenu-page button {
+    min-height: 44px;
+    color: var(--muted);
+  }
+  .settings-submenu-page button:hover,
+  .settings-submenu-page button[aria-current="page"] {
+    background: oklch(93% 0.035 60);
+    color: var(--accent);
+  }
+}
+@media (max-width: 760px) {
+  .settings-page .voice-selectors {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  }
+  .settings-page .voice-selectors label:last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 540px) {
+  .settings-page .voice-selectors,
+  .settings-page .voice-tuning {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .settings-page .voice-selectors select {
+    height: 44px;
+  }
+  .settings-page .settings-submenu-page {
+    gap: 4px;
+  }
+  .settings-submenu-page button {
+    gap: 7px;
+    padding-inline: 10px;
+  }
+}

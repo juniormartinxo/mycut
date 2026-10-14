@@ -22,7 +22,7 @@ test("criar, editar sem perder texto, produzir e baixar uma versão", async ({
   const navigation = page.getByRole("navigation", {
     name: "Navegação principal",
   });
-  for (const name of ["Produções", "Fila de produção", "Conexões"]) {
+  for (const name of ["Produções", "Fila de produção", "Configurações"]) {
     page.once("dialog", (dialog) => dialog.dismiss());
     await navigation.getByRole("button", { name, exact: true }).click();
     await expect(
@@ -144,12 +144,14 @@ test("conexões e entrada por pauta são o caminho principal", async ({
   await page
     .getByRole("button", { name: "Configurar conexões", exact: true })
     .click();
-  await expect(
-    page.getByRole("heading", { name: "Conexões e agentes" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agentes" })).toBeVisible();
   await expect(
     page.getByText("bash scripts/agents.sh", { exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Seções de configurações" })
+    .getByRole("button", { name: "Vozes", exact: true })
+    .click();
   await expect(page.getByLabel("Chave de API da ElevenLabs")).toHaveAttribute(
     "type",
     "password",

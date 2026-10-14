@@ -8,13 +8,11 @@ test("refresh e histórico preservam telas e aba do editor sem perder a proteç�
     name: "Navegação principal",
   });
   await navigation
-    .getByRole("button", { name: "Conexões", exact: true })
+    .getByRole("button", { name: "Configurações", exact: true })
     .click();
-  await expect(page).toHaveURL(/#\/conexoes$/);
+  await expect(page).toHaveURL(/#\/configuracoes\/agentes$/);
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Conexões e agentes" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agentes" })).toBeVisible();
   await navigation
     .getByRole("button", { name: "Fila de produção", exact: true })
     .click();
@@ -23,9 +21,7 @@ test("refresh e histórico preservam telas e aba do editor sem perder a proteç�
     page.getByRole("heading", { name: "Fila de produção", exact: true }),
   ).toBeVisible();
   await page.goBack();
-  await expect(
-    page.getByRole("heading", { name: "Conexões e agentes" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agentes" })).toBeVisible();
   await page.goForward();
   await expect(
     page.getByRole("heading", { name: "Fila de produção", exact: true }),

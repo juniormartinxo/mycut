@@ -15,7 +15,7 @@ docker compose up --build -d
 
 Abra **http://localhost:8321**. A primeira construção baixa as dependências. A API serve a interface compilada e o worker processa a fila em outro container. Fechar a aba não interrompe uma produção; os serviços e o computador precisam continuar ligados.
 
-A navegação fica no endereço: `#/conexoes`, `#/fila`, `#/novo` e `#/producoes`. No editor, a URL também identifica a produção e a aba. Atualizar a página preserva essa localização; Voltar e Avançar acompanham a navegação. Links antigos `#<id-da-produção>` continuam funcionando. Alterações não salvas no editor mantêm o aviso de descarte ao sair.
+A navegação fica no endereço: `#/configuracoes/agentes`, `#/configuracoes/vozes`, `#/configuracoes/ambiente`, `#/fila`, `#/novo` e `#/producoes`. No editor, a URL também identifica a produção e a aba. Atualizar a página preserva essa localização; Voltar e Avançar acompanham a navegação. Links antigos `#/conexoes` e `#<id-da-produção>` continuam funcionando. Alterações não salvas no editor mantêm o aviso de descarte ao sair.
 
 O arquivo `web/pnpm-workspace.yaml` autoriza o script de instalação do `esbuild` e é copiado antes de instalar as dependências na imagem. Essa configuração também vale para a instalação local; não é necessário executar `pnpm approve-builds` interativamente no container.
 
@@ -44,12 +44,28 @@ bash scripts/agents.sh
 
 Mantenha esse executor aberto junto com os containers. Ele usa o login local de cada CLI, sem copiar credenciais para o Docker. API, worker e executor compartilham a pasta `.data`. Se você usar `MYCUT_DATA_DIR` fora do Docker, todos precisam apontar para os mesmos dados.
 
-1. No aplicativo, abra **Conexões**. Distribua os CLIs entre Pesquisa, Roteiro, Direção visual e Conferência. Escolha o modelo na lista e clique **Testar agente** em cada papel. O teste usa a seleção atual sem salvá-la; clique **Salvar agentes** quando terminar. **Padrão do CLI** deixa a escolha a cargo do CLI.
-2. Na seção **ElevenLabs**, cole uma chave de API da sua conta e clique **Conectar ElevenLabs**. A chave precisa permitir listar vozes/modelos e gerar fala. Não coloque a chave no roteiro, Git ou chat. [Documentação de autenticação](https://elevenlabs.io/docs/api-reference/authentication).
+Por padrão, o executor chama `codex`, `claude` e `grok`. Em **Configurações › Ambiente › Comandos dos CLIs**, você pode trocar o comando de cada um para usar outro perfil ou login. Por exemplo, `CLAUDE_CONFIG_DIR=~/.config/cloak/profiles/amjr/claude claude` ou `cloak exec --profile amjr claude`. Variáveis `NOME=valor` antes do executável, `~` e `$VAR` são expandidas no WSL. O comando roda sem shell, então aliases, funções e pipes não funcionam. O executor relê os comandos a cada chamada, sem reiniciar, e atualiza a lista de modelos depois de salvar. Esses comandos são executados no seu computador; a API aceita a alteração apenas da própria interface local.
+
+### Navegador para a pesquisa
+
+Alguns sites, como o `openai.com`, respondem 403 à leitura automática dos CLIs. Nesse caso, a etapa de Pesquisa pode abrir a página no Chrome do Windows, como uma pessoa faria. Isso vale para Claude Code, Codex e Grok. O executor abre o Chrome Canary (ou o Chrome) com a porta de depuração `9222` e um perfil próprio em `%LOCALAPPDATA%\MyCut\ChromeProfile`, sem os seus logins. Cada CLI recebe o [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) com uma versão fixa e apenas as ferramentas de navegar, ler (snapshot), clicar, rolar e fechar abas. Formulários, digitação, uploads e execução de JavaScript ficam fora. O texto das páginas é tratado como dado, não como instrução.
+
+Configure em **Configurações › Ambiente › Navegador para pesquisa**: ative ou desative, informe o caminho do `chrome.exe` se a detecção automática não achar, escolha a porta e use **Abrir e testar**. Requisitos: Node.js com `npx` no WSL e rede espelhada (`networkingMode=mirrored` no `.wslconfig`), para o WSL alcançar a porta do Chrome no Windows. Desde o Chrome 136, a depuração remota [não funciona no perfil padrão](https://developer.chrome.com/blog/remote-debugging-port), por isso o perfil é separado. Se um site exigir login, entre nele só nessa janela do MyCut.
+
+Se o Chrome ou o MCP falharem, a pesquisa continua com a busca e a leitura dos próprios CLIs e registra a falta do navegador nas limitações. Sem fonte verificada, o fluxo continua parando antes do roteiro. No Grok, as execuções com navegador usam `--trust` na pasta temporária e desligam os MCPs importados do Claude e do Cursor. Nesse modo, chamar outro servidor MCP encerra a execução.
+
+1. No aplicativo, abra **Configurações › Agentes**. Distribua os CLIs entre Pesquisa, Roteiro, Direção visual e Conferência. Escolha o modelo na lista e clique **Testar agente** em cada papel. O teste usa a seleção atual sem salvá-la; clique **Salvar agentes** quando terminar. **Padrão do CLI** deixa a escolha a cargo do CLI.
+2. Abra **Configurações › Vozes**. Na seção **ElevenLabs**, cole uma chave de API da sua conta e clique **Conectar ElevenLabs**. A chave precisa permitir listar vozes/modelos e gerar fala. Não coloque a chave no roteiro, Git ou chat. [Documentação de autenticação](https://elevenlabs.io/docs/api-reference/authentication).
 3. Selecione a voz **Junior**, ou outra da sua conta, o modelo e os ajustes. Clique **Salvar voz**. A lista vem da conta conectada.
-4. Em **Novo Short**, informe a **Pauta ou link** e escolha **Produzir com agentes**. Para conferir o roteiro antes de gastar voz, escolha **Roteiro e cenas primeiro**.
+4. Em **Novo Short**, informe a **Pauta ou link**, escolha um formato e personalize fonte, fundo, texto e destaque. Defina se quer somente animações ou também imagens. Os agentes recebem essas escolhas antes de criar o roteiro e as cenas. Escolha **Produzir com agentes** ou, para conferir o roteiro antes de gastar voz, **Roteiro e cenas primeiro**.
 
 Conectar/listar vozes não sintetiza áudio. Produzir a voz usa créditos da conta ElevenLabs. Não há repetição automática da requisição paga após erro. O texto completo vai em uma única requisição para preservar a continuidade da narração. Os [tempos de fala retornados pelo provedor](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps) alimentam a sincronização de cenas e legendas. O MP3 de transporte fica como intermediário; a trilha usada no render é WAV normalizado.
+
+Em **Configurações › Vozes**, o catálogo carrega automaticamente. Depois de conectar, a chave e a ação de desconectar ficam em **Gerenciar conexão**. **Ouvir amostra · grátis** reproduz o áudio pronto fornecido pela voz, quando disponível, sem gerar fala. Essa amostra não reflete o modelo ou os ajustes do formulário; uma voz sem amostra mostra a indisponibilidade, sem gerar áudio como alternativa. O campo [`preview_url`](https://elevenlabs.io/docs/api-reference/voices/search) vem do catálogo do provedor.
+
+Antes de escolher a voz, use **Idioma da voz**. O filtro inicia em **Português**, mostra a quantidade de vozes por idioma e mantém sua preferência neste navegador após refresh. Há opções **Todos os idiomas** e **Idioma não informado**. A seleção usa o idioma cadastrado em `labels.language`, não a capacidade multilíngue do modelo; o nome da voz também mostra idioma e sotaque quando informados. Trocar o filtro não altera a voz padrão salva: uma seleção que fica fora dele precisa ser escolhida novamente para salvar ou gerar um teste. Filtrar não gera fala nem consome créditos.
+
+**Testar com meu texto** aceita até 300 caracteres e usa a seleção atual, sem alterar a voz padrão salva nem criar uma produção. O botão **Gerar teste (usa créditos)** informa a cobrança antes do clique; não é uma prévia gratuita de texto personalizado. Os últimos cinco testes aparecem com texto, voz, modelo e ajustes e podem ser reouvidos após recarregar a página. Repetir texto, voz, modelo e ajustes reutiliza o MP3 local, sem nova geração. O cache fica em `.data/voice-tests/`, separado por chave conectada, e não é versionado. [Regras de consumo e limites das regenerações gratuitas no site](https://elevenlabs.io/docs/help-center/product/core-capabilities/text-to-speech/is-there-a-way-to-preview-audio-without-losing-quota-before-downloading).
 
 A indicação “executor conectado” comprova o processo ativo e os executáveis disponíveis no PATH; não comprova login, saldo ou acesso a cada modelo. **Testar agente** executa uma solicitação curta pelo mesmo adaptador usado na produção, valida um desafio e mostra resposta, duração, ID solicitado e modelo informado nos metadados do CLI. O teste usa a cota do CLI; não gera voz ou vídeo. Há um teste por vez, cancelamento e limite de três minutos, incluindo espera na fila. O último resultado de cada papel permanece disponível após recarregar a página.
 
@@ -65,13 +81,36 @@ Os seletores recebem IDs do cache local de modelos do Codex/Grok e da inicializa
 4. ElevenLabs gera a narração usando a voz salva. Pillow/FFmpeg renderizam o Short em 1080 × 1920, com cenas animadas e legendas.
 5. Você acompanha as etapas, assiste ao resultado e baixa vídeo, capa, legendas, roteiro, publicação e manifesto.
 
-A conferência automática é uma etapa editorial, não uma garantia de verdade. A revisão final continua disponível antes de publicar. O agente de direção usa os formatos fluxo, comparação e destaque; esta versão não gera ilustrações raster, mascotes ou logos novos por modelo de imagem.
+A conferência automática é uma etapa editorial, não uma garantia de verdade. A revisão final continua disponível antes de publicar. O agente de direção usa cenas de fluxo, comparação e destaque; no modo com imagens, pode selecionar uma imagem pertinente da biblioteca ou das fontes verificadas. Esta versão não gera ilustrações raster, mascotes ou logos novos por modelo de imagem.
 
 O editor permanece para ajustar o material, importar voz/capa, gerar apenas a narração ou renderizar novamente sem pagar por outra voz. Comparações têm dois lados. Limites de edição: 12 cenas, 500 palavras, áudio até 3 minutos e 100 MB; capa até 15 MB. A geração ElevenLabs aceita até 4.000 caracteres. O agente de roteiro trabalha com até 180 palavras e 3 a 8 cenas.
+
+Na aba **Cenas**, **Criar cenas com agentes** recupera cenas incompletas; quando preenchidas, a ação aparece como **Refazer cenas com agentes**. Ela salva os ajustes abertos, chama apenas Direção visual e Conferência e recria os diagramas e a capa, preservando o roteiro e o áudio. Usa a cota dos CLIs, sem gerar outra voz. Fluxos exigem de dois a quatro textos, comparações exatamente dois e destaques ao menos um; respostas vazias recebem uma tentativa automática de correção e não são publicadas se continuarem inválidas.
 
 Projetos e fila persistem em SQLite. Cada tentativa tem diretório próprio; etapas concluídas salvam checkpoints no projeto, e o job atualiza sua revisão. Edições concorrentes ficam bloqueadas durante a produção. Após cancelamento, resultados atrasados não podem substituir novas alterações. Ao reiniciar o worker, jobs em execução ficam marcados como interrompidos e não são repetidos automaticamente.
 
 “Roteiro do Claude Code” era uma cópia fixa das sete cenas do primeiro Short, não um agente. Essa opção saiu da criação. O primeiro Short continua disponível como produção existente, e os arquivos originais em `shorts/claude-cloud/` permanecem intactos.
+
+### Formatos, cores e imagens
+
+Escolha o visual em **Novo Short** ou **Pauta e agentes**. Os formatos alteram a composição e a animação, além da paleta:
+
+| Formato | Composição |
+| --- | --- |
+| Editorial | Fundo claro, fonte serifada e blocos com entrada suave. |
+| Radar tech | Fundo escuro, etapas alternadas e entradas laterais. |
+| Passo a passo | Guia lateral e etapas reveladas em sequência. |
+| Impacto | Tipografia maior, blocos contrastantes e entrada com escala. |
+
+Você pode trocar a fonte entre sem serifa, serifada, monoespaçada e condensada; ajustar cores de fundo, texto e destaque; e restaurar os valores do formato. As miniaturas e a prévia da cena usam o mesmo renderizador do vídeo. Essas escolhas pertencem à produção e ficam registradas em cada versão. Projetos antigos mantêm o visual anterior até você escolher um formato.
+
+Em **Personalizar aparência › Nome do canal no vídeo**, substitua “MYCUT” pelo nome ou @ do seu canal (até 40 caracteres). Deixe vazio para ocultar o texto. A escolha permanece ao trocar ou restaurar um formato e aparece nas cenas e nas capas geradas ao renderizar novamente; capas importadas não são alteradas.
+
+**Somente animações** impede o uso automático de imagens. Em **Animações e imagens**, escolha a origem: fontes da pauta, imagens importadas na biblioteca da produção ou ambas. O agente de pesquisa pode sugerir até três imagens de páginas verificadas. O MyCut baixa imagens HTTPS públicas e registra sua origem. Se nenhuma imagem elegível estiver disponível, as cenas usam animações; os avisos aparecem no editor. A origem limita a seleção automática, sem apagar imagens já armazenadas nem substituir suas escolhas manuais.
+
+Em **Cenas**, selecione uma imagem por cena ou mantenha a animação. Você também pode importar PNG, JPG ou WebP de até 15 MB, com limite de 24 imagens por produção, e escolher entre mostrar a imagem inteira ou preencher a área com corte. Para usar sua biblioteca antes dos agentes, crie a produção sem iniciar a geração, importe as imagens em Cenas e execute os agentes em Pauta e agentes. Refazer apenas as cenas reutiliza a pesquisa existente; uma nova busca de imagens acontece na produção completa.
+
+Após mudar o visual, **Renderizar cenas atuais** aplica as alterações e atualiza a capa gerada pelo MyCut, reutilizando a narração existente. Capas importadas permanecem como enviadas. Alterar formato ou cores não solicita uma nova voz nem consome créditos ElevenLabs.
 
 ## Executar sem Docker
 
@@ -79,7 +118,7 @@ Requisitos: Node.js 24+, pnpm 12.8.1, Python 3.12, `uv`, FFmpeg/ffprobe e fontes
 
 ```bash
 sudo apt-get update
-sudo apt-get install ffmpeg fonts-dejavu-core
+sudo apt-get install ffmpeg fonts-dejavu-core fonts-dejavu-extra
 uv venv --python 3.12 .venv-app
 uv pip install --python .venv-app/bin/python -r backend/requirements.txt
 pnpm --dir web install --frozen-lockfile
@@ -120,9 +159,9 @@ npm --prefix web run test:e2e
 
 O cenário cobre criação, salvamento, proteção de texto não salvo, comparação, atualização entre abas, exportação real e download em desktop e celular. Screenshots e traces ficam em `web/test-results/`.
 
-Passaram **36 testes de integração** do backend, incluindo diagnósticos de agentes, respostas externas controladas e render real de um áudio de teste com tempos de fala, e **oito testes de navegação** com React e histórico controlado. A versão anterior também foi validada com a narração escolhida do Short original, de 45,87 segundos. A leitura real dos três catálogos foi conferida; chamadas de inferência nesta sessão falharam por permissões locais (Codex/Grok) e sessão OAuth expirada sem renovação (Claude). Isso não comprova geração real nos provedores nem na ElevenLabs.
+Passaram **45 testes de integração** do backend, incluindo diagnósticos de agentes, testes curtos de voz, respostas externas controladas e render real de um áudio de teste com tempos de fala, e **oito testes de navegação** com React e histórico controlado. A versão anterior também foi validada com a narração escolhida do Short original, de 45,87 segundos. A leitura real dos três catálogos foi conferida; chamadas de inferência na rodada anterior falharam por permissões locais (Codex/Grok) e sessão OAuth expirada sem renovação (Claude). Isso não comprova geração real nos provedores nem na ElevenLabs.
 
-Na atualização de navegação, Docker build/up concluíram, os containers foram recriados e a API serviu o novo JavaScript. Os dez casos de navegador estão preparados e listados, mas não foram executados porque Chromium permaneceu bloqueado. Consulte [a evidência e seus limites](docs/verificacao-studio.md).
+Na atualização de navegação, Docker build/up concluíram, os containers foram recriados e a API serviu o novo JavaScript. Na rodada das amostras de voz, **seis casos de navegador passaram em desktop/mobile**, usando o bundle real e respostas de API simuladas, sem consumir créditos. As capturas dessa tela foram inspecionadas. Isso não qualifica a síntese real nem substitui os casos de navegador das funcionalidades anteriores, que ficaram bloqueados naquela rodada. Consulte [a evidência e seus limites](docs/verificacao-studio.md).
 
 ## Direção editorial e visual
 

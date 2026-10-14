@@ -9,6 +9,7 @@ from .config import DATA
 
 BRIDGE = DATA / 'agent-bridge'
 PROVIDERS = ('codex', 'claude', 'grok')
+BROWSER_OFFLINE = {'enabled': False, 'available': False, 'version': ''}
 
 
 def atomic_json(path, value):
@@ -24,9 +25,10 @@ def status():
         value = json.loads((BRIDGE / 'heartbeat.json').read_text())
         return {'online': time.time()-value['time'] < 15,
                 'protocol': value.get('protocol', 1),
-                'providers': {p: bool(value.get('providers', {}).get(p)) for p in PROVIDERS}}
-    except (OSError, ValueError, KeyError):
-        return {'online': False, 'protocol': 0, 'providers': {p: False for p in PROVIDERS}}
+                'providers': {p: bool(value.get('providers', {}).get(p)) for p in PROVIDERS},
+                'browser': {**BROWSER_OFFLINE, **value.get('browser', {})}}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {'online': False, 'protocol': 0, 'providers': {p: False for p in PROVIDERS}, 'browser': dict(BROWSER_OFFLINE)}
 
 
 def require(providers):
@@ -38,9 +40,16 @@ def require(providers):
         raise ValueError('CLI não encontrado no executor: ' + ', '.join(missing) + '. Confira Conexões.')
 
 
-def invoke(config, prompt, schema, web=False, timeout=900):
+def response(request_id):
+    try:
+        return json.loads((BRIDGE / 'requests' / request_id / 'response.json').read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def invoke(config, prompt, schema, web=False, timeout=900, request_id=None):
     require([config['provider']])
-    folder = BRIDGE / 'requests' / uuid.uuid4().hex
+    folder = BRIDGE / 'requests' / (request_id or uuid.uuid4().hex)
     folder.mkdir(parents=True)
     lease = folder / 'lease'
     lease.touch()

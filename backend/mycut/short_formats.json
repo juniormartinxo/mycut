@@ -1,0 +1,46 @@
+[
+  {
+    "id": "editorial",
+    "name": "Editorial",
+    "description": "Papel claro, títulos serifados e diagramas com entradas suaves.",
+    "use_case": "Notícias e explicações",
+    "font": "serif",
+    "background": "#F7F3EB",
+    "text_color": "#29231F",
+    "accent": "#BE4D2A",
+    "direction": "Explique com clareza editorial: gancho, contexto, consequência. Alterne fluxos e destaques, com títulos curtos."
+  },
+  {
+    "id": "radar",
+    "name": "Radar tech",
+    "description": "Fundo escuro, conexões em zigue-zague e entradas laterais.",
+    "use_case": "Modelos, agentes e ferramentas",
+    "font": "sans",
+    "background": "#121C24",
+    "text_color": "#F0F6F9",
+    "accent": "#B9F078",
+    "direction": "Apresente a novidade, o que faz e seu limite. Use fluxos curtos de entrada, processamento e resultado, com destaques concretos."
+  },
+  {
+    "id": "tutorial",
+    "name": "Passo a passo",
+    "description": "Trilha vertical, etapas conectadas e revelação em sequência.",
+    "use_case": "Tutoriais e demonstrações",
+    "font": "sans",
+    "background": "#ECF2FA",
+    "text_color": "#172D4D",
+    "accent": "#285CCD",
+    "direction": "Organize uma explicação em etapas: objetivo, como funciona, resultado e cuidado. Não invente passos ou instruções ausentes da pesquisa. Prefira fluxos de 2 a 4 etapas."
+  },
+  {
+    "id": "impact",
+    "name": "Impacto",
+    "description": "Tipografia condensada, blocos amplos e aproximações rápidas.",
+    "use_case": "Anúncios e ideias em destaque",
+    "font": "condensed",
+    "background": "#F4CE56",
+    "text_color": "#25251F",
+    "accent": "#762E16",
+    "direction": "Uma ideia forte por cena, títulos muito curtos e destaques grandes. Use statement para ideias centrais e comparison quando houver comparação sustentada, sem sensacionalismo."
+  }
+]

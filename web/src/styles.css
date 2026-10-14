@@ -1992,6 +1992,82 @@ progress::-moz-progress-bar {
   font-size: 12px;
   margin-top: 5px;
 }
+.cli-commands-form {
+  margin-top: 30px;
+}
+.cli-commands-heading h3 {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.browser-form {
+  margin-top: 34px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
+.browser-state {
+  font-weight: 650;
+}
+.browser-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.7fr);
+  align-items: end;
+  gap: 22px;
+  margin-bottom: 16px;
+}
+.browser-settings input {
+  overflow-wrap: anywhere;
+}
+.browser-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.browser-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.browser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.cli-commands-heading p {
+  max-width: 82ch;
+  margin: 5px 0 16px;
+}
+.cli-commands-heading code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.cli-commands {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin-bottom: 18px;
+}
+.cli-commands input {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+.cli-commands input[aria-invalid="true"] {
+  border-color: #aa302c;
+}
+.cli-command-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: normal;
+}
 .key-form {
   display: flex;
   align-items: flex-end;
@@ -2105,7 +2181,9 @@ progress::-moz-progress-bar {
     padding: 25px 22px 45px;
   }
   .agent-setting,
-  .voice-settings {
+  .voice-settings,
+  .cli-commands,
+  .browser-settings {
     grid-template-columns: 1fr;
     gap: 16px;
   }

@@ -1,5 +1,16 @@
-from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from typing import Annotated, Literal
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator, model_validator
+
+
+class VisualStyle(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    format_id: Literal['editorial', 'radar', 'tutorial', 'impact'] = 'editorial'
+    channel_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] = 'MYCUT'
+    font: Literal['sans', 'serif', 'mono', 'condensed'] | None = None
+    background: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
+    text_color: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
+    media_mode: Literal['animations', 'mixed'] = 'animations'
+    image_source: Literal['sources', 'library', 'both'] = 'sources'
 
 
 class Scene(BaseModel):
@@ -8,6 +19,8 @@ class Scene(BaseModel):
     narration: str = Field(default='', max_length=1400)
     layout: Literal['flow', 'comparison', 'statement'] = 'flow'
     items: list[str] = Field(default_factory=list, max_length=4)
+    image_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
+    image_fit: Literal['contain', 'cover'] = 'contain'
 
     @field_validator('narration')
     @classmethod
@@ -37,6 +50,8 @@ class ProjectInput(BaseModel):
     sources: str = Field(default='', max_length=8000)
     brief: str = Field(default='', max_length=12000)
     accent: str = Field(default='#c85e37', pattern=r'^#[0-9a-fA-F]{6}$')
+    accent_locked: bool = True
+    visual_style: VisualStyle | None = None
     scenes: list[Scene] = Field(min_length=1, max_length=12)
     revision: int = Field(default=0, ge=0)
 
@@ -53,6 +68,15 @@ class CreateProject(BaseModel):
     template: Literal['blank', 'claude-cloud'] = 'blank'
     brief: str = Field(default='', max_length=12000)
     automation: Literal['none', 'plan', 'pipeline'] = 'none'
+    accent: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
+    visual_style: VisualStyle | None = None
+
+
+class ScenePreview(BaseModel):
+    scene: Scene
+    accent: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
+    visual_style: VisualStyle | None = None
+    project_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
 
 
 class RenderRequest(BaseModel):
@@ -74,6 +98,35 @@ class AgentSettings(BaseModel):
     reviewer: AgentChoice
 
 
+class AgentCommands(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    codex: str = Field(max_length=500)
+    claude: str = Field(max_length=500)
+    grok: str = Field(max_length=500)
+
+
+class BrowserSettings(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    enabled: bool
+    chrome_path: str = Field(default='', max_length=500, pattern=r'^[^\x00-\x1f]*$')
+    port: int = Field(default=9222, ge=1024, le=65535)
+
+
+class ModelPrice(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    input: float = Field(ge=0, le=10_000)
+    cache_read: float = Field(ge=0, le=10_000)
+    output: float = Field(ge=0, le=10_000)
+
+
+class PricingSettings(BaseModel):
+    """US$ per 1M tokens for CLIs that report no cost, plus the conversions shown next to US$."""
+    model_config = ConfigDict(extra='forbid')
+    usd_brl: float | None = Field(default=None, gt=0, le=1000)
+    elevenlabs_usd_per_1k_credits: float | None = Field(default=None, ge=0, le=1000)
+    models: dict[Annotated[str, StringConstraints(pattern=r'^[a-zA-Z0-9._:/-]{1,150}$')], ModelPrice] = Field(max_length=100)
+
+
 class AgentTestRequest(AgentChoice):
     role: Literal['research', 'writer', 'director', 'reviewer']
 
@@ -93,6 +146,6 @@ class ElevenSettings(BaseModel):
 
 
 class AgentRunRequest(BaseModel):
-    kind: Literal['pipeline', 'plan', 'voice'] = 'pipeline'
+    kind: Literal['pipeline', 'plan', 'voice', 'scenes'] = 'pipeline'
     mode: Literal['preview', 'final'] = 'final'
     revision: int = Field(ge=1)
