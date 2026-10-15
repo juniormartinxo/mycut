@@ -24,7 +24,7 @@ pesquisa, roteiro, cenas animadas, narração, capa e vídeo final em 1080 × 19
 
 <br>
 
-<img src="docs/screenshots/producoes.webp" alt="Tela Suas produções do MyCut com três Shorts: um em edição, uma prévia sem voz e um pronto para revisar" width="100%">
+<img src="docs/screenshots/producoes.webp" alt="Tela atual de produções do MyCut com três Shorts, capas e cards alinhados: dois em edição e um pronto para revisar" width="100%">
 
 </div>
 
@@ -98,32 +98,31 @@ e rodapé alinhados, além da identidade visual MyCut atualizada. A inicializaç
 local escolhe uma porta livre e pode acompanhar o WSL por serviço de usuário.
 
 <p align="center">
-  <img src="docs/screenshots/editor-de-cenas.webp" alt="Editor de cenas em blocos: composição vertical, abas de propriedades, Google Fonts e navegação numerada entre seis cenas" width="100%">
+  <img src="docs/screenshots/editor-de-cenas.webp" alt="Editor de cenas em blocos: composição vertical, abas Bloco, Objeto e Agente, Google Fonts e navegação numerada entre sete cenas" width="100%">
   <br><sub><b>Editor de cenas</b> · ajuste a composição e navegue entre cenas no mesmo modal, com Salvar e Fechar sempre disponíveis.</sub>
 </p>
 
-<table>
-<tr>
-<td width="42%" valign="top">
-  <img src="docs/screenshots/capa-chat.webp" alt="Chat da capa: o Grok cria uma primeira versão a partir de um quadrado laranja anexado e o Codex refina com robôs e o texto NA NUVEM em ciano, marcada como capa atual">
-  <br><sub><b>Capa</b> · o Grok cria a primeira versão a partir do anexo e o Codex refina na mensagem seguinte.</sub>
-</td>
-<td width="58%" valign="top">
-  <img src="docs/screenshots/novo.webp" alt="Tela Da pauta ao Short com o campo de pauta preenchido e os quatro formatos de Short">
-  <br><sub><b>Novo Short</b> · cole a pauta ou o link e escolha o formato antes de chamar os agentes.</sub>
-  <br><br>
-  <img src="docs/screenshots/agentes.webp" alt="Configurações de agentes com executor conectado e CLI e modelo escolhidos para Pesquisa, Roteiro e Direção visual">
+<p align="center">
+  <img src="docs/screenshots/capa-chat.webp" alt="Chat da capa com referência anexada, resposta do Grok e a imagem IA QUE TRABALHA POR VOCÊ selecionada como capa atual, ao lado da prévia da cena" width="100%">
+  <br><sub><b>Capa</b> · converse com o agente, anexe referências e escolha uma imagem como capa do Short.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/novo.webp" alt="Tela Da pauta ao Short com pauta preenchida, quatro formatos visuais e a opção Roteiro e cenas primeiro selecionada" width="100%">
+  <br><sub><b>Novo Short</b> · cole a pauta ou o link, escolha o formato e decida entre produzir o Short completo ou revisar o roteiro e as cenas primeiro.</sub>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/agentes.webp" alt="Configurações de agentes com CLI, modelo e botão de teste para os quatro papéis: Pesquisa, Roteiro, Direção visual e Conferência" width="100%">
   <br><sub><b>Agentes</b> · um CLI e um modelo por papel, com teste curto antes de salvar.</sub>
-</td>
-</tr>
-</table>
+</p>
 
 <p align="center">
   <img src="docs/screenshots/celular.webp" alt="O editor do MyCut no celular, nas abas Roteiro e Capa" width="62%">
   <br><sub>A interface também funciona no celular.</sub>
 </p>
 
-<sub>Capturas feitas com o Short de exemplo do repositório e produções de demonstração. As imagens da capa foram geradas pelo Grok e pelo Codex nos testes do chat.</sub>
+<sub>Capturas atualizadas em 15/10/2026, com a interface atual e produções de demonstração em uma instância local isolada. O estado de conexão dos agentes é demonstrativo; a capa exibida no chat foi criada anteriormente pelo Grok.</sub>
 
 ## Começar
 
