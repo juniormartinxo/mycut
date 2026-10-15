@@ -115,6 +115,32 @@ test("Fluxo animado reproduz no editor com os quadros do servidor e persiste ao 
   expect(saved.scenes[0].blocks[0].object.flow).toBeUndefined();
 });
 
+test("quadro que falha mostra o erro sem repetir a requisição em laço", async ({ page }) => {
+  const project = await flowProject(page, "Fluxo animado com falha", referenceFlow());
+  let attempts = 0;
+  await page.route("**/api/scene-preview", async route => {
+    const body = route.request().postDataJSON();
+    if (body.elapsed !== undefined && body.elapsed !== null && Math.abs(body.elapsed - 2) < .01) {
+      attempts += 1;
+      return route.fulfill({ status: 500, body: "falha simulada" });
+    }
+    return route.continue();
+  });
+  await page.goto(`/#/producoes/${project.id}/scenes`);
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  const controls = page.getByRole("group", { name: "Prévia animada da cena", exact: true });
+  await seek(page, 1.5);
+  await controls.getByRole("button", { name: "Reproduzir animação", exact: true }).click();
+  await expect(controls.getByRole("alert")).toContainText("Não foi possível gerar o quadro de 2,0 s.");
+  await expect(controls.getByRole("button", { name: "Reproduzir animação", exact: true })).toBeVisible();
+  await page.waitForTimeout(1500);
+  expect(attempts).toBe(1);
+  await controls.getByRole("button", { name: "Tentar novamente", exact: true }).click();
+  await expect.poll(() => attempts).toBe(2);
+  await page.waitForTimeout(1000);
+  expect(attempts).toBe(2);
+});
+
 test("Fluxo animado sem montagem bloqueia a exportação e oferece o pedido ao agente", async ({ page }) => {
   const project = await flowProject(page, "Fluxo animado pendente", null);
   await page.goto(`/#/producoes/${project.id}/scenes`);

@@ -13,6 +13,9 @@ export function useFlowPlayer(body: string, clock: SceneClock | null) {
   const [frame, setFrame] = useState<string | null>(null);
   const cache = useRef(new Map<number, string>());
   const pending = useRef(new Set<number>());
+  // A frame that failed is not requested again until the user retries; otherwise each render would refetch it.
+  const failed = useRef(new Set<number>());
+  const [error, setError] = useState("");
   const generation = useRef(0);
   const [, setLoaded] = useState(0);
   const last = clock ? Math.ceil(clock.duration*FPS) : 0;
@@ -20,19 +23,25 @@ export function useFlowPlayer(body: string, clock: SceneClock | null) {
     // A new draft invalidates every frame; the player returns to the final state.
     generation.current += 1;
     cache.current.forEach(url => URL.revokeObjectURL(url));
-    cache.current.clear(); pending.current.clear();
-    setTime(null); setPlaying(false); setFrame(null);
+    cache.current.clear(); pending.current.clear(); failed.current.clear();
+    setTime(null); setPlaying(false); setFrame(null); setError("");
   }, [body]);
   useEffect(() => () => cache.current.forEach(url => URL.revokeObjectURL(url)), []);
   const load = useCallback((index: number) => {
-    if (index < 0 || index > last || cache.current.has(index) || pending.current.has(index) || pending.current.size >= PARALLEL) return;
+    if (index < 0 || index > last || cache.current.has(index) || pending.current.has(index) || failed.current.has(index)
+      || pending.current.size >= PARALLEL) return;
     const owner = generation.current;
     pending.current.add(index);
     fetch("/api/scene-preview", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...JSON.parse(body), elapsed: index/FPS }) })
       .then(response => { if (!response.ok) throw new Error("frame"); return response.blob(); })
       .then(blob => { if (owner === generation.current) { cache.current.set(index, URL.createObjectURL(blob)); setLoaded(n => n+1); } })
-      .catch(() => {})
+      .catch(() => {
+        if (owner !== generation.current) return;
+        failed.current.add(index);
+        setPlaying(false);
+        setError(`Não foi possível gerar o quadro de ${(index/FPS).toFixed(1).replace(".", ",")} s.`);
+      })
       .finally(() => { if (owner === generation.current) { pending.current.delete(index); setLoaded(n => n+1); } });
   }, [body, last]);
   const index = time === null ? null : Math.min(last, Math.round(time*FPS));
@@ -52,8 +61,9 @@ export function useFlowPlayer(body: string, clock: SceneClock | null) {
     return () => clearTimeout(timer);
   }, [playing, index, ready, last, clock]);
   return {
-    time, playing, frame, buffering: playing && index !== null && index < last && !ready,
-    play: () => { setTime(t => t === null || (clock && t >= clock.duration) ? 0 : t); setPlaying(true); },
+    time, playing, frame, error, buffering: playing && index !== null && index < last && !ready,
+    retry: () => { failed.current.clear(); setError(""); setPlaying(true); },
+    play: () => { failed.current.clear(); setError(""); setTime(t => t === null || (clock && t >= clock.duration) ? 0 : t); setPlaying(true); },
     pause: () => setPlaying(false),
     seek: (value: number) => { setPlaying(false); setTime(value); },
     reset: () => { setPlaying(false); setTime(null); },
@@ -74,6 +84,9 @@ export function FlowControls({ player, clock, disabled }: {
       value={player.time ?? clock.duration} onChange={e => player.seek(e.currentTarget.valueAsNumber)} />
     <output aria-live="off">{player.time === null ? "Estado final" : `${seconds(player.time)} de ${seconds(clock.duration)}`}</output>
     <button type="button" className="text-button" disabled={disabled || player.time === null} onClick={player.reset} aria-label="Mostrar estado final"><RotateCcw size={15} /></button>
-    <small>{player.buffering ? "Preparando quadros…" : clock.source === "narration" ? "Tempos da narração gerada" : "Tempos estimados: gere a narração para sincronizar"}</small>
+    {player.error ? <p className="notice danger" role="alert">{player.error} <button type="button" className="text-button" onClick={player.retry}>Tentar novamente</button></p>
+      : <small>{player.buffering ? "Preparando quadros…" : clock.source === "narration" ? "Tempos da narração gerada"
+        : clock.source === "export" ? "Tempos estimados: o MP4 sincroniza com a narração importada ao exportar"
+        : "Tempos estimados: gere a narração para sincronizar"}</small>}
   </div>;
 }

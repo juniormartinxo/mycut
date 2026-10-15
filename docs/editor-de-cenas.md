@@ -114,14 +114,20 @@ qualquer outra. Na aba **Objeto** ficam o resumo das etapas, com a palavra da
 fala que dispara cada uma, o botão **Pedir nova versão ao agente** e o
 **Tamanho dos rótulos**. Na criação de um Short em **Novo**, o diretor já usa
 o Fluxo animado no bloco central sempre que a fala descreve um processo, uma
-sequência, causa e efeito ou números.
+sequência, causa e efeito ou números. Se, depois da correção, ainda sobrar uma
+âncora fora da fala ou um rótulo que não cabe, a produção não falha. A âncora
+passa ao tempo automático, os rótulos recebem o tamanho que cabe, e, se nem
+assim couberem, a cena usa o parágrafo com o resumo.
 
 Abaixo da composição, **Reproduzir animação**, **Pausar animação** e o
 controle **Tempo da cena** mostram os quadros gerados pelo mesmo código da
 exportação. **Mostrar estado final** volta à composição estática. Com a
 narração gerada e ainda correspondente ao roteiro, os tempos seguem a fala
-alinhada; antes disso, seguem a mesma estimativa da exportação sem narração,
-e o editor indica isso. Uma âncora que não está mais na narração aparece no
+alinhada. Antes disso, seguem a mesma estimativa da exportação sem narração, e
+o editor indica isso. Com narração importada, que não guarda o alinhamento por
+palavra, a prévia usa a estimativa e avisa que o MP4 sincroniza com a fala ao
+exportar. Se um quadro da prévia falhar, a reprodução pausa e mostra o erro
+com **Tentar novamente**, sem repetir o pedido sozinha. Uma âncora que não está mais na narração aparece no
 resumo e passa à distribuição automática. Um Fluxo animado ainda não montado,
 ou com rótulo que não cabe, pode ser salvo, mas bloqueia a exportação.
 
@@ -268,16 +274,18 @@ recuperação em desktop/celular. A conferência visual com seis cenas confirmou
 posição, destaque da cena atual e contraste sob hover; o teste de navegação
 também verifica esse contraste.
 
-No Fluxo animado, 115 testes de backend passaram, 10 deles novos em
+No Fluxo animado, 118 testes de backend passaram, 13 deles novos em
 `backend/tests/test_animated_flow.py`. Eles cobrem validação e persistência,
 âncoras na narração e distribuição automática, a ordem de entrada, traçado,
 pulso e reação, gráficos crescendo e a correção automática de propostas do
-agente na conversa e em **Novo**. Também confirmam que objetos existentes
+agente na conversa e em **Novo**, inclusive a última tentativa, que
+degrada a cena em vez de falhar a produção. Também confirmam que objetos existentes
 continuam estáticos. A paridade compara, por pixels, a prévia do servidor com o
 MP4 exportado em três instantes da cena. Em `web/tests/animated-flow.spec.ts`,
-seis cenários passaram em desktop e celular: reprodução e quadros iguais aos do
-servidor em três instantes, edição, salvamento e reabertura, a pendência sem
-montagem e o pedido automático ao agente simulado, com revisão e aceite.
+oito cenários passaram em desktop e celular: reprodução e quadros iguais aos do
+servidor em três instantes, edição, salvamento e reabertura, a falha de um
+quadro sem novas tentativas automáticas, a pendência sem montagem e o pedido
+automático ao agente simulado, com revisão e aceite.
 
 A suíte completa de navegador teve 74 cenários aprovados. Os dois que falharam
 são de `costs.spec.ts` (edição de preços), e falham igualmente na `main`, sem

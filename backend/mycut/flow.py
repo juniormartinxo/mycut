@@ -137,14 +137,15 @@ def scene_clock(project, scene):
     scenes = project.get('scenes') or []
     index = next((i for i, s in enumerate(scenes) if s.get('id') and s.get('id') == scene.get('id')), None)
     audio = project.get('audio')
-    if (index is not None and audio and audio.get('alignment') and scenes[index]['narration'] == scene['narration']
+    if (index is not None and audio and scenes[index]['narration'] == scene['narration']
             and audio.get('script_hash') == store.script_hash(project)):
         try:
             transcript = json.loads(data_path(audio['alignment']).read_text())
             timing = alignment.make_timing(store.script(project), transcript, audio['duration'], None)
             return clock_from_timing(timing, index)
-        except (OSError, ValueError, KeyError, IndexError):
-            pass
+        except (OSError, ValueError, KeyError, IndexError, TypeError):
+            # Imported narration has no saved word alignment: the export aligns it with Whisper.
+            return {**estimate_clock(scene['narration']), 'source': 'export'}
     return estimate_clock(scene['narration'])
 
 

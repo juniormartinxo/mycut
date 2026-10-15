@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from typing import Annotated
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, StringConstraints, ValidationError, model_validator
 from . import bridge, costs, integrations, elevenlabs, store, visuals, scene_images, flow
 from .config import DATA
 from .media import data_path
@@ -59,6 +59,8 @@ class Visual(Output):
     image_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     image_fit: str = Field(default='contain', pattern=r'^(contain|cover)$')
     flow: FlowSpec | None = None
+    # Label size settled by settle_flow on the last attempt; never part of the agent schema.
+    _flow_font: float = PrivateAttr(default=30)
 
     @model_validator(mode='after')
     def complete_diagram(self):
@@ -194,6 +196,10 @@ def create_direction(job, script, research, issues, attempt=1):
                 if not blocks:
                     visual.flow = None
                     continue
+                if correction == 1:
+                    # The research and script are already paid: degrade the flow instead of failing the production.
+                    settle_flow(visual, narration, style)
+                    continue
                 obj = VisualObject(type='flow', font_size=FLOW_FONT, flow=visual.flow).model_dump()
                 notes = flow.check_for_agent(obj, FLOW_BOX, style, narration)
                 if notes:
@@ -248,6 +254,21 @@ FLOW_BOX = geometry(new_scene()['blocks'])[1]['block']
 FLOW_FONT = 30
 
 
+def settle_flow(visual, narration, style):
+    """Keep a usable scene: unknown anchors fall back to automatic timing, labels to a size that fits,
+    and a flow whose labels never fit gives way to the paragraph summary."""
+    for index in flow.anchor_warnings(visual.flow.model_dump(), narration):
+        visual.flow.steps[index].anchor = None
+    obj = VisualObject(type='flow', font_size=FLOW_FONT, flow=visual.flow).model_dump()
+    issues, _ = flow.problems(obj, FLOW_BOX, style, narration)
+    if not issues:
+        visual._flow_font = FLOW_FONT
+    elif issues[0].get('font_size'):
+        visual._flow_font = issues[0]['font_size']
+    else:
+        visual.flow = None
+
+
 def directed_scene(visual, narration, project):
     """New productions use blocks; legacy productions keep their existing contract."""
     values = visual.model_dump(exclude={'flow'})
@@ -255,7 +276,7 @@ def directed_scene(visual, narration, project):
         return Scene(**values, narration=narration).model_dump()
     scene = {**new_scene(visual.title, narration), **values}
     scene['blocks'][0]['object'] = VisualObject(type='title', text=visual.title, font_size=64).model_dump()
-    scene['blocks'][1]['object'] = (VisualObject(type='flow', font_size=FLOW_FONT, flow=visual.flow) if visual.flow else
+    scene['blocks'][1]['object'] = (VisualObject(type='flow', font_size=visual._flow_font, flow=visual.flow) if visual.flow else
                                     VisualObject(type='image', asset_id=visual.image_id, fit=visual.image_fit)
                                     if visual.image_id else VisualObject(type='paragraph', text='\n\n'.join(visual.items), font_size=40)).model_dump()
     return Scene.model_validate(scene).model_dump()

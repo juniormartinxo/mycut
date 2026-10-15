@@ -170,7 +170,7 @@ export type SceneIssue = {
   font_size?: number | null;
   step?: number;
 };
-export type SceneClock = { duration: number; source: "narration" | "estimate" };
+export type SceneClock = { duration: number; source: "narration" | "estimate" | "export" };
 export type SceneThread = {
   id: string;
   scene_id: string;

@@ -166,6 +166,15 @@ class AnimatedFlowTests(unittest.TestCase):
         self.assertEqual(len(clock['words']), len(words))
         self.assertAlmostEqual(clock['words'][0], 0)
 
+    def test_imported_narration_without_alignment_is_reported_as_synced_at_export(self):
+        scene = self.flow_scene(reference_flow())
+        project = {'scenes': [scene], 'audio': {'duration': 9.0}}
+        project['audio']['script_hash'] = store.script_hash(project)
+        self.assertEqual(flow.scene_clock(project, scene)['source'], 'export')
+        self.assertEqual(flow.scene_clock(project, {**scene, 'narration': 'Outra fala.'})['source'], 'estimate')
+        project['audio']['script_hash'] = 'f'*64
+        self.assertEqual(flow.scene_clock(project, scene)['source'], 'estimate')
+
     def test_timeline_enters_draws_pulses_and_reacts_in_cause_and_effect_order(self):
         clock = flow.estimate_clock(NARRATION)
         spec = reference_flow()
@@ -322,6 +331,45 @@ class AnimatedFlowTests(unittest.TestCase):
         self.assertIn('wrench', seen[0][1]['flow_icons'])
         self.assertIn('scenes[0].flow', seen[1][1]['issues_to_fix'][-1])
         self.assertIsNotNone(direction.scenes[0].flow)
+
+
+    def direct(self, answer):
+        """create_direction with a director that returns the same flow on every attempt."""
+        visual = pipeline.Visual(title='Como o agente responde', layout='flow', items=['Pedido', 'Resposta'], flow=answer)
+        calls = []
+
+        def fake_agent(job, role, instructions, payload, model, attempt=1, **_):
+            calls.append(payload['issues_to_fix'])
+            return pipeline.Direction(accent='#c85e37', scenes=[visual.model_dump()])
+        job = {'id': 'x', 'snapshot': {**self.project, 'accent_locked': True}}
+        with patch.object(pipeline, 'agent', side_effect=fake_agent):
+            direction = pipeline.create_direction(job, {'narration': [NARRATION]}, {}, [])
+        self.assertEqual(len(calls), 2)
+        return direction.scenes[0], pipeline.directed_scene(direction.scenes[0], NARRATION, self.project)
+
+    def test_last_attempt_drops_unknown_anchors_instead_of_failing_the_production(self):
+        answer = reference_flow()
+        answer['steps'][1]['anchor'] = 'palavra que nunca foi dita'
+        visual, scene = self.direct(answer)
+        steps = scene['blocks'][1]['object']['flow']['steps']
+        self.assertEqual([s['anchor'] for s in steps], ['pedido', None, 'devolve', 'resposta'])
+        self.assertEqual(scene['blocks'][1]['object']['font_size'], pipeline.FLOW_FONT)
+        self.assertFalse(block_render.inspect(scene, self.project)['warnings'])
+
+    def test_last_attempt_fits_labels_or_falls_back_to_the_paragraph(self):
+        crowded = reference_flow()
+        crowded['nodes'][3].update(size=34, label='Resposta final do agente')  # a chart title must fit on one line
+        visual, scene = self.direct(crowded)
+        obj = scene['blocks'][1]['object']
+        self.assertEqual(obj['type'], 'flow')
+        self.assertLess(obj['font_size'], pipeline.FLOW_FONT)
+        self.assertFalse(block_render.inspect(scene, self.project)['issues'])
+        impossible = reference_flow()
+        impossible['nodes'][3].update(size=6, label='Resposta final do agente')
+        visual, scene = self.direct(impossible)
+        self.assertIsNone(visual.flow)
+        self.assertEqual(scene['blocks'][1]['object']['type'], 'paragraph')
+        self.assertEqual(scene['blocks'][1]['object']['text'], 'Pedido\n\nResposta')
 
 
 if __name__ == '__main__':
