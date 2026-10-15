@@ -116,8 +116,9 @@ fala que dispara cada uma, o botão **Pedir nova versão ao agente** e o
 o Fluxo animado no bloco central sempre que a fala descreve um processo, uma
 sequência, causa e efeito ou números. Se, depois da correção, ainda sobrar uma
 âncora fora da fala ou um rótulo que não cabe, a produção não falha. A âncora
-passa ao tempo automático, os rótulos recebem o tamanho que cabe, e, se nem
-assim couberem, a cena usa o parágrafo com o resumo.
+passa ao tempo automático e os rótulos recebem o tamanho que cabe, desde que
+seja de pelo menos 22 px, para continuarem legíveis no celular. Abaixo disso,
+ou se não couberem, a cena usa o parágrafo com o resumo.
 
 Abaixo da composição, **Reproduzir animação**, **Pausar animação** e o
 controle **Tempo da cena** mostram os quadros gerados pelo mesmo código da

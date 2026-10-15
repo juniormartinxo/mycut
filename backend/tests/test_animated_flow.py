@@ -363,13 +363,16 @@ class AnimatedFlowTests(unittest.TestCase):
         obj = scene['blocks'][1]['object']
         self.assertEqual(obj['type'], 'flow')
         self.assertLess(obj['font_size'], pipeline.FLOW_FONT)
+        self.assertGreaterEqual(obj['font_size'], pipeline.FLOW_MIN_FONT)
         self.assertFalse(block_render.inspect(scene, self.project)['issues'])
-        impossible = reference_flow()
-        impossible['nodes'][3].update(size=6, label='Resposta final do agente')
-        visual, scene = self.direct(impossible)
-        self.assertIsNone(visual.flow)
-        self.assertEqual(scene['blocks'][1]['object']['type'], 'paragraph')
-        self.assertEqual(scene['blocks'][1]['object']['text'], 'Pedido\n\nResposta')
+        # Fits only around 19 px (unreadable on a phone) or never fits: both fall back to the paragraph.
+        for size in (26, 6):
+            unreadable = reference_flow()
+            unreadable['nodes'][3].update(size=size, label='Resposta final do agente')
+            visual, scene = self.direct(unreadable)
+            self.assertIsNone(visual.flow)
+            self.assertEqual(scene['blocks'][1]['object']['type'], 'paragraph')
+            self.assertEqual(scene['blocks'][1]['object']['text'], 'Pedido\n\nResposta')
 
 
 if __name__ == '__main__':

@@ -252,18 +252,20 @@ def uses_blocks(project):
 # The central block of a new scene (20/60/20) is where the director's animated flow lives.
 FLOW_BOX = geometry(new_scene()['blocks'])[1]['block']
 FLOW_FONT = 30
+# Below this, labels in the 1080 px frame are unreadable on a phone; the scene falls back to the paragraph.
+FLOW_MIN_FONT = 22
 
 
 def settle_flow(visual, narration, style):
-    """Keep a usable scene: unknown anchors fall back to automatic timing, labels to a size that fits,
-    and a flow whose labels never fit gives way to the paragraph summary."""
+    """Keep a usable scene: unknown anchors fall back to automatic timing, labels to a size that fits
+    (never below FLOW_MIN_FONT), and a flow whose labels do not fit gives way to the paragraph summary."""
     for index in flow.anchor_warnings(visual.flow.model_dump(), narration):
         visual.flow.steps[index].anchor = None
     obj = VisualObject(type='flow', font_size=FLOW_FONT, flow=visual.flow).model_dump()
     issues, _ = flow.problems(obj, FLOW_BOX, style, narration)
     if not issues:
         visual._flow_font = FLOW_FONT
-    elif issues[0].get('font_size'):
+    elif (issues[0].get('font_size') or 0) >= FLOW_MIN_FONT:
         visual._flow_font = issues[0]['font_size']
     else:
         visual.flow = None
