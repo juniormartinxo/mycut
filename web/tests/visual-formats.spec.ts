@@ -113,7 +113,7 @@ test("escolher formato, personalizar tudo e manter após salvar e atualizar", as
     path: info.outputPath("formats-gallery.png"),
     fullPage: true,
   });
-  await page.getByLabel("Fonte do vídeo").selectOption("mono");
+  await page.getByLabel("Fonte dos layouts anteriores").selectOption("mono");
   await page.getByLabel("Nome do canal no vídeo").fill("@JuniorIA");
   await page.getByLabel("Cor de fundo", { exact: true }).fill("#142138");
   await page.getByLabel("Cor do texto", { exact: true }).fill("#f7efcf");
@@ -130,7 +130,7 @@ test("escolher formato, personalizar tudo e manter após salvar e atualizar", as
   await expect(
     page.getByRole("radio", { name: "Radar tech", exact: true }),
   ).toBeChecked();
-  await expect(page.getByLabel("Fonte do vídeo")).toHaveValue("mono");
+  await expect(page.getByLabel("Fonte dos layouts anteriores")).toHaveValue("mono");
   await expect(page.getByLabel("Nome do canal no vídeo")).toHaveValue("@JuniorIA");
   await settled(page);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -154,7 +154,7 @@ test("escolher formato, personalizar tudo e manter após salvar e atualizar", as
   });
   await page.reload();
   await expect(page.getByLabel("Nome do canal no vídeo")).toHaveValue("@JuniorIA");
-  await expect(page.getByLabel("Fonte do vídeo")).toHaveValue("mono");
+  await expect(page.getByLabel("Fonte dos layouts anteriores")).toHaveValue("mono");
   await expect(page.getByLabel("Cor de fundo", { exact: true })).toHaveValue(
     "#142138",
   );

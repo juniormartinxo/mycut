@@ -17,7 +17,8 @@ from .config import ROOT, DATA, UPLOAD_LIMIT
 from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
 from . import voice_tests, covers, endings
-from . import visuals
+from . import visuals, scene_layout, scene_media, google_fonts
+from .scene_api import router as scene_router
 from .models import ScenePreview
 from .seed import blank, claude, initialize_example
 
@@ -40,7 +41,9 @@ app.add_middleware(CORSMiddleware, allow_origins=['http://localhost:5173', 'http
 async def local_origin(request: Request, call_next):
     origin = request.headers.get('origin')
     if request.method not in ('GET', 'HEAD', 'OPTIONS') and origin:
-        allowed = {'http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:8321', 'http://127.0.0.1:8321', 'http://testserver'}
+        port = int(os.environ.get('MYCUT_PORT', '8321'))
+        allowed = {'http://localhost:5173', 'http://127.0.0.1:5173', 'http://testserver',
+                   f'http://localhost:{port}', f'http://127.0.0.1:{port}'}
         if origin not in allowed:
             return JSONResponse({'detail': 'Origem não autorizada para alterar projetos.'}, status_code=403)
     return await call_next(request)
@@ -77,6 +80,7 @@ def present(project):
         if project.get(key):
             project[key] = {k: v for k, v in project[key].items() if k not in ('path', 'alignment')}
             project[key]['url'] = f'/api/projects/{project["id"]}/assets/{key}?v={project["revision"]}'
+    project['videos'] = [scene_media.public(project['id'], item) for item in project.get('videos', [])]
     project['usage_total'] = costs.project(project['id'], integrations.read()['pricing'])['total']
     project['audio_matches_script'] = bool(project.get('audio') and project['audio']['script_hash'] == store.script_hash(project))
     project['images'] = [{k: v for k, v in item.items() if k != 'path'} |
@@ -107,7 +111,9 @@ def format_preview(format_id: str):
 def scene_preview(body: ScenePreview):
     document = body.model_dump()
     if body.project_id:
-        document['images'] = store.get_project(body.project_id).get('images', [])
+        owner = store.get_project(body.project_id)
+        document['images'] = owner.get('images', [])
+        document['videos'] = owner.get('videos', [])
     return Response(visuals.preview_png(body.scene.model_dump(), document), media_type='image/png')
 
 
@@ -139,7 +145,8 @@ def project_image(project_id: str, image_id: str):
 
 @app.get('/api/health')
 def health():
-    return {'status': 'ok', 'worker_online': store.worker_online(), 'ffmpeg': bool(shutil.which('ffmpeg'))}
+    return {'status': 'ok', 'worker_online': store.worker_online(), 'ffmpeg': bool(shutil.which('ffmpeg')),
+            'instance': os.environ.get('MYCUT_INSTANCE', os.environ.get('HOSTNAME', 'local'))}
 
 
 @app.get('/api/projects')
@@ -317,6 +324,8 @@ def voice_test_audio(test_id: str):
 
 @app.post('/api/projects/{project_id}/run', status_code=202)
 def run_agents(project_id: str, body: AgentRunRequest):
+    if body.kind == 'scenes' and any(s.get('blocks') is not None for s in store.get_project(project_id)['scenes']):
+        raise store.Conflict('Use a conversa da cena para revisar e aceitar alterações nos blocos.')
     settings = ready_for(body.kind)
     return store.enqueue(project_id, body.mode, body.revision, body.kind, settings)
 
@@ -332,7 +341,15 @@ def update(project_id: str, body: ProjectInput):
     revision = values.pop('revision')
     if body.ending_id:
         endings.get(body.ending_id)
-    images = {item['id'] for item in store.get_project(project_id).get('images', [])}
+    current = store.get_project(project_id)
+    images = {item['id'] for item in current.get('images', [])}
+    if body.visual_style and body.visual_style.google_font:
+        google_fonts.entry(body.visual_style.google_font)
+    for scene in body.scenes:
+        scene_layout.validate_assets(scene.model_dump(), current)
+        for block in scene.blocks or []:
+            if block.object and block.object.font:
+                google_fonts.entry(block.object.font)
     if any(scene.image_id and scene.image_id not in images for scene in body.scenes):
         raise ValueError('Escolha uma imagem desta produção ou use somente animação.')
     return present(store.update_project(project_id, values, revision))
@@ -556,6 +573,8 @@ def package(job_id: str):
         staging.unlink(missing_ok=True)
     return FileResponse(target, filename=f'mycut-{job_id[:8]}.zip')
 
+
+app.include_router(scene_router)
 
 # Production uses the same origin for frontend, API and range-enabled video files.
 web = Path(os.environ.get('MYCUT_WEB_DIR', ROOT / 'web/dist'))

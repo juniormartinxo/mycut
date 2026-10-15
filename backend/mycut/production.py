@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
-from . import visuals, endings
+from . import visuals, endings, block_render
 from .config import ROOT, DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
 
@@ -131,6 +131,7 @@ def transcribe(audio, folder, job):
 
 def make_video(job):
     project, job_id = job['snapshot'], job['id']
+    block_render.validate_project(project)
     ending = endings.get(project['ending_id']) if project.get('ending_id') else None
     folder = DATA / 'projects' / project['id'] / 'renders' / job_id
     folder.mkdir(parents=True, exist_ok=True)
@@ -166,9 +167,13 @@ def make_video(job):
     graphics.write_subtitles(timing)
     frames = [scene_image(scene, project['accent']) for scene in project['scenes']]
     compositions = None
-    if project.get('visual_style'):
-        compositions = [visuals.Composition(scene, project, 540 if job['mode'] == 'preview' else 1080,
-                                           visuals.scene_asset(scene, project)) for scene in project['scenes']]
+    if project.get('visual_style') or any(s.get('blocks') is not None for s in project['scenes']):
+        compositions = [block_render.BlockComposition(scene, project, 540 if job['mode'] == 'preview' else 1080,
+                                                       24 if job['mode'] == 'preview' else 30)
+                        if scene.get('blocks') is not None else
+                        visuals.Composition(scene, project, 540 if job['mode'] == 'preview' else 1080,
+                                            visuals.scene_asset(scene, project)) if project.get('visual_style') else None
+                        for scene in project['scenes']]
     if project.get('cover'):
         source_cover = data_path(project['cover']['path'])
         concept = None
@@ -182,7 +187,7 @@ def make_video(job):
         else:
             shutil.copy2(source_cover, folder / 'capa.png')
     else:
-        if compositions:
+        if compositions and compositions[0]:
             visuals.save_png(compositions[0].frame().resize((1080, 1920)), folder / 'capa.png', project,
                              scene=project['scenes'][0])
         else:
@@ -214,8 +219,8 @@ def make_video(job):
                 scene = project['scenes'][scene_index]
                 bounds = timing['scenes'][scene_index]
                 phase = min(.999, max(0, (now-bounds['start']) / max(.1, bounds['end']-bounds['start'])))
-                if compositions:
-                    caption = timing['captions'][caption_index]
+                if compositions and compositions[scene_index]:
+                    caption = timing['captions'][caption_index] if timing['captions'] else {'text': '', 'start': 0, 'end': 0}
                     text = caption['text'] if caption['start'] <= now < caption['end'] else ''
                     frame = compositions[scene_index].frame(now-bounds['start'], phase, text)
                     if not audio:
@@ -255,6 +260,10 @@ def make_video(job):
                 process.kill()
             process.wait()
             raise
+        finally:
+            for composition in compositions or []:
+                if isinstance(composition, block_render.BlockComposition):
+                    composition.close()
     if ending:
         store.progress(job_id, 96, 'Acrescentando o vídeo de encerramento')
         ending = endings.append_clip(target, ending, width, height, fps, bool(audio))

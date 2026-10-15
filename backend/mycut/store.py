@@ -58,10 +58,21 @@ def initialize():
                 created_at REAL NOT NULL, updated_at REAL NOT NULL);
             -- Cover chat generations run beside a production, one of each per project.
             DROP INDEX IF EXISTS one_active_job_per_project;
+            DROP INDEX IF EXISTS one_active_production_per_project;
             CREATE UNIQUE INDEX IF NOT EXISTS one_active_production_per_project
-                ON jobs(project_id) WHERE state IN ('queued','running') AND mode != 'cover';
+                ON jobs(project_id) WHERE state IN ('queued','running') AND mode NOT IN ('cover','scene_edit');
             CREATE UNIQUE INDEX IF NOT EXISTS one_active_cover_per_project
                 ON jobs(project_id) WHERE state IN ('queued','running') AND mode = 'cover';
+            CREATE UNIQUE INDEX IF NOT EXISTS one_active_scene_edit_per_project
+                ON jobs(project_id) WHERE state IN ('queued','running') AND mode = 'scene_edit';
+            CREATE TABLE IF NOT EXISTS scene_threads (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                scene_id TEXT NOT NULL, scope TEXT NOT NULL, target_id TEXT NOT NULL,
+                marked INTEGER NOT NULL DEFAULT 0, resolved INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(project_id,scene_id,scope,target_id));
+            CREATE TABLE IF NOT EXISTS scene_decisions (
+                job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+                decision TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS worker_status (id INTEGER PRIMARY KEY CHECK(id=1), heartbeat REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS job_steps (
                 job_id TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -113,7 +124,7 @@ def update_project(project_id, changes, revision):
         current = project_row(db.execute('SELECT * FROM projects WHERE id=?', (project_id,)).fetchone())
         if current['revision'] != revision:
             raise Conflict('O projeto mudou em outra tela. Reabra-o antes de salvar.')
-        if db.execute("SELECT 1 FROM jobs WHERE project_id=? AND state IN ('queued','running') AND mode != 'cover'", (project_id,)).fetchone():
+        if db.execute("SELECT 1 FROM jobs WHERE project_id=? AND state IN ('queued','running') AND mode NOT IN ('cover','scene_edit')", (project_id,)).fetchone():
             raise Conflict('Espere a produção terminar ou cancele-a antes de editar.')
         current.update(changes, revision=revision + 1)
         for key in ('id', 'created_at', 'updated_at'):
@@ -131,7 +142,7 @@ def job_row(row, private=False):
     job['revision'] = snapshot['revision']
     job['kind'] = snapshot.get('_kind', 'render')
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
-    job['materials'] = [] if job['kind'] == 'cover' else (['input.json'] if job['kind'] != 'render' else []) + [
+    job['materials'] = [] if job['kind'] in ('cover', 'scene_edit') else (['input.json'] if job['kind'] != 'render' else []) + [
         name for name in ('roteiro.txt', 'publicacao.txt', 'capa.png', 'narracao.wav')
         if job['state'] in ('succeeded', 'failed', 'cancelled') and (folder / name).is_file()]
     with connect() as db:
@@ -144,7 +155,7 @@ def job_row(row, private=False):
 
 def jobs(project_id=None, covers=False):
     """Productions only; cover chat generations are listed by cover_jobs and, with covers=True, for costs."""
-    kinds = '' if covers else " AND mode != 'cover'"
+    kinds = '' if covers else " AND mode NOT IN ('cover','scene_edit')"
     with connect() as db:
         rows = db.execute(f'SELECT * FROM jobs WHERE project_id=?{kinds} ORDER BY created_at DESC', (project_id,)) if project_id else db.execute(f'SELECT * FROM jobs WHERE 1{kinds} ORDER BY created_at DESC LIMIT 100')
         return [job_row(row) for row in rows]
@@ -173,6 +184,9 @@ def enqueue(project_id, mode, revision, kind='render', settings=None):
             raise Conflict('Gere ou salve o roteiro antes de criar as cenas com agentes.')
         if len(script(project).split()) > 500:
             raise Conflict('Use até 500 palavras por Short nesta versão.')
+        if kind == 'render':
+            from .block_render import validate_project
+            validate_project(project)
         if kind == 'render' and mode == 'final' and not project.get('audio'):
             raise Conflict('Importe a narração antes de gerar o vídeo final.')
         if kind == 'render' and project.get('audio') and project['audio']['script_hash'] != script_hash(project):
@@ -222,7 +236,7 @@ def claim(covers=False):
     """Productions and cover generations are claimed by separate worker lanes."""
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
-        row = db.execute(f"SELECT * FROM jobs WHERE state='queued' AND mode {'=' if covers else '!='} 'cover' ORDER BY created_at LIMIT 1").fetchone()
+        row = db.execute(f"SELECT * FROM jobs WHERE state='queued' AND mode {'IN' if covers else 'NOT IN'} ('cover','scene_edit') ORDER BY created_at LIMIT 1").fetchone()
         if row is None:
             return None
         db.execute("UPDATE jobs SET state='running', message='Preparando produção', updated_at=? WHERE id=?", (time.time(), row['id']))

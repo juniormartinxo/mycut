@@ -52,7 +52,7 @@ O job captura a revisão inicial em uma tabela imutável separada e recebe apena
 
 O worker marca execuções interrompidas como falhas na reinicialização; enfileiradas sobrevivem. O executor não repete solicitações já iniciadas sem resposta após reinício. Cancelamento ou perda do lease encerra o subprocesso CLI. Se uma chamada de voz já chegou à ElevenLabs, cancelar localmente não garante estorno dos créditos.
 
-A porta 8321 é local, sem autenticação multiusuário. O Compose compartilha `.data`, monta o Short original como somente leitura e usa volume separado de modelos. O executor precisa usar o mesmo diretório e usuário com permissão de escrita. A máquina e os três processos precisam permanecer ativos. Coleta recorrente e publicação YouTube ainda não fazem parte do runtime.
+A aplicação atende apenas em loopback, sem autenticação multiusuário. `scripts/docker.sh` e `scripts/start.sh` procuram uma porta livre a partir de 8321, verificando Windows e Linux; a URL efetiva fica em `.data/http.json`. No Docker, somente a porta publicada muda: a API continua na porta interna 8321. `MYCUT_PORT` leva a porta escolhida à validação de origem, sem liberar outras portas. O serviço de usuário `mycut-app.service` pode iniciar e monitorar os containers, preservando a porta de uma instância acessível e aguardando a fila antes de recriações. O Compose compartilha `.data`, monta o Short original como somente leitura e usa volume separado de modelos. O executor precisa usar o mesmo diretório e usuário com permissão de escrita. A máquina e os três processos precisam permanecer ativos. Coleta recorrente e publicação YouTube ainda não fazem parte do runtime.
 
 ## Contratos externos consultados
 

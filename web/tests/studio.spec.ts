@@ -30,25 +30,27 @@ test("criar, editar sem perder texto, produzir e baixar uma versão", async ({
     ).toHaveValue("A ideia 1 aparece no vídeo.");
   }
   await page.getByRole("tab", { name: "Cenas", exact: true }).click();
-  await page.getByLabel("Formato visual").selectOption("comparison");
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  await page.getByRole("combobox", { name: "Objeto do bloco", exact: true }).selectOption("title");
+  await page.getByRole("textbox", { name: "Texto do título", exact: true }).fill("Computador · sessão local");
+  await page.getByRole("button", { name: "Selecionar bloco 2", exact: true }).click();
+  await page.getByRole("combobox", { name: "Objeto do bloco", exact: true }).selectOption("paragraph");
+  await page.getByRole("textbox", { name: "Texto do parágrafo", exact: true }).fill("Nuvem\nSessão independente");
   await page
-    .getByLabel("Opção 1 da comparação")
-    .fill("Computador\nSessão local");
-  await page
-    .getByLabel("Opção 2 da comparação")
-    .fill("Nuvem\nSessão independente");
-  await page
-    .getByRole("button", { name: "Salvar alterações", exact: true })
+    .getByRole("button", { name: "Salvar", exact: true })
     .click();
   await expect(
-    page.getByText("Alterações salvas.", { exact: true }),
+    page.getByRole("dialog").getByText("Salvo", { exact: true }),
   ).toBeVisible();
   await page.reload();
   await page.getByRole("tab", { name: "Cenas", exact: true }).click();
-  await expect(page.getByLabel("Opção 2 da comparação")).toHaveValue(
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  await page.getByRole("button", { name: "Selecionar bloco 2", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Texto do parágrafo", exact: true })).toHaveValue(
     "Nuvem\nSessão independente",
   );
 
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
   await page
     .getByRole("button", { name: "Renderizar cenas atuais", exact: true })
     .click();
@@ -91,13 +93,16 @@ test("criar, editar sem perder texto, produzir e baixar uma versão", async ({
   await expect(
     page.getByRole("button", { name: "Mover cena para cima", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel("Título em tela").fill("Cena atualizada");
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  await page.getByRole("button", { name: "Selecionar bloco 1", exact: true }).click();
+  await page.getByRole("textbox", { name: "Texto do título", exact: true }).fill("Cena atualizada");
   await page
-    .getByRole("button", { name: "Salvar alterações", exact: true })
+    .getByRole("button", { name: "Salvar", exact: true })
     .click();
   await expect(
-    page.getByText("Alterações salvas.", { exact: true }),
+    page.getByRole("dialog").getByText("Salvo", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
   await expect(
     page.getByRole("link", { name: "MP4", exact: true }),
   ).toBeVisible();
@@ -144,7 +149,7 @@ test("conexões e entrada por pauta são o caminho principal", async ({
   await page
     .getByRole("button", { name: "Configurar conexões", exact: true })
     .click();
-  await expect(page.getByRole("heading", { name: "Agentes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agentes", exact: true })).toBeVisible();
   await expect(
     page.getByText("bash scripts/agents.sh", { exact: true }),
   ).toBeVisible();

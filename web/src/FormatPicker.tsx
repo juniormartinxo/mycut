@@ -3,6 +3,7 @@ import { Check, ImagePlus, RotateCcw } from "lucide-react";
 import { request } from "./api";
 import type { Scene, ShortFormat, VisualStyle } from "./types";
 import "./FormatPicker.css";
+import { GoogleFontPicker } from "./GoogleFontPicker";
 
 export const initialStyle: VisualStyle = {
   format_id: "editorial",
@@ -32,7 +33,7 @@ export function RenderedScene({
   label = "Composição da cena",
 }: {
   scene: Scene;
-  style: VisualStyle;
+  style: VisualStyle | null;
   accent: string;
   projectId?: string;
   label?: string;
@@ -263,7 +264,7 @@ export function FormatPicker({
                 </small>
               </label>
               <label>
-                Fonte do vídeo
+                Fonte dos layouts anteriores
                 <select
                   value={style.font || selected.font}
                   onChange={(e) =>
@@ -277,6 +278,7 @@ export function FormatPicker({
                   ))}
                 </select>
               </label>
+              <GoogleFontPicker label="Fonte dos blocos · Google Fonts" value={style.google_font || "Roboto"} disabled={disabled} onChange={google_font => change({ google_font })} />
               <div className="format-colors">
                 <ColorControl
                   label="Cor de fundo"

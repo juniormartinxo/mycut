@@ -1,5 +1,6 @@
 from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator, model_validator
+from .scene_layout import Id, SceneBlock, validate_blocks
 
 
 class VisualStyle(BaseModel):
@@ -7,6 +8,7 @@ class VisualStyle(BaseModel):
     format_id: Literal['editorial', 'radar', 'tutorial', 'impact'] = 'editorial'
     channel_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] = 'MYCUT'
     font: Literal['sans', 'serif', 'mono', 'condensed'] | None = None
+    google_font: str | None = Field(default=None, min_length=1, max_length=150, exclude_if=lambda value: value is None)
     background: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
     text_color: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
     media_mode: Literal['animations', 'mixed'] = 'animations'
@@ -15,12 +17,19 @@ class VisualStyle(BaseModel):
 
 class Scene(BaseModel):
     model_config = ConfigDict(extra='forbid')
+    id: Id | None = None
+    blocks: list[SceneBlock] | None = Field(default=None, min_length=1, max_length=100)
     title: str = Field(default='', max_length=100)
     narration: str = Field(default='', max_length=1400)
     layout: Literal['flow', 'comparison', 'statement'] = 'flow'
     items: list[str] = Field(default_factory=list, max_length=4)
     image_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     image_fit: Literal['contain', 'cover'] = 'contain'
+
+    @field_validator('blocks')
+    @classmethod
+    def valid_blocks(cls, value):
+        return validate_blocks(value) if value is not None else None
 
     @field_validator('narration')
     @classmethod
@@ -55,6 +64,17 @@ class ProjectInput(BaseModel):
     ending_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     scenes: list[Scene] = Field(min_length=1, max_length=12)
     revision: int = Field(default=0, ge=0)
+
+    @model_validator(mode='after')
+    def unique_scene_ids(self):
+        ids = [scene.id for scene in self.scenes if scene.id]
+        ids += [block.id for scene in self.scenes for block in scene.blocks or []]
+        ids += [block.object.id for scene in self.scenes for block in scene.blocks or [] if block.object]
+        if len(ids) != len(set(ids)):
+            raise ValueError('Cenas, blocos e objetos devem ter identificações únicas no projeto.')
+        if any(scene.blocks is not None and not scene.id for scene in self.scenes):
+            raise ValueError('Uma cena com blocos precisa de identificação.')
+        return self
 
     @field_validator('title')
     @classmethod

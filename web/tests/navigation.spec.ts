@@ -12,7 +12,7 @@ test("refresh e histórico preservam telas e aba do editor sem perder a proteç�
     .click();
   await expect(page).toHaveURL(/#\/configuracoes\/agentes$/);
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Agentes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agentes", exact: true })).toBeVisible();
   await navigation
     .getByRole("button", { name: "Fila de produção", exact: true })
     .click();
@@ -21,7 +21,7 @@ test("refresh e histórico preservam telas e aba do editor sem perder a proteç�
     page.getByRole("heading", { name: "Fila de produção", exact: true }),
   ).toBeVisible();
   await page.goBack();
-  await expect(page.getByRole("heading", { name: "Agentes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Agentes", exact: true })).toBeVisible();
   await page.goForward();
   await expect(
     page.getByRole("heading", { name: "Fila de produção", exact: true }),
@@ -45,17 +45,23 @@ test("refresh e histórico preservam telas e aba do editor sem perder a proteç�
   await expect(
     page.getByRole("tab", { name: "Cenas", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
-  await page.getByLabel("Título em tela").fill("Rascunho protegido");
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  await page.getByRole("combobox", { name: "Objeto do bloco", exact: true }).selectOption("title");
+  await page.getByRole("textbox", { name: "Texto do título", exact: true }).fill("Rascunho protegido");
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
   await page.goBack(); // Back to the previous tab, with the same editor still mounted.
   await page.goForward();
-  await expect(page.getByLabel("Título em tela")).toHaveValue(
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Texto do título", exact: true })).toHaveValue(
     "Rascunho protegido",
   );
+  await page.getByRole("button", { name: "Fechar", exact: true }).click();
   const leaveDialog = page.waitForEvent("dialog");
   await page.evaluate(() => history.go(-2)); // Try to leave the project through history.
   await (await leaveDialog).dismiss();
   await expect(page).toHaveURL(/\/scenes$/);
-  await expect(page.getByLabel("Título em tela")).toHaveValue(
+  await page.getByRole("button", { name: "Editar cena", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Texto do título", exact: true })).toHaveValue(
     "Rascunho protegido",
   );
 });

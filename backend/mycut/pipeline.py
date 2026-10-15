@@ -11,6 +11,7 @@ from . import bridge, costs, integrations, elevenlabs, store, visuals, scene_ima
 from .config import DATA
 from .media import data_path
 from .models import Scene
+from .scene_layout import new_scene, VisualObject
 
 
 class Output(BaseModel):
@@ -218,6 +219,17 @@ def recreate_scenes(job, folder):
     return job
 
 
+def directed_scene(visual, narration, project):
+    """New productions use blocks; legacy productions keep their existing contract."""
+    if not any(s.get('blocks') is not None for s in project['scenes']):
+        return Scene(**visual.model_dump(), narration=narration).model_dump()
+    scene = {**new_scene(visual.title, narration), **visual.model_dump()}
+    scene['blocks'][0]['object'] = VisualObject(type='title', text=visual.title, font_size=64).model_dump()
+    scene['blocks'][1]['object'] = (VisualObject(type='image', asset_id=visual.image_id, fit=visual.image_fit)
+                                  if visual.image_id else VisualObject(type='paragraph', text='\n\n'.join(visual.items), font_size=40)).model_dump()
+    return Scene.model_validate(scene).model_dump()
+
+
 def produce(job):
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
@@ -247,7 +259,7 @@ def produce(job):
             if not 40 <= len(' '.join(writing.narration).split()) <= 180 or any(not text.strip() or len(text)>1400 for text in writing.narration):
                 raise ValueError('O agente de roteiro excedeu o tamanho do Short ou retornou cenas vazias.')
             direction = create_direction(job, writing.model_dump(), research.model_dump(), issues, attempt)
-            scenes = [Scene(**visual.model_dump(), narration=narration).model_dump()
+            scenes = [directed_scene(visual, narration, job['snapshot'])
                       for visual,narration in zip(direction.scenes, writing.narration)]
             review = agent(job, 'reviewer',
                 'Confira TODAS as afirmações do roteiro e textos visuais contra os fatos e evidências da pesquisa. '

@@ -257,7 +257,12 @@ def save_png(image, target, project, **content):
 
 
 def preview_png(scene, project, width=360):
-    image = Composition(scene, project, width, scene_asset(scene, project)).frame(
+    if scene.get('blocks') is not None:
+        from .block_render import BlockComposition
+        composition = BlockComposition(scene, project, width)
+    else:
+        composition = Composition(scene, project, width, scene_asset(scene, project))
+    image = composition.frame(
         caption=scene.get('narration', '')[:115] + ('…' if len(scene.get('narration', '')) > 115 else ''))
     stream = io.BytesIO()
     save_png(image, stream, project, scene=scene)

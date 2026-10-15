@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="web/public/mark.svg" alt="" width="72" height="72">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="web/src/assets/brand/mycut-logo-dark.webp">
+  <source media="(prefers-color-scheme: light)" srcset="web/src/assets/brand/mycut-logo.png">
+  <img src="web/src/assets/brand/mycut-logo.png" alt="MyCut — Estúdio de Shorts" width="340">
+</picture>
 
 # MyCut
 
@@ -16,7 +20,7 @@ pesquisa, roteiro, cenas animadas, narração, capa e vídeo final em 1080 × 19
 ![FFmpeg](https://img.shields.io/badge/FFmpeg-render-3a4538?logo=ffmpeg&logoColor=white)
 ![Docker Compose](https://img.shields.io/badge/Docker-Compose-3a4538?logo=docker&logoColor=white)
 
-[Começar](#começar) · [Como funciona](#como-funciona) · [Capa com agentes](#capa) · [Executar sem Docker](#executar-sem-docker) · [Verificação](#verificação)
+[Começar](#começar) · [Editor de cenas](#editor-de-cenas) · [Como funciona](#como-funciona) · [Capa com agentes](#capa) · [Executar sem Docker](#executar-sem-docker) · [Verificação](#verificação)
 
 <br>
 
@@ -43,8 +47,8 @@ Pesquisa, Roteiro, Direção visual e Conferência rodam nos CLIs autenticados n
 </td>
 <td width="50%" valign="top">
 
-### Cenas que explicam
-Fluxos, comparações e destaques animados em quatro formatos visuais, com fonte, cores e nome do canal ajustáveis. A prévia usa o mesmo renderizador do vídeo.
+### Cenas editáveis em blocos
+Combine títulos, parágrafos, imagens e vídeos. Ajuste dimensões, Google Fonts, alinhamento e recorte; converse com o agente sobre cada objeto. A prévia usa o mesmo renderizador do vídeo.
 
 </td>
 </tr>
@@ -64,9 +68,41 @@ SQLite, arquivos e fila locais, sem login. Cada versão guarda vídeo, capa, leg
 </tr>
 </table>
 
+## Editor de cenas
+
+Na aba **Cenas**, clique em **Editar cena** para abrir o editor em um modal amplo.
+Os botões **01, 02, 03…** permitem navegar sem fechar; **Salvar** grava as
+alterações das cenas visitadas e mantém o editor aberto.
+
+- **Blocos ajustáveis:** cada cena nova começa com três áreas, nas proporções
+  20%, 60% e 20%. Adicione, duplique, reordene ou exclua blocos. Cada borda
+  pode ser redimensionada separadamente, ajustando somente o vizinho imediato.
+- **Texto com Google Fonts:** título e parágrafo têm fonte, tamanho, cor e
+  alinhamento próprios, inclusive **Topo, Centro e Rodapé**. Dimensões e tamanho
+  da fonte aceitam digitação direta, decimais e ajustes pelas setas.
+- **Imagem e vídeo:** importe arquivos ou use a biblioteca da produção. Escolha
+  entre mostrar inteiro e preencher com corte, aplique zoom de até **500%** e
+  arraste a mídia com o mouse para escolher o enquadramento.
+- **Edição com agentes:** marque um objeto para conversa, peça mudanças e
+  revise a proposta antes de aceitar. O alcance pode ser objeto, bloco ou cena.
+- **Controles organizados:** abas **Bloco**, **Objeto** e **Agente**, comandos
+  junto à composição e **Desfazer/Refazer** durante a edição.
+
+Cenas antigas continuam funcionando e são preparadas em blocos ao abrir o
+editor; a conversão só substitui a composição ao salvar. Diagramas convertidos
+viram imagens. Marca do canal e legendas mantêm suas áreas separadas.
+Veja formatos aceitos, limites e funcionamento no [guia do editor](docs/editor-de-cenas.md).
+
+O estúdio também ganhou cards de produção com capa, status, título, informações
+e rodapé alinhados, além da identidade visual MyCut atualizada. A inicialização
+local escolhe uma porta livre e pode acompanhar o WSL por serviço de usuário.
+Para uso no Leia, há um [servidor local Qwen3-TTS](docs/leia-qwen.md) separado
+da integração ElevenLabs do estúdio; ele requer GPU, modelo e perfil de voz
+preparados na máquina.
+
 <p align="center">
-  <img src="docs/screenshots/cenas.webp" alt="Aba Cenas do editor com a lista de cenas, o formulário da cena 5 em comparação e a prévia vertical ao lado" width="100%">
-  <br><sub><b>Cenas</b> · cada cena tem título, formato visual e textos do diagrama, com a prévia vertical ao lado.</sub>
+  <img src="docs/screenshots/editor-de-cenas.webp" alt="Editor de cenas em blocos: composição vertical, abas de propriedades, Google Fonts e navegação numerada entre seis cenas" width="100%">
+  <br><sub><b>Editor de cenas</b> · ajuste a composição e navegue entre cenas no mesmo modal, com Salvar e Fechar sempre disponíveis.</sub>
 </p>
 
 <table>
@@ -98,10 +134,27 @@ No Linux ou WSL, a partir da raiz do repositório, com Docker e Docker Compose d
 
 ```bash
 mkdir -p .data
-docker compose up --build -d
+bash scripts/docker.sh --build
 ```
 
-Abra **http://localhost:8321**. Para os agentes funcionarem, ative o serviço local como explica [Conectar os agentes](#conectar-os-agentes-e-a-elevenlabs).
+Abra o endereço exibido ao iniciar, normalmente **http://127.0.0.1:8321**. Se a porta estiver ocupada ou reservada, o iniciador tenta 8322, 8323 e assim por diante, até 65535. Ele verifica Windows e Linux, confirma que o endereço responde pelo MyCut e salva a URL em `.data/http.json`. O endereço usa IPv4 explicitamente para evitar diferenças na resolução de `localhost` no Windows. A porta interna do container permanece 8321. Para os agentes funcionarem, ative o serviço local como explica [Conectar os agentes](#conectar-os-agentes-e-a-elevenlabs).
+
+Para iniciar junto com o WSL e recuperar automaticamente conflitos posteriores:
+
+```bash
+python3 scripts/launch.py install
+```
+
+O serviço de usuário `mycut-app.service` verifica a aplicação a cada 30 segundos. Mantém a porta quando o MyCut já está acessível e procura outra quando necessário; aguarda a fila terminar antes de recriar containers em uso. Se o Docker Desktop ainda não estiver pronto, tenta novamente. O WSL e o Docker Desktop precisam estar em execução; este serviço não inicia o Windows nem mantém o WSL ligado por conta própria.
+
+```bash
+cat .data/http.json                         # endereço atual
+systemctl --user status mycut-app.service
+journalctl --user -u mycut-app.service -f
+bash scripts/docker.sh --build              # atualizar a imagem e os containers
+```
+
+Use `scripts/docker.sh` para iniciar/atualizar com seleção automática. O comando direto `docker compose up` usa a porta padrão ou o valor de `MYCUT_PORT`, sem executar a busca. `MYCUT_PORT=9000 bash scripts/docker.sh` define o início da busca; uma instância já ativa conserva sua porta.
 
 A primeira construção baixa as dependências. A API serve a interface compilada e o worker processa a fila em outro container. Fechar a aba não interrompe uma produção; os serviços e o computador precisam continuar ligados.
 
@@ -119,6 +172,7 @@ Isso baixa o Whisper `large-v3` para o volume persistente `models`. Não há cob
 
 ```bash
 docker compose logs -f api worker  # acompanhar serviços
+systemctl --user stop mycut-app.service  # se o serviço automático estiver instalado
 docker compose stop                # parar sem apagar projetos
 ```
 
@@ -205,7 +259,7 @@ A conferência automática é uma etapa editorial, não uma garantia de verdade.
 
 O editor permanece para ajustar o material, importar voz (aba **Áudio**) ou capa (aba **Capa**), gerar apenas a narração ou renderizar novamente sem pagar por outra voz. Comparações têm dois lados. Limites de edição: 12 cenas, 500 palavras, áudio até 3 minutos e 100 MB; capa até 15 MB. A geração ElevenLabs aceita até 4.000 caracteres. O agente de roteiro trabalha com até 180 palavras e 3 a 8 cenas.
 
-Na aba **Cenas**, **Criar cenas com agentes** recupera cenas incompletas; quando preenchidas, a ação aparece como **Refazer cenas com agentes**. Ela salva os ajustes abertos, chama apenas Direção visual e Conferência e recria os diagramas, preservando o roteiro, o áudio e a capa. Usa a cota dos CLIs, sem gerar outra voz. Fluxos exigem de dois a quatro textos, comparações exatamente dois e destaques ao menos um; respostas vazias recebem uma tentativa automática de correção e não são publicadas se continuarem inválidas.
+Nas produções que ainda usam os layouts anteriores, **Criar cenas com agentes** recupera cenas incompletas; quando preenchidas, a ação aparece como **Refazer cenas com agentes**. Ela salva os ajustes abertos, chama apenas Direção visual e Conferência e recria os diagramas, preservando o roteiro, o áudio e a capa. Usa a cota dos CLIs, sem gerar outra voz. Fluxos exigem de dois a quatro textos, comparações exatamente dois e destaques ao menos um; respostas vazias recebem uma tentativa automática de correção e não são publicadas se continuarem inválidas. Em produções com cenas em blocos, use a aba **Agente** do editor para revisar e aceitar propostas de alteração.
 
 Projetos e fila persistem em SQLite. Cada tentativa tem diretório próprio; etapas concluídas salvam checkpoints no projeto, e o job atualiza sua revisão. Edições concorrentes ficam bloqueadas durante a produção. Após cancelamento, resultados atrasados não podem substituir novas alterações. Ao reiniciar o worker, jobs em execução ficam marcados como interrompidos e não são repetidos automaticamente.
 
@@ -222,13 +276,13 @@ Escolha o visual em **Novo Short** ou **Pauta e agentes**. Os formatos alteram a
 | Passo a passo | Guia lateral e etapas reveladas em sequência. |
 | Impacto | Tipografia maior, blocos contrastantes e entrada com escala. |
 
-Você pode trocar a fonte entre sem serifa, serifada, monoespaçada e condensada; ajustar cores de fundo, texto e destaque; e restaurar os valores do formato. As miniaturas e a prévia da cena usam o mesmo renderizador do vídeo. Essas escolhas pertencem à produção e ficam registradas em cada versão. Projetos antigos mantêm o visual anterior até você escolher um formato.
+Nos layouts anteriores, você pode trocar a fonte entre sem serifa, serifada, monoespaçada e condensada. Nos objetos de texto dos blocos, escolha uma família **Google Fonts** ou herde a fonte definida para os blocos da produção. Também é possível ajustar cores de fundo, texto e destaque e restaurar os valores do formato. As miniaturas e a prévia da cena usam o mesmo renderizador do vídeo. Essas escolhas pertencem à produção e ficam registradas em cada versão. Projetos antigos mantêm o visual anterior até você escolher um formato.
 
 Em **Personalizar aparência › Nome do canal no vídeo**, substitua “MYCUT” pelo nome ou @ do seu canal (até 40 caracteres). Deixe vazio para ocultar o texto. A escolha permanece ao trocar ou restaurar um formato e aparece nas cenas e nas capas geradas ao renderizar novamente; capas importadas não são alteradas.
 
 **Somente animações** impede o uso automático de imagens. Em **Animações e imagens**, escolha a origem: fontes da pauta, imagens importadas na biblioteca da produção ou ambas. O agente de pesquisa pode sugerir até três imagens de páginas verificadas. O MyCut baixa imagens HTTPS públicas e registra sua origem. Se nenhuma imagem elegível estiver disponível, as cenas usam animações; os avisos aparecem no editor. A origem limita a seleção automática, sem apagar imagens já armazenadas nem substituir suas escolhas manuais.
 
-Em **Cenas**, selecione uma imagem por cena ou mantenha a animação. Você também pode importar PNG, JPG ou WebP de até 15 MB, com limite de 24 imagens por produção, e escolher entre mostrar a imagem inteira ou preencher a área com corte. Para usar sua biblioteca antes dos agentes, crie a produção sem iniciar a geração, importe as imagens em Cenas e execute os agentes em Pauta e agentes. Refazer apenas as cenas reutiliza a pesquisa existente; uma nova busca de imagens acontece na produção completa.
+Nos layouts anteriores, selecione uma imagem por cena ou mantenha a animação. No editor de blocos, cada bloco pode receber uma imagem ou vídeo da biblioteca. Imagens aceitam PNG, JPG ou WebP de até 15 MB, com limite de 24 imagens por produção; vídeos aceitam MP4, MOV ou WebM de até 100 MB e 180 segundos. O enquadramento oferece imagem inteira ou preenchimento com corte, zoom e reposicionamento pelo mouse. Para usar sua biblioteca antes dos agentes, crie a produção sem iniciar a geração e importe os arquivos. Refazer os layouts anteriores reutiliza a pesquisa existente; uma nova busca de imagens acontece na produção completa.
 
 Após mudar o visual, **Renderizar cenas atuais** aplica as alterações reutilizando a narração existente. Capas importadas ou criadas no chat permanecem como estão; capas compostas pelo antigo agente de direção seguem o visual atual.
 
@@ -261,13 +315,14 @@ npm --prefix web run build
 bash scripts/start.sh
 ```
 
-O modelo Whisper só é necessário para alinhar áudio importado sem tempos de fala. Para baixá-lo: `PYTHONPATH=backend .venv-app/bin/python -m mycut.download_model`. O serviço dos agentes também funciona com API e worker locais; alternativamente, rode `bash scripts/agents.sh` em outro terminal, com o serviço parado. `scripts/start.sh` inicia API e worker e encerra ambos com Ctrl+C. Para reutilizar outro ambiente Python compatível, informe `MYCUT_PYTHON=/caminho/absoluto/bin/python`.
+O modelo Whisper só é necessário para alinhar áudio importado sem tempos de fala. Para baixá-lo: `PYTHONPATH=backend .venv-app/bin/python -m mycut.download_model`. O serviço dos agentes também funciona com API e worker locais; alternativamente, rode `bash scripts/agents.sh` em outro terminal, com o serviço parado. `scripts/start.sh` escolhe uma porta livre, inicia API e worker e encerra ambos com Ctrl+C. Pare o serviço `mycut-app.service` e os containers antes de usar os mesmos dados no modo local. Para reutilizar outro ambiente Python compatível, informe `MYCUT_PYTHON=/caminho/absoluto/bin/python`.
 
-Durante o desenvolvimento, mantenha os serviços acima ativos e rode `pnpm --dir web dev` em outro terminal. Abra http://localhost:5173; o Vite encaminha `/api` para a porta 8321.
+Durante o desenvolvimento, mantenha os serviços acima ativos e rode `pnpm --dir web dev` em outro terminal. Abra http://localhost:5173; o Vite lê `.data/http.json` ao iniciar para encaminhar `/api` à porta escolhida. Reinicie o Vite se a API mudar de porta, ou informe `MYCUT_PORT` explicitamente. A porta do servidor de desenvolvimento continua sendo 5173.
 
 | Variável | Padrão | Uso |
 | --- | --- | --- |
 | `MYCUT_DATA_DIR` | `.data` na raiz | Banco, uploads e versões |
+| `MYCUT_PORT` | `8321` | Primeira porta a tentar nos iniciadores; porta efetiva passada à API |
 | `MYCUT_WHISPER_MODEL` | `large-v3` | Modelo do faster-whisper |
 | `MYCUT_WHISPER_DIR` | não definido | Caminho para um modelo local já baixado |
 | `MYCUT_WEB_DIR` | `web/dist` | Interface compilada |
@@ -277,9 +332,15 @@ Para backup, pare os serviços e copie `.data` inteira. Os áudios originais em 
 
 ## Verificação
 
+O [editor de cenas em blocos](docs/editor-de-cenas.md) permite compor título,
+parágrafo, imagem e vídeo, usar Google Fonts e revisar propostas dos agentes
+antes de aplicá-las. O guia descreve a conversão de cenas anteriores e os
+testes específicos dessa funcionalidade.
+
 ```bash
 uv pip install --python .venv-app/bin/python -r backend/requirements-test.txt
 PYTHONPATH=backend .venv-app/bin/python -m unittest discover -s backend/tests -v
+python3 -m unittest discover -s scripts -p 'test_ports.py' -v
 npm --prefix web run build
 npm --prefix web run test:navigation
 docker compose config --quiet
@@ -294,7 +355,11 @@ npm --prefix web run test:e2e
 
 O cenário cobre criação, salvamento, proteção de texto não salvo, comparação, atualização entre abas, exportação real e download em desktop e celular. Screenshots e traces ficam em `web/test-results/`.
 
-Passaram **45 testes de integração** do backend, incluindo diagnósticos de agentes, testes curtos de voz, respostas externas controladas e render real de um áudio de teste com tempos de fala, e **oito testes de navegação** com React e histórico controlado. A versão anterior também foi validada com a narração escolhida do Short original, de 45,87 segundos. A leitura real dos três catálogos foi conferida; chamadas de inferência na rodada anterior falharam por permissões locais (Codex/Grok) e sessão OAuth expirada sem renovação (Claude). Isso não comprova geração real nos provedores nem na ElevenLabs.
+Na validação de 15/10/2026, passaram **105 testes do backend**, **14 testes dos scripts de inicialização**, **9 testes do contrato local do Leia** e **9 testes de navegação** com histórico controlado, além do TypeScript e build Vite. Os testes cobrem persistência, limites de edição, propostas com agentes simulados e renderização real com FFmpeg. O contrato do Leia é testado com voz simulada, sem carregar pesos ou qualificar a GPU.
+
+Também passaram **38 cenários de navegador** em desktop e celular, cobrindo edição em blocos, fontes, mídia, recorte, navegação, propostas, renderização e download. Dezesseis casos foram repetidos após uma interrupção da API temporária de testes; a repetição passou integralmente.
+
+Em validações anteriores, o estúdio também foi executado com a narração escolhida do Short original, de 45,87 segundos. A leitura real dos três catálogos foi conferida; chamadas de inferência naquela rodada falharam por permissões locais (Codex/Grok) e sessão OAuth expirada sem renovação (Claude). Esses resultados não comprovam geração real nos provedores nem na ElevenLabs.
 
 Na atualização de navegação, Docker build/up concluíram, os containers foram recriados e a API serviu o novo JavaScript. Na rodada das amostras de voz, **seis casos de navegador passaram em desktop/mobile**, usando o bundle real e respostas de API simuladas, sem consumir créditos. As capturas dessa tela foram inspecionadas. Isso não qualifica a síntese real nem substitui os casos de navegador das funcionalidades anteriores, que ficaram bloqueados naquela rodada. Consulte [a evidência e seus limites](docs/verificacao-studio.md).
 
@@ -314,6 +379,9 @@ backend/mycut/                 API, armazenamento, mídia, renderização e work
 backend/tests/                 Integração ASGI, SQLite e exportação com FFmpeg
 web/                           React, Vite, TypeScript e testes Playwright
 scripts/start.sh               API + worker locais
+scripts/docker.sh              Containers com seleção automática de porta
+scripts/launch.py              Iniciador e instalação do serviço mycut-app
+scripts/ports.py               Verificação de portas e acesso Windows/WSL
 scripts/agents.sh              Executor dos CLIs autenticados no WSL
 scripts/install-agents-service.py  Instalação do executor como serviço automático do usuário
 compose.yaml                   API + worker em containers
@@ -401,6 +469,10 @@ bash experiments/narration/run.sh
 ```
 
 `--cpu` permite executar a comparação sem CUDA. O refinamento e a geração com o perfil pessoal reutilizam versões e pesos já disponíveis; não são um assistente de configuração para uma instalação nova. Consulte o [histórico de experimentos](docs/visao-e-experimentos.md) para os requisitos e as avaliações de cada rodada.
+
+Para usar o mesmo Qwen com uma referência própria no leitor Leia, veja
+[Qwen3-TTS do MyCut no Leia](docs/leia-qwen.md). Com o perfil local preparado,
+`bash scripts/leia-tts.sh` disponibiliza a voz em `http://127.0.0.1:8323`.
 
 </details>
 

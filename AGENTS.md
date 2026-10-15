@@ -42,3 +42,17 @@ This project is indexed by GitNexus as **mycut** (1426 symbols, 3270 relationshi
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues e especificações ficam no It's a Plan, projeto `jm.MYC`. Antes de consultar, criar ou atualizar tickets, leia `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco papéis padrão de triagem são valores do campo nativo `Triagem`. Antes de interpretar ou alterar a triagem, leia `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Layout single-context: `GLOSSARY.md` e `docs/adr/` na raiz. Antes de explorar o domínio, leia `docs/agents/domain.md`.

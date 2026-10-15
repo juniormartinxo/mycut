@@ -6,9 +6,11 @@ services:
     init: true
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8321:8321"
+      - "127.0.0.1:${MYCUT_PORT:-8321}:8321"
+    environment:
+      MYCUT_PORT: "${MYCUT_PORT:-8321}"
     volumes:
-      - ./.data:/data
+      - ${MYCUT_DATA_DIR:-./.data}:/data
       - ./shorts/claude-cloud:/app/shorts/claude-cloud:ro
       - models:/models
     healthcheck:
@@ -26,7 +28,7 @@ services:
       api:
         condition: service_healthy
     volumes:
-      - ./.data:/data
+      - ${MYCUT_DATA_DIR:-./.data}:/data
       - ./shorts/claude-cloud:/app/shorts/claude-cloud:ro
       - models:/models
 volumes:

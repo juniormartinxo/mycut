@@ -1,4 +1,6 @@
 export type Scene = {
+  id?: string | null;
+  blocks?: SceneBlock[] | null;
   title: string;
   narration: string;
   layout: "flow" | "comparison" | "statement";
@@ -10,6 +12,7 @@ export type VisualStyle = {
   format_id: "editorial" | "radar" | "tutorial" | "impact";
   channel_name?: string;
   font: "sans" | "serif" | "mono" | "condensed" | null;
+  google_font?: string | null;
   background: string | null;
   text_color: string | null;
   media_mode: "animations" | "mixed";
@@ -44,7 +47,7 @@ export type Job = {
   message: string;
   revision: number;
   created_at: number;
-  kind: "render" | "pipeline" | "plan" | "voice" | "scenes" | "cover";
+  kind: "render" | "pipeline" | "plan" | "voice" | "scenes" | "cover" | "scene_edit";
   materials: string[];
   steps: { name: string; state: string; message: string; updated_at: number }[];
   output: null | {
@@ -89,6 +92,7 @@ export type Project = {
   visual_style?: VisualStyle | null;
   ending_id?: string | null;
   images?: ProjectImage[];
+  videos?: ProjectVideo[];
   image_notes?: string[];
   scenes: Scene[];
   revision: number;
@@ -99,6 +103,69 @@ export type Project = {
   cover?: Material;
   audio_matches_script: boolean;
   usage_total: UsageTotal;
+};
+
+export type VisualObject = {
+  id: string;
+  type: "title" | "paragraph" | "image" | "video";
+  width: number;
+  height: number;
+  horizontal: "left" | "center" | "right";
+  vertical: "top" | "center" | "bottom";
+  text: string;
+  font: string | null;
+  font_size: number;
+  color: string | null;
+  align: "left" | "center" | "right";
+  text_vertical?: "top" | "center" | "bottom";
+  asset_id: string | null;
+  fit: "contain" | "cover";
+  zoom: number;
+  crop_x: number;
+  crop_y: number;
+};
+export type SceneBlock = {
+  id: string;
+  width: number;
+  height: number;
+  align: "left" | "center" | "right";
+  object: VisualObject | null;
+};
+export type ProjectVideo = {
+  id: string;
+  name: string;
+  url: string;
+  poster_url: string;
+  width: number;
+  height: number;
+  duration: number;
+};
+export type SceneIssue = {
+  object_id: string;
+  kind: "missing_media" | "overflow";
+  message: string;
+  font_size?: number | null;
+};
+export type SceneThread = {
+  id: string;
+  scene_id: string;
+  scope: "scene" | "block" | "object";
+  target_id: string;
+  marked: boolean;
+  resolved: boolean;
+  archived: boolean;
+};
+export type SceneMessage = {
+  id: string;
+  thread_id: string;
+  text: string;
+  created_at: number;
+  state: Job["state"];
+  status: string;
+  stale: boolean;
+  decision: "accepted" | "discarded" | null;
+  reply: string;
+  blocks: SceneBlock[] | null;
 };
 export type UsageTotal = {
   input: number;

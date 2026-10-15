@@ -30,6 +30,9 @@ import {
 import type { ProductionDraft } from "./Automation";
 import { Connections } from "./Connections";
 import { CoverStudio } from "./CoverStudio";
+import { SceneEditor } from "./SceneEditor";
+import { SceneEditorDialog } from "./SceneEditorDialog";
+import { newScene } from "./sceneLayout";
 import { EndingStudio } from "./EndingStudio";
 import { FormatPicker, RenderedScene, initialStyle } from "./FormatPicker";
 import { money, ProjectCosts, tokens } from "./ProjectCosts";
@@ -533,6 +536,7 @@ function Editor({
     );
   const [dirty, setDirty] = useState(false);
   const [selectedScene, setSceneIndex] = useState(0);
+  const [sceneEditorOpen, setSceneEditorOpen] = useState(false);
   const sceneIndex = Math.min(selectedScene, draft.scenes.length - 1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -550,7 +554,7 @@ function Editor({
       )) ||
     completedJob(project);
   const previewJob =
-    !dirty && tab !== "brief" && tab !== "scenes" ? done : null;
+    !dirty && tab !== "brief" && (tab !== "scenes" || draft.scenes[sceneIndex]?.blocks) ? done : null;
   const wordCount = draft.scenes.reduce(
     (n, s) => n + s.narration.trim().split(/\s+/).filter(Boolean).length,
     0,
@@ -668,7 +672,28 @@ function Editor({
     });
   };
   const scene = draft.scenes[sceneIndex] || draft.scenes[0];
+  const editScene = (index: number) => {
+    if (locked || index < 0 || index >= draft.scenes.length) return;
+    setSceneIndex(index);
+    setError("");
+    if (draft.scenes[index].blocks) return;
+    void action(async () => {
+      const result = await request<{ project: Project; scene: Scene }>(`/projects/${project.id}/scene-layout/convert?revision=${draft.revision}`, {
+        method: "POST", body: JSON.stringify({ scene: draft.scenes[index], project_id: project.id,
+          accent: draft.accent, visual_style: draft.visual_style || null }),
+      });
+      onUpdate(result.project);
+      setDraft(current => ({ ...current, revision: result.project.revision, images: result.project.images,
+        scenes: current.scenes.map((item, position) => position === index ? result.scene : item) }));
+      setDirty(true);
+    });
+  };
+  const openSceneEditor = () => {
+    setSceneEditorOpen(true);
+    editScene(sceneIndex);
+  };
   const incompleteScenes = draft.scenes.filter((s) => {
+    if (s.blocks) return false;
     const count = s.items.filter((item) => item.trim()).length;
     return s.layout === "comparison"
       ? count !== 2
@@ -934,12 +959,7 @@ function Editor({
                       change({
                         scenes: [
                           ...draft.scenes,
-                          {
-                            title: "Nova cena",
-                            narration: "",
-                            layout: "flow",
-                            items: [],
-                          },
+                          newScene(),
                         ],
                       })
                     }
@@ -961,8 +981,7 @@ function Editor({
                   <div>
                     <h2>Revise as cenas do seu Short</h2>
                     <p>
-                      Os agentes criam os diagramas. Aqui você confere e ajusta
-                      o resultado.
+                      Edite textos e mídias de cada cena e revise as propostas dos agentes.
                     </p>
                   </div>
                   <label className="color-field">
@@ -978,7 +997,7 @@ function Editor({
                     Cor do vídeo
                   </label>
                 </div>
-                <div className="scene-agent-actions">
+                {draft.scenes.every(s => !s.blocks) && <div className="scene-agent-actions">
                   {incompleteScenes > 0 && (
                     <Notice>
                       {incompleteScenes === 1
@@ -1013,11 +1032,12 @@ function Editor({
                   {project.jobs[0]?.kind === "scenes" && (
                     <AgentSteps job={project.jobs[0]} />
                   )}
-                </div>
+                </div>}
                 <div className="scene-selector" aria-label="Selecionar cena">
                   {draft.scenes.map((s, i) => (
                     <button
                       key={i}
+                      disabled={locked}
                       aria-label={`Editar cena ${i + 1}`}
                       aria-pressed={i === sceneIndex}
                       onClick={() => setSceneIndex(i)}
@@ -1027,7 +1047,14 @@ function Editor({
                     </button>
                   ))}
                 </div>
+                <div className="scene-editor-launch">
+                  <button type="button" className="button primary" disabled={locked} onClick={openSceneEditor}>
+                    <Settings2 size={18} /> Editar cena
+                  </button>
+                  <p>Abra o editor para ajustar textos, imagens, vídeos e o tamanho de cada área.</p>
+                </div>
                 <fieldset className="scene-form" disabled={locked}>
+                  {!scene.blocks && <>
                   {draft.visual_style?.media_mode === "mixed" && (
                     <div className="scene-image-controls">
                       <label>
@@ -1183,6 +1210,7 @@ function Editor({
                       />
                     </label>
                   )}
+                  </>}
                   <div className="scene-form-bottom">
                     <div>
                       <button
@@ -1237,7 +1265,7 @@ function Editor({
                 </fieldset>
                 <div className="scene-note">
                   <Layers size={18} />
-                  Animações e legendas são aplicadas na renderização.
+                  {scene.blocks ? "A composição usa o mesmo renderizador da exportação. Vídeos são reproduzidos no arquivo final." : "Animações e legendas são aplicadas na renderização."}
                 </div>
               </>
             )}
@@ -1524,10 +1552,10 @@ function Editor({
                 src={fileUrl(previewJob.id, "short.mp4")}
                 aria-label="Prévia do Short"
               />
-            ) : draft.visual_style ? (
+            ) : draft.visual_style || scene.blocks ? (
               <RenderedScene
                 scene={scene}
-                style={draft.visual_style}
+                style={draft.visual_style || null}
                 accent={draft.accent}
                 projectId={project.id}
               />
@@ -1608,6 +1636,15 @@ function Editor({
           </div>
         </aside>
       </div>
+      {sceneEditorOpen && <SceneEditorDialog sceneNumber={sceneIndex + 1} busy={locked} dirty={dirty} error={error}
+        scenes={draft.scenes} onSceneChange={editScene}
+        onSave={() => void action(async () => { await save(); setNotice("Alterações das cenas salvas."); })}
+        onClose={() => { setSceneEditorOpen(false); if (dirty) setNotice("Alterações mantidas no rascunho. Salve quando estiver pronto."); }}>
+        {scene.blocks ? <SceneEditor key={scene.id || sceneIndex} project={draft} scene={scene} disabled={locked}
+          onChange={next => changeScene(sceneIndex, next)} save={save} onProject={accept} onBusy={setBusy} />
+          : error ? <button type="button" className="button secondary" disabled={locked} onClick={() => editScene(sceneIndex)}>Tentar abrir novamente</button>
+            : <p role="status">Abrindo editor…</p>}
+      </SceneEditorDialog>}
     </section>
   );
 }

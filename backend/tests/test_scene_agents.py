@@ -110,5 +110,8 @@ class SceneAgentTests(unittest.TestCase):
         invalid = self.client.post(url, json={'kind': 'scenes', 'revision': self.project['revision']})
         self.assertEqual(invalid.status_code, 409, invalid.text)
         self.fill()
+        # This endpoint is the legacy diagram flow; blocks use reviewed proposals.
+        self.edit(scenes=[{k: v for k, v in scene.items() if k not in ('id', 'blocks')}
+                          for scene in self.project['scenes']])
         valid = self.client.post(url, json={'kind': 'scenes', 'revision': self.project['revision']})
         self.assertEqual(valid.status_code, 202, valid.text)

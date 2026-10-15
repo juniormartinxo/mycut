@@ -4,15 +4,12 @@ import shutil
 from .config import ROOT, DATA
 from . import store
 from .media import digest
+from .scene_layout import new_scene
 
 
 def blank(title):
     return {'title': title, 'description': '', 'tags': '#IA #Shorts', 'sources': '', 'accent': '#c85e37',
-            'scenes': [
-                {'title': 'O que mudou?', 'narration': '', 'layout': 'statement', 'items': []},
-                {'title': 'Como funciona', 'narration': '', 'layout': 'flow', 'items': ['Pedido', 'Execução', 'Resultado']},
-                {'title': 'Por que isso importa', 'narration': '', 'layout': 'statement', 'items': []},
-            ]}
+            'scenes': [new_scene(title) for title in ('O que mudou?', 'Como funciona', 'Por que isso importa')]}
 
 
 def claude():

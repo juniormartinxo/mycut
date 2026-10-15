@@ -22,6 +22,7 @@ const kinds: Record<ProjectUsage["versions"][number]["kind"], string> = {
   pipeline: "Produção com agentes",
   plan: "Roteiro e cenas",
   scenes: "Cenas",
+  scene_edit: "Conversa sobre a cena",
   cover: "Capa",
   voice: "Narração",
   render: "Renderização",
