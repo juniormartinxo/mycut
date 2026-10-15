@@ -1,7 +1,7 @@
 """Authoritative layout, text overflow and video compositing for scene blocks."""
 import io
 from PIL import Image, ImageDraw, ImageOps
-from . import visuals, google_fonts
+from . import visuals, google_fonts, flow
 from .scene_layout import geometry, validate_assets
 from .scene_media import VideoFrames
 from .media import data_path, digest
@@ -39,13 +39,17 @@ def text_layout(obj, box, style, size=None):
 def inspect(scene, project):
     validate_assets(scene, project)
     style = visuals.resolve(project)
-    issues, boxes = [], geometry(scene['blocks'])
+    issues, warnings, boxes = [], [], geometry(scene['blocks'])
     for block, info in zip(scene['blocks'], boxes):
         obj = block.get('object')
         if not obj:
             continue
         if obj['type'] in ('image', 'video') and not obj.get('asset_id'):
             issues.append({'object_id': obj['id'], 'kind': 'missing_media', 'message': 'Selecione um arquivo ou remova o objeto.'})
+        if obj['type'] == 'flow':
+            blocking, notes = flow.problems(obj, info['object'], style, scene.get('narration', ''))
+            issues += blocking
+            warnings += notes
         if obj['type'] in ('title', 'paragraph'):
             if text_layout(obj, info['object'], style)[3]:
                 fitted = None
@@ -55,7 +59,7 @@ def inspect(scene, project):
                         break
                 issues.append({'object_id': obj['id'], 'kind': 'overflow', 'font_size': fitted,
                                'message': 'O texto não cabe. Aumente a área, reduza o texto ou ajuste a fonte.'})
-    return {'issues': issues, 'geometry': boxes}
+    return {'issues': issues, 'warnings': warnings, 'geometry': boxes}
 
 
 def validate_project(project):
@@ -67,7 +71,7 @@ def validate_project(project):
 
 
 class BlockComposition:
-    def __init__(self, scene, project, width=1080, fps=30):
+    def __init__(self, scene, project, width=1080, fps=30, clock=None):
         self.scene, self.project, self.fps = scene, project, fps
         self.scale = width / 1080
         self.size = (width, round(1920*self.scale))
@@ -76,7 +80,7 @@ class BlockComposition:
         draw = ImageDraw.Draw(self.base)
         visuals.text_box(draw, self.style['channel_name'], (80, 95, 920, 70), self.style, 28)
         draw.line((70, 190, 1010, 190), fill=self.style['accent'], width=3)
-        self.videos, self.readers = [], {}
+        self.videos, self.readers, self.flows = [], {}, []
         validate_assets(scene, project)
         for block, info in zip(scene['blocks'], geometry(scene['blocks'])):
             obj = block.get('object')
@@ -85,6 +89,13 @@ class BlockComposition:
             x, y, w, h = info['object']
             size = (max(1, round(w)), max(1, round(h)))
             layer = Image.new('RGBA', size)
+            if obj['type'] == 'flow':
+                # Drawn per frame: its states change with the narration (ADR 0003).
+                if obj.get('flow'):
+                    narration = scene.get('narration', '')
+                    self.flows.append((flow.FlowRenderer(obj, info['object'], self.style, narration,
+                                                         clock or flow.estimate_clock(narration)), (round(x), round(y))))
+                continue
             if obj['type'] in ('title', 'paragraph'):
                 face, lines, leading, _ = text_layout(obj, info['object'], self.style)
                 pen = ImageDraw.Draw(layer)
@@ -117,9 +128,9 @@ class BlockComposition:
             fitted = ImageOps.contain(source, layer.size, Image.Resampling.LANCZOS)
         layer.paste(fitted, ((layer.width-fitted.width)//2, (layer.height-fitted.height)//2))
 
-    def frame(self, elapsed=None, phase=0, caption=''):
+    def frame(self, elapsed=None, phase=0, caption='', videos=True):
         image = self.base.copy()
-        for obj, record, (x, y, w, h) in self.videos if elapsed is not None else []:
+        for obj, record, (x, y, w, h) in self.videos if elapsed is not None and videos else []:
             if obj['id'] not in self.readers:
                 ratio = min(w/record['width'], h/record['height'])
                 size = (w, h) if obj['fit'] == 'cover' else (max(1, round(record['width']*ratio)), max(1, round(record['height']*ratio)))
@@ -128,6 +139,9 @@ class BlockComposition:
             layer = Image.new('RGB', (w, h), self.style['background'])
             self.fit(layer, source, obj['fit'])
             image.paste(layer, (x, y))
+        for renderer, position in self.flows:
+            layer = renderer.layer(elapsed)
+            image.paste(layer, position, layer)
         if caption:
             draw = ImageDraw.Draw(image)
             draw.rounded_rectangle((70, 1620, 1010, 1810), radius=16,

@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageSquare, Flag, Check, X } from "lucide-react";
 import { request } from "./api";
 import { RenderedScene } from "./FormatPicker";
 import type { Project, Scene, SceneMessage, SceneThread } from "./types";
 
 type Conversations = { threads: SceneThread[]; messages: SceneMessage[] };
-export function SceneConversation({ project, scene, blockId, objectId, disabled, save, onAccepted, onBusy, onThreads }: {
+export function SceneConversation({ project, scene, blockId, objectId, disabled, save, onAccepted, onBusy, onThreads, autoRequest }: {
   project: Project; scene: Scene; blockId: string; objectId?: string; disabled: boolean;
   save: () => Promise<Project>; onAccepted: (project: Project) => void; onBusy: (busy: boolean) => void; onThreads: (threads: SceneThread[]) => void;
+  /** Sent once per key to the selected object, e.g. when a Fluxo animado is chosen and the agent must build it. */
+  autoRequest?: { key: number; text: string } | null;
 }) {
   const [data, setData] = useState<Conversations>({ threads: [], messages: [] });
   const [scope, setScope] = useState<SceneThread["scope"]>(objectId ? "object" : "block");
@@ -42,6 +44,17 @@ export function SceneConversation({ project, scene, blockId, objectId, disabled,
     setBusy(true); onBusy(true); setError("");
     try { await run(); await refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); onBusy(false); }
   };
+  const sent = useRef(0);
+  useEffect(() => {
+    if (!autoRequest || !objectId || sent.current === autoRequest.key || disabled) return;
+    sent.current = autoRequest.key;
+    setScope("object"); setHistoryId("");
+    void action(async () => {
+      const current = await save();
+      await request(`/projects/${project.id}/scene-conversations`, { method: "POST", body: JSON.stringify({
+        scene_id: scene.id, scope: "object", target_id: objectId, text: autoRequest.text, revision: current.revision, marked: true, resolved: false }) });
+    });
+  });
   const mark = (marked: boolean, resolved: boolean) => void action(async () => {
     await save();
     await request(`/projects/${project.id}/scene-conversations`, { method: "PUT", body: JSON.stringify({ ...target, marked, resolved }) });

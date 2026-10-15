@@ -7,8 +7,9 @@ export const emptyBlocks = (): SceneBlock[] => [20, 60, 20].map(height => ({
 export const newScene = (): Scene => ({ id: identity(), title: "Nova cena", narration: "", layout: "statement", items: [], blocks: emptyBlocks() });
 export const newObject = (type: VisualObject["type"], id = identity()): VisualObject => ({
   id, type, width: 100, height: 100, horizontal: "center", vertical: "center",
-  text: "", font: null, font_size: type === "title" ? 64 : 48, color: null,
+  text: "", font: null, font_size: type === "title" ? 64 : type === "flow" ? 30 : 48, color: null,
   align: "left", asset_id: null, fit: "contain", zoom: 1, crop_x: 50, crop_y: 50,
+  ...(type === "flow" ? { flow: null } : {}),
 });
 export function mediaExtent(block: SceneBlock, source: { width: number; height: number }) {
   const obj = block.object!;

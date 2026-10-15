@@ -16,7 +16,7 @@ from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
 from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
-from . import voice_tests, covers, endings
+from . import voice_tests, covers, endings, flow
 from . import visuals, scene_layout, scene_media, google_fonts
 from .scene_api import router as scene_router
 from .models import ScenePreview
@@ -110,11 +110,15 @@ def format_preview(format_id: str):
 @app.post('/api/scene-preview')
 def scene_preview(body: ScenePreview):
     document = body.model_dump()
+    scene = body.scene.model_dump()
+    clock = flow.estimate_clock(scene['narration'])
     if body.project_id:
         owner = store.get_project(body.project_id)
         document['images'] = owner.get('images', [])
         document['videos'] = owner.get('videos', [])
-    return Response(visuals.preview_png(body.scene.model_dump(), document), media_type='image/png')
+        clock = flow.scene_clock(owner, scene)
+    width = 1080 if body.width == 'full' else 360
+    return Response(visuals.preview_png(scene, document, width, body.elapsed, clock), media_type='image/png')
 
 
 @app.post('/api/projects/{project_id}/images')

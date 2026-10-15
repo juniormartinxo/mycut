@@ -157,31 +157,44 @@ def choose(project_id, job_id, decision, revision):
 
 def run(job):
     from .pipeline import agent
+    from .block_render import inspect
+    from . import flow
     project = job['snapshot']
     request = project['_scene_edit']
     scene = scene_in(project, request['scene_id'])
-    proposal = agent(job, 'director',
-        'Converse sobre a composição da cena. Se não houver pedido de mudança, responda com blocks=null. '
-        'Para mudar, entregue TODOS os blocos da cena em blocks, mas altere somente o alvo e alcance escolhidos. '
-        'Um bloco tem zero ou um objeto: title, paragraph, image ou video. Alturas somam 100. '
-        'Ao mudar altura do alvo, mova apenas uma borda: compense a diferença em um único bloco vizinho imediato; não altere seus outros campos. '
-        'Mantenha IDs existentes, inclusive ao trocar tipo; novos blocos/objetos recebem IDs hexadecimais de 32 caracteres únicos. '
-        'Não altere narração nem marca/legendas. Use somente asset_id disponíveis e fontes Google Fonts conhecidas, '
-        'ou font=null para herdar. Nunca prometa geração de arquivo ou mudança já aplicada. '
-        'O usuário aceitará a proposta na prévia. Priorize texto conciso que caiba na área.',
-        {'scene': scene, 'scope': request['scope'], 'target_id': request['target_id'],
-         'message': request['text'], 'history': request['history'], 'style': project.get('visual_style'),
-         'images': [{k: v for k, v in r.items() if k != 'path'} for r in project.get('images', [])],
-         'videos': [{k: v for k, v in r.items() if k not in ('path', 'poster_path')} for r in project.get('videos', [])]}, Proposal)
-    output = proposal.model_dump()
-    if output['blocks'] is not None:
+    corrections = []
+    for attempt in (1, 2):
+        proposal = agent(job, 'director',
+            'Converse sobre a composição da cena. Se não houver pedido de mudança, responda com blocks=null. '
+            'Para mudar, entregue TODOS os blocos da cena em blocks, mas altere somente o alvo e alcance escolhidos. '
+            'Um bloco tem zero ou um objeto: title, paragraph, image, video ou flow. Alturas somam 100. '
+            'Ao mudar altura do alvo, mova apenas uma borda: compense a diferença em um único bloco vizinho imediato; não altere seus outros campos. '
+            'Mantenha IDs existentes, inclusive ao trocar tipo; novos blocos/objetos recebem IDs hexadecimais de 32 caracteres únicos. '
+            'Não altere narração nem marca/legendas. Use somente asset_id disponíveis e fontes Google Fonts conhecidas, '
+            'ou font=null para herdar. Nunca prometa geração de arquivo ou mudança já aplicada. '
+            'O usuário aceitará a proposta na prévia. Priorize texto conciso que caiba na área. '
+            'Se o alvo for um objeto flow ainda sem flow (ausente ou null), monte agora um Fluxo animado completo a partir da narração da cena, '
+            'mesmo que a mensagem não detalhe nada: você decide nós, posições, conexões, etapas, âncoras e animação. '
+            'Quando o alcance for a cena inteira e o pedido permitir, prefira transformar o conteúdo central em um Fluxo animado. '
+            'Objetos que não são flow usam flow=null. ' + flow.GUIDE + ' Corrija os problemas em issues_to_fix.',
+            {'scene': scene, 'scope': request['scope'], 'target_id': request['target_id'],
+             'message': request['text'], 'history': request['history'], 'style': project.get('visual_style'),
+             'flow_icons': flow.icon_names(), 'issues_to_fix': corrections,
+             'images': [{k: v for k, v in r.items() if k != 'path'} for r in project.get('images', [])],
+             'videos': [{k: v for k, v in r.items() if k not in ('path', 'poster_path')} for r in project.get('videos', [])]},
+            Proposal, attempt=attempt)
+        output = proposal.model_dump()
+        if output['blocks'] is None:
+            break
         blocks = scoped_blocks(scene, output['blocks'], request['scope'], request['target_id'])
         changed = Scene.model_validate({**scene, 'blocks': blocks}).model_dump()
         validate_assets(changed, project)
-        from .block_render import inspect
-        issues = inspect(changed, project)['issues']
-        if issues:
-            raise ValueError('A proposta não cabe na cena: '+issues[0]['message']+' Peça uma proposta mais concisa.')
+        report = inspect(changed, project)
+        corrections = [item['message'] for item in report['issues'] + report['warnings']]
+        if not corrections:
+            break
+        if attempt == 2 and report['issues']:
+            raise ValueError('A proposta não cabe na cena: '+report['issues'][0]['message']+' Peça uma proposta mais concisa.')
     folder = DATA / 'projects' / project['id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
     (folder / 'result.json').write_text(json.dumps(output, ensure_ascii=False))

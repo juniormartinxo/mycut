@@ -105,9 +105,31 @@ export type Project = {
   usage_total: UsageTotal;
 };
 
+export type FlowChart = {
+  kind: "bars" | "line" | "gauge";
+  values: number[];
+  labels: string[];
+  maximum: number | null;
+  unit: string;
+};
+export type FlowNode = {
+  id: string;
+  label: string;
+  icon: string | null;
+  shape: "circle" | "rounded" | "diamond";
+  x: number;
+  y: number;
+  size: number;
+  chart: FlowChart | null;
+};
+export type FlowSpec = {
+  nodes: FlowNode[];
+  links: { source: string; target: string }[];
+  steps: { source: string | null; target: string; kind: "request" | "result"; anchor: string | null }[];
+};
 export type VisualObject = {
   id: string;
-  type: "title" | "paragraph" | "image" | "video";
+  type: "title" | "paragraph" | "image" | "video" | "flow";
   width: number;
   height: number;
   horizontal: "left" | "center" | "right";
@@ -123,6 +145,7 @@ export type VisualObject = {
   zoom: number;
   crop_x: number;
   crop_y: number;
+  flow?: FlowSpec | null;
 };
 export type SceneBlock = {
   id: string;
@@ -142,10 +165,12 @@ export type ProjectVideo = {
 };
 export type SceneIssue = {
   object_id: string;
-  kind: "missing_media" | "overflow";
+  kind: "missing_media" | "overflow" | "missing_flow" | "anchor";
   message: string;
   font_size?: number | null;
+  step?: number;
 };
+export type SceneClock = { duration: number; source: "narration" | "estimate" | "export" };
 export type SceneThread = {
   id: string;
   scene_id: string;

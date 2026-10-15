@@ -4,6 +4,7 @@ import math
 import uuid
 from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from .flow import FlowSpec
 
 Id = Annotated[str, StringConstraints(pattern=r'^[a-f0-9]{32}$')]
 Percent = Annotated[float, Field(gt=0, le=100, allow_inf_nan=False)]
@@ -17,7 +18,7 @@ def new_id():
 class VisualObject(BaseModel):
     model_config = ConfigDict(extra='forbid')
     id: Id = Field(default_factory=new_id)
-    type: Literal['title', 'paragraph', 'image', 'video']
+    type: Literal['title', 'paragraph', 'image', 'video', 'flow']
     width: Percent = 100
     height: Percent = 100
     horizontal: Literal['left', 'center', 'right'] = 'center'
@@ -33,6 +34,14 @@ class VisualObject(BaseModel):
     zoom: float = Field(default=1, ge=1, le=5, allow_inf_nan=False)
     crop_x: float = Field(default=50, ge=0, le=100, allow_inf_nan=False)
     crop_y: float = Field(default=50, ge=0, le=100, allow_inf_nan=False)
+    # Only animated flows carry this; omitted elsewhere so older objects keep their stored shape.
+    flow: FlowSpec | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @model_validator(mode='after')
+    def flow_only_in_flow_objects(self):
+        if self.flow is not None and self.type != 'flow':
+            raise ValueError('Somente um Fluxo animado contém nós e etapas.')
+        return self
 
 
 class SceneBlock(BaseModel):

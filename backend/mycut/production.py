@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
-from . import visuals, endings, block_render, graphics, alignment
+from . import visuals, endings, block_render, graphics, alignment, flow
 from .config import DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
 
@@ -78,11 +78,13 @@ def scene_image(scene, accent):
 
 
 def estimated_timing(project):
-    scenes, captions, current = [], [], 0.0
+    scenes, captions, spoken, current = [], [], [], 0.0
     for i, scene in enumerate(project['scenes']):
         words = scene['narration'].split()
         duration = max(2.0, len(words)/2.7 + .3)
         scenes.append({'index': i, 'start': current, 'end': current+duration})
+        spoken += [{'scene': i, 'start': current+duration*k/len(words), 'end': current+duration*(k+1)/len(words)}
+                   for k in range(len(words))]
         chunks, chunk = [], []
         for word in words:
             if chunk and (len(chunk) >= 6 or len(' '.join(chunk+[word])) > 42):
@@ -97,7 +99,8 @@ def estimated_timing(project):
             offset += len(chunk)
             captions.append({'start': start, 'end': current+duration*offset/len(words), 'text': ' '.join(chunk)})
         current += duration
-    return {'duration_seconds': current, 'scenes': scenes, 'captions': captions, 'timing_source': 'estimated_preview_only'}
+    return {'duration_seconds': current, 'scenes': scenes, 'captions': captions, 'words': spoken,
+            'timing_source': 'estimated_preview_only'}
 
 
 def transcribe(audio, folder, job):
@@ -163,11 +166,12 @@ def make_video(job):
     compositions = None
     if project.get('visual_style') or any(s.get('blocks') is not None for s in project['scenes']):
         compositions = [block_render.BlockComposition(scene, project, 540 if job['mode'] == 'preview' else 1080,
-                                                       24 if job['mode'] == 'preview' else 30)
+                                                       24 if job['mode'] == 'preview' else 30,
+                                                       flow.clock_from_timing(timing, index))
                         if scene.get('blocks') is not None else
                         visuals.Composition(scene, project, 540 if job['mode'] == 'preview' else 1080,
                                             visuals.scene_asset(scene, project)) if project.get('visual_style') else None
-                        for scene in project['scenes']]
+                        for index, scene in enumerate(project['scenes'])]
     if project.get('cover'):
         source_cover = data_path(project['cover']['path'])
         concept = None

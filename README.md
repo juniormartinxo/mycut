@@ -329,8 +329,8 @@ Para backup, pare os serviços e copie `.data` inteira. Os áudios originais em 
 ## Verificação
 
 O [editor de cenas em blocos](docs/editor-de-cenas.md) permite compor título,
-parágrafo, imagem e vídeo, usar Google Fonts e revisar propostas dos agentes
-antes de aplicá-las. O guia descreve a conversão de cenas anteriores e os
+parágrafo, imagem, vídeo e Fluxo animado, usar Google Fonts e revisar propostas
+dos agentes antes de aplicá-las. O guia descreve a conversão de cenas anteriores e os
 testes específicos dessa funcionalidade.
 
 ```bash

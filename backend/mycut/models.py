@@ -98,6 +98,9 @@ class ScenePreview(BaseModel):
     accent: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
     visual_style: VisualStyle | None = None
     project_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
+    # Scene time in seconds for animated flows; omitted shows the final state.
+    elapsed: float | None = Field(default=None, ge=0, le=180, allow_inf_nan=False)
+    width: Literal['preview', 'full'] = 'preview'
 
 
 class RenderRequest(BaseModel):

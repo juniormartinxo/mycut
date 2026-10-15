@@ -1,0 +1,8 @@
+{
+  "package": "lucide-react",
+  "version": "1.53.0",
+  "license": "ISC",
+  "url": "https://lucide.dev",
+  "note": "Curated subset for animated flow nodes; viewBox 0 0 24 24, stroke-based.",
+  "icons": 77
+}

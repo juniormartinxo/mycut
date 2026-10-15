@@ -65,7 +65,8 @@ def make_timing(script, transcript, duration, folder):
                                'transcript': ' '.join(actual_words[k:l])}
                               for op,i,j,k,l in matcher.get_opcodes() if op != 'equal'],
               'note': 'ASR differences may be pronunciation errors or recognition errors; human review is still required.'}
-    (folder/'alignment-review.json').write_text(json.dumps(review,ensure_ascii=False,indent=2)+'\n')
+    if folder is not None:
+        (folder/'alignment-review.json').write_text(json.dumps(review,ensure_ascii=False,indent=2)+'\n')
     if matcher.ratio() < .90:
         raise ValueError('A transcrição diverge do roteiro. Consulte alignment-review.json antes de renderizar.')
     for i, word in enumerate(original):
@@ -112,4 +113,5 @@ def make_timing(script, transcript, duration, folder):
         if caption['end'] <= caption['start']:
             raise ValueError('Legenda sem duração; reveja o alinhamento.')
     return {'duration_seconds':duration, 'scenes':scenes, 'captions':captions,
+            'words':[{'scene':w['scene'], 'start':w['start'], 'end':w['end']} for w in original],
             'timing_source':'Whisper word timestamps; missing words interpolated', 'alignment':review}

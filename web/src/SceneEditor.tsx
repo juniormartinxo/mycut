@@ -1,15 +1,17 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
-import { ArrowDown, ArrowUp, Copy, Plus, Redo2, Trash2, Undo2, Upload } from "lucide-react";
-import type { Project, Scene, SceneBlock, SceneIssue, SceneThread, ShortFormat, VisualObject } from "./types";
+import { ArrowDown, ArrowUp, Copy, Plus, Redo2, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
+import type { Project, Scene, SceneBlock, SceneClock, SceneIssue, SceneThread, ShortFormat, VisualObject } from "./types";
 import { request } from "./api";
 import { RenderedScene } from "./FormatPicker";
 import { GoogleFontPicker } from "./GoogleFontPicker";
 import { SceneConversation } from "./SceneConversation";
+import { FlowControls, useFlowPlayer } from "./FlowPlayer";
 import { appendBlock, mediaExtent, newObject, removeBlock, resizeBlock, resizeBlockEdge } from "./sceneLayout";
 import "./SceneEditor.css";
 
-const labels = { title: "Título", paragraph: "Parágrafo", image: "Imagem", video: "Vídeo" };
+const labels = { flow: "Fluxo animado", title: "Título", paragraph: "Parágrafo", image: "Imagem", video: "Vídeo" };
+const FLOW_REQUEST = "Monte um Fluxo animado para este objeto a partir da narração da cena: você decide nós, posições, conexões, etapas e a animação.";
 const horizontal = { left: "Esquerda", center: "Centro", right: "Direita" };
 
 function NumberField({ label, value, onChange, max = 100, min = .1 }: {
@@ -35,6 +37,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   const [future, setFuture] = useState<Scene[]>([]);
   const [threads, setThreads] = useState<SceneThread[]>([]);
   const [issues, setIssues] = useState<SceneIssue[]>([]);
+  const [warnings, setWarnings] = useState<SceneIssue[]>([]);
+  const [clock, setClock] = useState<SceneClock | null>(null);
+  const [agentRequest, setAgentRequest] = useState<{ key: number; text: string } | null>(null);
   const [error, setError] = useState("");
   const [inspectionError, setInspectionError] = useState("");
   const [pending, setPending] = useState(false);
@@ -73,12 +78,16 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
     if (!scene.blocks) { setIssues([]); return; }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      request<{ issues: SceneIssue[] }>("/scene-layout/inspect", { method: "POST", body: inspectBody, signal: controller.signal })
-        .then(result => { if (!controller.signal.aborted) { setIssues(result.issues); setInspectionError(""); } })
+      request<{ issues: SceneIssue[]; warnings?: SceneIssue[]; clock?: SceneClock }>("/scene-layout/inspect", { method: "POST", body: inspectBody, signal: controller.signal })
+        .then(result => { if (!controller.signal.aborted) { setIssues(result.issues); setWarnings(result.warnings || []); setClock(result.clock || null); setInspectionError(""); } })
         .catch(e => { if (!controller.signal.aborted) setInspectionError(e.message); });
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [inspectBody, scene.blocks]);
+  const animated = blocks.some(b => b.object?.type === "flow" && b.object.flow);
+  const player = useFlowPlayer(inspectBody, animated ? clock : null);
+  const askAgent = (text = FLOW_REQUEST) => { setActiveTab("agent"); setAgentRequest({ key: Date.now(), text }); };
+  const nodeName = (id: string | null) => obj?.flow?.nodes.find(n => n.id === id)?.label ?? id;
   const change = (next: Scene) => {
     setPast(old => [...old.slice(-99), structuredClone(scene)]); setFuture([]); onChange(next);
   };
@@ -174,6 +183,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
           </aside>
         <div ref={canvas} className="block-canvas" aria-label="Composição com áreas editáveis">
           <RenderedScene scene={scene} style={project.visual_style || null} accent={project.accent} projectId={project.id} />
+          {player.frame && <img className="flow-frame" src={player.frame} alt="Quadro da animação no tempo selecionado" />}
           <div className="block-canvas-area">
             {blocks.map((b, index) => {
               const y = top; top += b.height;
@@ -209,6 +219,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
           </div>
         </div>
         </div>
+        {animated && <FlowControls player={player} clock={clock} disabled={locked} />}
         <p className="block-hint">Arraste a alça de cima ou de baixo para mover uma borda por vez. A alça do canto ajusta a largura e a borda inferior; a redonda ajusta o objeto. Marca e legendas ficam fora dessas áreas.</p>
         <ol className="block-list">{blocks.map((b, index) => <li key={b.id}>
           <button type="button" aria-pressed={b.id === block.id} onClick={() => setSelected(b.id)}><span>Bloco {index+1} · {b.object ? labels[b.object.type] : "Vazio"}</span><small>{threads.some(t => t.marked && !t.resolved && !t.archived && (t.target_id === b.object?.id || t.target_id === b.id)) ? "Conversa marcada · " : ""}{Number(b.height.toFixed(1))}%</small></button>
@@ -221,8 +232,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
         <fieldset disabled={locked} className="block-object-picker">
           <label>Objeto do bloco<select value={obj?.type || ""} onChange={e => {
             const type = e.target.value as VisualObject["type"];
-            patchBlock({ object: type ? { ...newObject(type, obj?.id), text: obj?.text || "" } : null });
-            setActiveTab("object");
+            patchBlock({ object: type ? { ...newObject(type, obj?.id), text: type === "flow" ? "" : obj?.text || "" } : null });
+            // The agent builds every Fluxo animado; choosing it starts that request (ADR 0003).
+            if (type === "flow") askAgent(); else setActiveTab("object");
           }}><option value="">Vazio</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </fieldset>
         <div className="block-tabs" role="tablist" aria-label="Propriedades do bloco">
@@ -256,7 +268,23 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             <label>Posição horizontal<select value={obj.horizontal} onChange={e => patchObject({ horizontal: e.target.value as VisualObject["horizontal"] })}>{Object.entries(horizontal).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label>Posição vertical<select value={obj.vertical} onChange={e => patchObject({ vertical: e.target.value as VisualObject["vertical"] })}><option value="top">Topo</option><option value="center">Centro</option><option value="bottom">Base</option></select></label>
           </div>
-          {obj.type === "title" || obj.type === "paragraph" ? <>
+          {obj.type === "flow" ? <div className="flow-summary">
+            <p className="block-hint">O agente de direção monta o Fluxo animado a partir da narração: nós, posições, conexões, pulsos, gráficos e a sincronia com a fala. Revise e aceite a proposta na aba Agente.</p>
+            {obj.flow ? <>
+              <p><strong>{obj.flow.nodes.length} nós · {obj.flow.links.length} conexões · {obj.flow.steps.length} etapas</strong></p>
+              <ol aria-label="Etapas do fluxo">{obj.flow.steps.map((step, index) => {
+                const missing = warnings.some(w => w.object_id === obj.id && w.step === index);
+                return <li key={index}>
+                  {step.source ? `${nodeName(step.source)} → ${nodeName(step.target)}` : `Ativa ${nodeName(step.target)}`}
+                  <small> · {step.source ? step.kind === "result" ? "resultado" : "pedido" : "ativação"}{step.anchor ? ` · na fala “${step.anchor}”` : " · tempo automático"}{missing ? " · âncora fora da narração" : ""}</small>
+                </li>;
+              })}</ol>
+            </> : <p className="notice">Este Fluxo animado ainda não foi montado.</p>}
+            <button type="button" className="button secondary" disabled={locked} onClick={() => askAgent(obj.flow ? "Refaça este Fluxo animado a partir da narração atual da cena, mantendo o mesmo objeto." : FLOW_REQUEST)}>
+              <Sparkles size={15} /> {obj.flow ? "Pedir nova versão ao agente" : "Pedir ao agente para montar"}
+            </button>
+            <div className="block-field-grid"><NumberField label="Tamanho dos rótulos (px)" value={obj.font_size} min={8} max={400} onChange={font_size => patchObject({ font_size })} /></div>
+          </div> : obj.type === "title" || obj.type === "paragraph" ? <>
             <label>Texto do {obj.type === "title" ? "título" : "parágrafo"}<textarea rows={obj.type === "title" ? 2 : 5} value={obj.text} maxLength={6000} onChange={e => patchObject({ text: e.target.value })} /></label>
             <GoogleFontPicker key={obj.id} value={obj.font} inherit disabled={locked} onChange={font => patchObject({ font })} />
             <div className="block-field-grid"><NumberField label="Tamanho da fonte (px)" value={obj.font_size} min={8} max={400} onChange={font_size => patchObject({ font_size })} />
@@ -298,7 +326,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
         </div>
         {issues.some(issue => issue.object_id !== obj?.id) && <p className="notice">Há pendências em outros blocos. Revise cada objeto antes de exportar.</p>}
         <div className="block-panel" role="tabpanel" id={`${tabId}-agent-panel`} aria-labelledby={`${tabId}-agent-tab`} hidden={!conversation} tabIndex={0}>
-          <SceneConversation project={project} scene={scene} blockId={block.id} objectId={obj?.id} disabled={locked} save={save} onBusy={onBusy} onThreads={setThreads} onAccepted={updated => {
+          <SceneConversation project={project} scene={scene} blockId={block.id} objectId={obj?.id} disabled={locked} save={save} onBusy={onBusy} onThreads={setThreads} autoRequest={agentRequest} onAccepted={updated => {
             setPast(old => [...old, structuredClone(scene)]); setFuture([]); onProject(updated);
           }} />
         </div>
