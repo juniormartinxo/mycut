@@ -169,20 +169,16 @@ progress::-moz-progress-bar {
   flex-direction: column;
 }
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 10px;
-  font-size: 31px;
-  font-weight: 780;
-  letter-spacing: -0.035em;
+  display: block;
+  flex-shrink: 0;
+  width: 180px;
+  max-width: 100%;
+  padding-left: 10px;
 }
 .brand img {
-  width: 35px;
-  height: 35px;
-}
-.brand-dot {
-  color: #ef956d;
+  display: block;
+  width: 100%;
+  height: auto;
 }
 .workspace-name {
   color: #b6bdb0;
@@ -1463,7 +1459,7 @@ progress::-moz-progress-bar {
     padding: 29px 13px 22px;
   }
   .brand {
-    font-size: 28px;
+    width: 155px;
   }
   .nav-item {
     font-size: 11px;
@@ -1531,10 +1527,10 @@ progress::-moz-progress-bar {
     padding: 26px 12px;
   }
   .brand {
+    width: 35px;
     padding: 0;
-    justify-content: center;
+    align-self: center;
   }
-  .brand > span,
   .workspace-name,
   .sidebar-note,
   .local-status > div {
@@ -1606,13 +1602,8 @@ progress::-moz-progress-bar {
     padding: 13px 18px;
     gap: 22px;
   }
-  .brand > span {
-    display: block;
-    font-size: 25px;
-  }
-  .brand img {
-    width: 30px;
-    height: 30px;
+  .brand {
+    width: 128px;
   }
   .sidebar nav {
     margin: 0 0 0 auto;

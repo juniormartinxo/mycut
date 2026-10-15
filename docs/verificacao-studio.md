@@ -172,6 +172,18 @@ A revisão independente retornou **ship** no escopo de `channel_name`, sem achad
 
 A imagem Docker foi preparada enquanto uma produção estava ativa, e os serviços só foram reiniciados depois de a fila ficar livre. A imagem `sha256:5cbd481b25d0537db171db9d4556c26f02c712c59881ca0d1409a32782094bd2` serve `/assets/index-Bo_Q84gu.js`; API e worker estão saudáveis. A verificação HTTP no container confirmou nome personalizado e cabeçalho vazio nos quatro formatos, incluindo diferenças nos pixels e o valor nos metadados da prévia.
 
+## Atualização: executor automático no WSL — 15/10/2026
+
+O executor foi instalado como serviço de usuário `mycut-agents.service`, com `Restart=always`, intervalo de 5 segundos e inicialização em `default.target`. O WSL já usava systemd e o usuário já tinha `Linger=yes`. `scripts/install-agents-service.py` prepara ou instala a unidade e um arquivo de ambiente `0600`, persistindo somente caminhos e variáveis de localização de perfis. `scripts/agents.sh` mantém o modo manual e recupera a ponte permanente do WSL para executar programas do Windows sem depender do socket de um terminal.
+
+Passaram **quatro testes isolados** do instalador e launcher: caminhos temporários do Node resolvidos para diretórios estáveis; credenciais e variáveis não permitidas excluídas; preparação sem instalação com caminhos especiais; recusa diante de um lock real de outro executor, preservando o processo; e passagem dos argumentos, perfil e diretório de dados sem terminal. Comando: `python3 -m unittest discover -s scripts -p 'test_agents_service.py' -v`. Também passaram `bash -n scripts/agents.sh`, `systemd-analyze --user verify` da unidade final e `git diff --check`.
+
+A instalação real terminou com `ActiveState=active`, `SubState=running` e `UnitFileState=enabled`. No ambiente do processo do serviço, os wrappers configurados `clkex`, `clkec` e `clkeg` responderam a `--version`: Codex 0.162.1, Claude Code 2.1.300 e Grok 1.0.50. Foram encontrados 6 modelos no catálogo Codex, 12 no Claude e 4 no Grok. Isso comprova a localização e execução dos CLIs e a descoberta dos catálogos, sem qualificar inferência ou acesso a cada modelo.
+
+Com a fila sem jobs ativos e sem solicitação de agente pendente, o processo principal foi encerrado com SIGKILL para exercitar a recuperação. O systemd iniciou outro PID, o heartbeat voltou e `NRestarts=1` registrou essa interrupção deliberada. Em seguida, o teste nativo `POST /api/integrations/browser/test` foi processado pelo serviço: abriu o Chrome do Windows, verificou as ferramentas do MCP e retornou `Chrome/158.0.8106.0` sem erro. A leitura final de `/api/integrations` confirmou executor online, os três provedores disponíveis e navegador disponível.
+
+Não houve geração de conteúdo ou reinício dos containers. A contagem de jobs permaneceu em 10 concluídos, 2 falhos e 1 cancelado. A distribuição WSL não foi reiniciada durante a verificação; a inicialização automática foi conferida pela unidade habilitada e pelo linger, e a recuperação do processo foi exercitada de fato. O serviço depende de o WSL estar em execução.
+
 ## Escopo ainda pendente
 
 A qualificação real dos três CLIs exige login e acesso aos modelos no host; disponibilidade do executável não garante autenticação. A geração real ElevenLabs exige chave/voz configuradas no app e não foi executada nesta verificação. A seção de testes de voz teve interação validada no navegador com APIs simuladas; os demais fluxos de navegador mantêm os limites das rodadas anteriores. Coleta recorrente de tendências, duas execuções diárias e envio/agendamento no YouTube continuam requisitos ainda não implementados. O resultado atual vai até vídeo disponível para revisão e download.

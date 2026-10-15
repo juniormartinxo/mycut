@@ -1,0 +1,20 @@
+MyCut — prompts de geração
+
+Ferramenta: image_gen integrada. Originais preservados; exports feitos por recorte, redução e conversão de formato.
+
+Logo principal (PNG transparente):
+
+Use case: logo-design.
+Create a polished, production-ready horizontal logo for "MyCut", a Brazilian video/Shorts production studio app. One logo only, on a genuinely transparent background with alpha. No presentation board, no mockup.
+Design direction: precise editorial cutting, warm tactile studio identity, confident and quiet. At the left, create a bold highly simplified geometric monogram M built from two interlocking cut strips, with one distinct diagonal negative-space cut, subtly suggesting a video play triangle. The icon must have a compact square silhouette, very few solid shapes, thick geometry and strong readability at 16px. No containing square around the icon. To its right write exactly "MyCut" with correct capitalization, in a custom refined bold geometric sans serif close to Manrope, beautifully kerned, similar height to the mark. Text must be flat dark green #202621. Icon must be flat terracotta #bd4b28. Restrained proportions, icon-to-type gap about half the icon width, optically aligned.
+Composition: wide horizontal lockup occupying most of the image, centered, generous but not excessive transparent margins. Crisp sharp clean vector-like edges. Two flat inks only.
+Avoid: scissors, clapperboard, camera illustration, film sprocket holes, generic AI sparkles, robots, gradients, outlines, glow, shadows, 3D, texture, tiny details, slogan, registered marks, extra text, white backdrop, fake transparency checkerboard.
+Deliver the final image as a transparent PNG.
+
+Favicon (PNG com fundo marfim):
+
+Use case: logo-design / precise-object-edit. The attached image is the approved MyCut logo and is the edit target. Create the matching square favicon asset. Isolate ONLY the terracotta geometric M/play/cut symbol on the left, delete all lettering. Preserve exactly the distinctive silhouette, rounded outside corners, central triangular play opening, and diagonal cut from the reference. Place this single symbol centered on a solid warm ivory #fffaf2 square, with equal padding of about 14% on each side. The paper square is an intentional opaque background to provide contrast in both dark and light browser tabs. Make the geometry crisp and flat in #bd4b28, no texture, no gradient, no glow, no shadow, no extra details. Slightly strengthen the thin diagonal cut so it stays visible when reduced to 16px. The result must be one square icon ready for 512px, 32px and 16px export, no text, no labels, no mockup, no presentation board. Preserve the approved mark's identity exactly.
+
+Logo para a barra lateral (PNG com fundo verde escuro opaco):
+
+Use case: precise-object-edit. Adapt the attached MyCut logo into a final logo for the application's dark sidebar. Preserve the precise symbol and wordmark. CRITICAL: this output has a FULLY OPAQUE SOLID DARK GREEN BACKGROUND, uniform hex #202621 covering the entire canvas. Do NOT output transparency. The mark is flat salmon terracotta #ef956d, the exact text "MyCut" is flat warm ivory #fffaf2. Smooth crisp edges, geometric curves, same icon and type proportions, centered wide horizontal composition. Solid colors only. No shadows, no gradients, no grit, no decorative pixels, no paper texture, no edge glow. A clean digitally typeset brand mark. Background is an intentional part of the asset.

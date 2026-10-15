@@ -101,7 +101,7 @@ mkdir -p .data
 docker compose up --build -d
 ```
 
-Abra **http://localhost:8321**. Para os agentes funcionarem, conecte os CLIs em outro terminal, como explica [Conectar os agentes](#conectar-os-agentes-e-a-elevenlabs).
+Abra **http://localhost:8321**. Para os agentes funcionarem, ative o serviço local como explica [Conectar os agentes](#conectar-os-agentes-e-a-elevenlabs).
 
 A primeira construção baixa as dependências. A API serve a interface compilada e o worker processa a fila em outro container. Fechar a aba não interrompe uma produção; os serviços e o computador precisam continuar ligados.
 
@@ -126,13 +126,30 @@ A configuração atende somente o computador local, sem login. Não foi preparad
 
 ## Conectar os agentes e a ElevenLabs
 
-Com os três CLIs instalados e autenticados no WSL, abra outro terminal na raiz do MyCut:
+Com os três CLIs instalados e autenticados no WSL, execute uma vez na raiz do MyCut, como seu usuário habitual e sem `sudo`:
 
 ```bash
-bash scripts/agents.sh
+python3 scripts/install-agents-service.py
 ```
 
-Mantenha esse executor aberto junto com os containers. Ele usa o login local de cada CLI, sem copiar credenciais para o Docker. API, worker e executor compartilham a pasta `.data`. Se você usar `MYCUT_DATA_DIR` fora do Docker, todos precisam apontar para os mesmos dados.
+O instalador cria o serviço de usuário `mycut-agents.service`, habilita a inicialização junto com o WSL e o inicia em segundo plano. O executor reinicia após uma saída inesperada; fechar o terminal não o encerra. Requer `systemd` habilitado no WSL e ativa `linger` para os serviços do usuário continuarem após o logout. A distribuição WSL e o Docker precisam estar ativos; o serviço acompanha a inicialização do WSL e não inicia o Windows ou a distribuição por conta própria. [Ciclo de vida de serviços no WSL](https://learn.microsoft.com/en-us/windows/wsl/systemd#how-does-enabling-systemd-affect-wsl-architecture).
+
+O executor usa os logins locais dos CLIs, sem copiar credenciais para o Docker. API, worker e executor compartilham `.data`. O instalador registra `MYCUT_DATA_DIR`, os caminhos dos executáveis e as variáveis de localização dos perfis em `~/.config/mycut/agents.env` (ou no diretório definido por `XDG_CONFIG_HOME`), com permissão `0600`. Não copia chaves de API nem o ambiente completo do terminal. Caminhos temporários do gerenciador de Node são resolvidos para diretórios persistentes. Os comandos e perfis escolhidos no aplicativo continuam valendo.
+
+```bash
+systemctl --user status mycut-agents.service
+journalctl --user -u mycut-agents.service -f
+```
+
+Antes de reiniciar ou parar, espere as produções, gerações de capa e testes de agentes terminarem. Após atualizar o código do MyCut, recarregue o executor com:
+
+```bash
+systemctl --user restart mycut-agents.service
+```
+
+Para desativar a inicialização automática e parar: `systemctl --user disable --now mycut-agents.service`. Para reativar: `systemctl --user enable --now mycut-agents.service`. O modo manual continua disponível com `bash scripts/agents.sh`, mantendo esse terminal aberto; use-o com o serviço parado. O instalador recusa a instalação se houver um executor ativo, sem interrompê-lo. Se mudar o caminho do projeto, a instalação do Node ou as variáveis dos perfis, espere a fila esvaziar, pare o serviço e execute o instalador novamente a partir do ambiente atualizado. Para apenas inspecionar os arquivos, use `python3 scripts/install-agents-service.py --output-dir .data/agents-service-preview`.
+
+Se você usar `MYCUT_DATA_DIR` fora do Docker, todos os componentes precisam apontar para os mesmos dados. O serviço recupera a ponte permanente do WSL para continuar abrindo o Chrome do Windows mesmo sem um terminal.
 
 Por padrão, o executor chama `codex`, `claude` e `grok`. Em **Configurações › Ambiente › Comandos dos CLIs**, você pode trocar o comando de cada um para usar outro perfil ou login. Por exemplo, `CLAUDE_CONFIG_DIR=~/.config/cloak/profiles/amjr/claude claude` ou `cloak exec --profile amjr claude`. Variáveis `NOME=valor` antes do executável, `~` e `$VAR` são expandidas no WSL. O comando roda sem shell, então aliases, funções e pipes não funcionam. O executor relê os comandos a cada chamada, sem reiniciar, e atualiza a lista de modelos depois de salvar. Esses comandos são executados no seu computador; a API aceita a alteração apenas da própria interface local.
 
@@ -172,7 +189,7 @@ A indicação “executor conectado” comprova o processo ativo e os executáve
 
 Claude e Grok podem informar `modelUsage`: o app distingue confirmação, modelo diferente e resolução do padrão. No adaptador Codex atual, a resposta pode ser validada, mas o modelo efetivamente usado **não é confirmado**. Uma declaração do próprio modelo nunca serve como confirmação de identidade.
 
-Os seletores recebem IDs do cache local de modelos do Codex/Grok e da inicialização do Claude Code, sem copiar credenciais. O catálogo não comprova acesso nem login. **Atualizar modelos** relê essas fontes quando o executor está livre; se a lista faltar ou estiver antiga, abra o CLI no WSL antes de atualizar. Trocar de CLI limpa o modelo selecionado. Nomes antigos digitados à mão precisam ser selecionados novamente. Após atualizar o MyCut, reconstrua os containers e reinicie também `bash scripts/agents.sh` para carregar o novo executor.
+Os seletores recebem IDs do cache local de modelos do Codex/Grok e da inicialização do Claude Code, sem copiar credenciais. O catálogo não comprova acesso nem login. **Atualizar modelos** relê essas fontes quando o executor está livre; se a lista faltar ou estiver antiga, abra o CLI no WSL antes de atualizar. Trocar de CLI limpa o modelo selecionado. Nomes antigos digitados à mão precisam ser selecionados novamente. Após atualizar o MyCut, espere a fila esvaziar, reconstrua os containers e execute `systemctl --user restart mycut-agents.service` para carregar o novo executor; no modo manual, encerre e execute novamente `bash scripts/agents.sh`.
 
 </details>
 
@@ -228,7 +245,7 @@ A aba **Capa** é um chat: descreva a capa, anexe até 4 imagens de referência 
 - **Grok** usa `image_gen`/`image_edit` e **Codex** usa a geração de imagens do próprio CLI; os CLIs recebem somente essas ferramentas.
 - **Claude Code** não tem gerador de imagens: desenha a capa em SVG (formas, gradientes, texto e os anexos), que o MyCut converte em PNG com `resvg`. O SVG não pode usar scripts nem referenciar arquivos além dos anexos.
 
-O chat roda numa fila própria do worker: gerar uma imagem não bloqueia a edição nem uma produção em andamento, e há uma geração por vez por produção. O custo aparece em **Custos** como versão “Capa”. É preciso reiniciar `bash scripts/agents.sh` depois de atualizar o MyCut, porque o executor passou a trocar anexos e imagens com os CLIs. Alterar formato ou cores não solicita uma nova voz nem consome créditos ElevenLabs.
+O chat roda numa fila própria do worker: gerar uma imagem não bloqueia a edição nem uma produção em andamento, e há uma geração por vez por produção. O custo aparece em **Custos** como versão “Capa”. Depois de atualizar o MyCut, espere a fila esvaziar e reinicie o serviço dos agentes, porque o executor troca anexos e imagens com os CLIs. Alterar formato ou cores não solicita uma nova voz nem consome créditos ElevenLabs.
 
 ## Executar sem Docker
 
@@ -244,7 +261,7 @@ npm --prefix web run build
 bash scripts/start.sh
 ```
 
-O modelo Whisper só é necessário para alinhar áudio importado sem tempos de fala. Para baixá-lo: `PYTHONPATH=backend .venv-app/bin/python -m mycut.download_model`. Em outro terminal, rode `bash scripts/agents.sh` para conectar os CLIs. `scripts/start.sh` inicia API e worker e encerra ambos com Ctrl+C. Para reutilizar outro ambiente Python compatível, informe `MYCUT_PYTHON=/caminho/absoluto/bin/python`.
+O modelo Whisper só é necessário para alinhar áudio importado sem tempos de fala. Para baixá-lo: `PYTHONPATH=backend .venv-app/bin/python -m mycut.download_model`. O serviço dos agentes também funciona com API e worker locais; alternativamente, rode `bash scripts/agents.sh` em outro terminal, com o serviço parado. `scripts/start.sh` inicia API e worker e encerra ambos com Ctrl+C. Para reutilizar outro ambiente Python compatível, informe `MYCUT_PYTHON=/caminho/absoluto/bin/python`.
 
 Durante o desenvolvimento, mantenha os serviços acima ativos e rode `pnpm --dir web dev` em outro terminal. Abra http://localhost:5173; o Vite encaminha `/api` para a porta 8321.
 
@@ -298,6 +315,7 @@ backend/tests/                 Integração ASGI, SQLite e exportação com FFmp
 web/                           React, Vite, TypeScript e testes Playwright
 scripts/start.sh               API + worker locais
 scripts/agents.sh              Executor dos CLIs autenticados no WSL
+scripts/install-agents-service.py  Instalação do executor como serviço automático do usuário
 compose.yaml                   API + worker em containers
 .data/                         Dados pessoais do app (ignorado pelo Git)
 docs/

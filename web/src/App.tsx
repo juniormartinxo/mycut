@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import brandLogo from "./assets/brand/mycut-logo-dark.webp";
+import brandMark from "./assets/brand/mycut-mark-dark.webp";
 import {
   ArrowDown,
   ArrowLeft,
@@ -96,12 +98,15 @@ function status(project: Project) {
 
 function Brand() {
   return (
-    <div className="brand">
-      <img src="/mark.svg" alt="" />
-      <span>
-        mycut<span className="brand-dot">.</span>
-      </span>
-    </div>
+    <picture className="brand">
+      <source
+        media="(min-width: 761px) and (max-width: 1000px)"
+        srcSet={brandMark}
+        width="192"
+        height="192"
+      />
+      <img src={brandLogo} alt="MyCut" width="909" height="250" />
+    </picture>
   );
 }
 function Notice({
