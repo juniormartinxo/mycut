@@ -105,16 +105,17 @@ class StudioTests(unittest.TestCase):
         self.assertEqual(Image.open(io.BytesIO(data)).size,(1080,1920))
 
     def test_comparison_preserves_both_sides_and_rejects_hidden_options(self):
-        response = self.client.post('/api/projects', json={'title': 'Comparação', 'template': 'claude-cloud'})
-        self.project = response.json()
         scenes = self.project['scenes']
-        comparison = scenes[4]
+        scenes[0].update(layout='comparison', items=['Remote Control\nComputador ativo', 'Cloud Sessions\nExecução na nuvem'])
+        self.assertEqual(self.edit(scenes=scenes).status_code, 200)
+        scenes = self.project['scenes']
+        comparison = scenes[0]
         self.assertEqual(len(comparison['items']), 2)
         comparison['items'][0] += '!'
         self.assertEqual(self.edit(scenes=scenes).status_code, 200)
-        self.assertIn('Cloud Sessions', self.project['scenes'][4]['items'][1])
-        self.assertIn('\n', self.project['scenes'][4]['items'][1])
-        scenes[4]['items'].append('Uma terceira opção seria cortada no render')
+        self.assertIn('Cloud Sessions', self.project['scenes'][0]['items'][1])
+        self.assertIn('\n', self.project['scenes'][0]['items'][1])
+        scenes[0]['items'].append('Uma terceira opção seria cortada no render')
         self.assertEqual(self.edit(scenes=scenes).status_code, 422)
 
     def test_queue_is_atomic_and_edits_are_locked_while_producing(self):

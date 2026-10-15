@@ -86,7 +86,7 @@ class ProjectInput(BaseModel):
 
 class CreateProject(BaseModel):
     title: str = Field(default='Novo Short', min_length=1, max_length=100)
-    template: Literal['blank', 'claude-cloud'] = 'blank'
+    template: Literal['blank'] = 'blank'
     brief: str = Field(default='', max_length=12000)
     automation: Literal['none', 'plan', 'pipeline'] = 'none'
     accent: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')

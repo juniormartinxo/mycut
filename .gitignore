@@ -1,7 +1,7 @@
-# Gravações e perfis pessoais
+# Gravações, experimentos e material de cada Short (só locais)
 /audios/
-/experiments/narration/prepared/
-/experiments/narration/results/
+/experiments/
+/shorts/
 
 # Ambientes Python e caches
 .venv/
@@ -34,24 +34,6 @@ __pycache__/
 *.mov
 *.mkv
 *.webm
-
-# Derivados de cada Short
-/shorts/*/audio/
-/shorts/*/assets/
-/shorts/*/inspection/
-/shorts/*/versions/
-/shorts/*/voice-tests/
-/shorts/*/index.html
-/shorts/*/capa.png
-/shorts/*/storyboard.jpg
-/shorts/*/timing.json
-/shorts/*/alignment.raw.json
-/shorts/*/alignment-review.json
-/shorts/*/legendas.srt
-/shorts/*/render-manifest.json
-/shorts/*/preview-manifest.json
-/shorts/*/verification.json
-/shorts/*/brand/previous-version.txt
 
 # Segredos e configurações locais
 .env

@@ -8,13 +8,9 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
-from . import visuals, endings, block_render
-from .config import ROOT, DATA, MODEL, MODEL_DIR
+from . import visuals, endings, block_render, graphics, alignment
+from .config import DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
-
-sys.path.insert(0, str(ROOT / 'shorts/claude-cloud'))
-import render as graphics
-import align as alignment
 
 
 def wrapped(draw, value, y, size=68, color='#29231f', width=890, gap=1.22, centered=False):
@@ -153,9 +149,8 @@ def make_video(job):
                             '-c:a', 'pcm_s24le', str(audio)], check=True, timeout=180)
         transcript = transcribe(audio, folder, job)
         (folder / 'alignment.json').write_text(json.dumps(transcript, ensure_ascii=False))
-        alignment.HERE = folder
         duration = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', str(audio)]))
-        timing = alignment.make_timing(script, transcript, duration)
+        timing = alignment.make_timing(script, transcript, duration, folder)
     else:
         timing = estimated_timing(project)
     if not 1 <= timing['duration_seconds'] <= 180:
@@ -163,8 +158,7 @@ def make_video(job):
     if ending and timing['duration_seconds'] + ending['duration'] > 180:
         raise ValueError('O Short com encerramento ultrapassa 3 minutos. Encurte as cenas ou desative o encerramento.')
     (folder / 'timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=2))
-    graphics.HERE = folder
-    graphics.write_subtitles(timing)
+    graphics.write_subtitles(timing, folder)
     frames = [scene_image(scene, project['accent']) for scene in project['scenes']]
     compositions = None
     if project.get('visual_style') or any(s.get('blocks') is not None for s in project['scenes']):

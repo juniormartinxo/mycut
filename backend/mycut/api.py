@@ -20,7 +20,7 @@ from . import voice_tests, covers, endings
 from . import visuals, scene_layout, scene_media, google_fonts
 from .scene_api import router as scene_router
 from .models import ScenePreview
-from .seed import blank, claude, initialize_example
+from .seed import blank, initialize_example
 
 
 @asynccontextmanager
@@ -160,7 +160,7 @@ def create(body: CreateProject):
         if not body.brief.strip():
             raise ValueError('Informe a pauta ou link para iniciar os agentes.')
         settings = ready_for(body.automation)
-    document = claude() if body.template == 'claude-cloud' else blank(body.title)
+    document = blank(body.title)
     document['title'] = body.title.strip() or 'Novo Short'
     document['brief'] = body.brief
     document['accent_locked'] = body.accent is not None

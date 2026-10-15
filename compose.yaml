@@ -11,7 +11,6 @@ services:
       MYCUT_PORT: "${MYCUT_PORT:-8321}"
     volumes:
       - ${MYCUT_DATA_DIR:-./.data}:/data
-      - ./shorts/claude-cloud:/app/shorts/claude-cloud:ro
       - models:/models
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8321/api/health', timeout=3)"]
@@ -29,7 +28,6 @@ services:
         condition: service_healthy
     volumes:
       - ${MYCUT_DATA_DIR:-./.data}:/data
-      - ./shorts/claude-cloud:/app/shorts/claude-cloud:ro
       - models:/models
 volumes:
   models:

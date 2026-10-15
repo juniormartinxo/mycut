@@ -18,7 +18,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-de
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/mycut ./backend/mycut
-COPY shorts/claude-cloud ./shorts/claude-cloud
 COPY --from=web /build/dist ./web/dist
 USER studio
 EXPOSE 8321

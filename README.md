@@ -96,9 +96,6 @@ Veja formatos aceitos, limites e funcionamento no [guia do editor](docs/editor-d
 O estúdio também ganhou cards de produção com capa, status, título, informações
 e rodapé alinhados, além da identidade visual MyCut atualizada. A inicialização
 local escolhe uma porta livre e pode acompanhar o WSL por serviço de usuário.
-Para uso no Leia, há um [servidor local Qwen3-TTS](docs/leia-qwen.md) separado
-da integração ElevenLabs do estúdio; ele requer GPU, modelo e perfil de voz
-preparados na máquina.
 
 <p align="center">
   <img src="docs/screenshots/editor-de-cenas.webp" alt="Editor de cenas em blocos: composição vertical, abas de propriedades, Google Fonts e navegação numerada entre seis cenas" width="100%">
@@ -263,7 +260,7 @@ Nas produções que ainda usam os layouts anteriores, **Criar cenas com agentes*
 
 Projetos e fila persistem em SQLite. Cada tentativa tem diretório próprio; etapas concluídas salvam checkpoints no projeto, e o job atualiza sua revisão. Edições concorrentes ficam bloqueadas durante a produção. Após cancelamento, resultados atrasados não podem substituir novas alterações. Ao reiniciar o worker, jobs em execução ficam marcados como interrompidos e não são repetidos automaticamente.
 
-“Roteiro do Claude Code” era uma cópia fixa das sete cenas do primeiro Short, não um agente. Essa opção saiu da criação. O primeiro Short continua disponível como produção existente, e os arquivos originais em `shorts/claude-cloud/` permanecem intactos.
+“Roteiro do Claude Code” era uma cópia fixa das sete cenas do primeiro Short, não um agente. Essa opção saiu da criação. O primeiro Short continua disponível como produção existente; ele é importado do material local em `shorts/claude-cloud/`, que fica fora do Git.
 
 ### Formatos, cores e imagens
 
@@ -328,7 +325,7 @@ Durante o desenvolvimento, mantenha os serviços acima ativos e rode `pnpm --dir
 | `MYCUT_WEB_DIR` | `web/dist` | Interface compilada |
 | `MYCUT_SEED` | `1` | Use `0` para iniciar sem importar o exemplo |
 
-Para backup, pare os serviços e copie `.data` inteira. Os áudios originais em `audios/` e o material de `shorts/` continuam separados; preserve-os também.
+Para backup, pare os serviços e copie `.data` inteira. Os áudios originais em `audios/` e o material de `shorts/` ficam fora do Git; preserve-os também.
 
 ## Verificação
 
@@ -355,7 +352,7 @@ npm --prefix web run test:e2e
 
 O cenário cobre criação, salvamento, proteção de texto não salvo, comparação, atualização entre abas, exportação real e download em desktop e celular. Screenshots e traces ficam em `web/test-results/`.
 
-Na validação de 15/10/2026, passaram **105 testes do backend**, **14 testes dos scripts de inicialização**, **9 testes do contrato local do Leia** e **9 testes de navegação** com histórico controlado, além do TypeScript e build Vite. Os testes cobrem persistência, limites de edição, propostas com agentes simulados e renderização real com FFmpeg. O contrato do Leia é testado com voz simulada, sem carregar pesos ou qualificar a GPU.
+Na validação de 15/10/2026, passaram **105 testes do backend**, **14 testes dos scripts de inicialização** e **9 testes de navegação** com histórico controlado, além do TypeScript e build Vite. Os testes cobrem persistência, limites de edição, propostas com agentes simulados e renderização real com FFmpeg.
 
 Também passaram **38 cenários de navegador** em desktop e celular, cobrindo edição em blocos, fontes, mídia, recorte, navegação, propostas, renderização e download. Dezesseis casos foram repetidos após uma interrupção da API temporária de testes; a repetição passou integralmente.
 
@@ -386,99 +383,11 @@ scripts/agents.sh              Executor dos CLIs autenticados no WSL
 scripts/install-agents-service.py  Instalação do executor como serviço automático do usuário
 compose.yaml                   API + worker em containers
 .data/                         Dados pessoais do app (ignorado pelo Git)
-docs/
-  visao-e-experimentos.md       Histórico, propostas e resultados dos testes
-experiments/narration/
-  compare.py                   Comparação de narrador e voz pessoal
-  refine.py                    Comparação de referências da voz pessoal
-  narrate.py                   Narração de novos roteiros com o perfil local
-  run.sh                       Instalação e execução do experimento Qwen
-shorts/claude-cloud/
-  roteiro.txt                  Texto da narração
-  storyboard.json              Planejamento das cenas
-  sources.json                 Referências da pauta
-  publicacao.txt               Título, descrição, hashtags e tags do YouTube
-  brand/                       Capa, referências visuais e prompt de criação
-  align.py                     Alinhamento de cenas e legendas
-  render.py                    Cenas, animações, legendas e exportação
-  audio_review.py              Validação da avaliação da narração
-  compare_narration.py          Experimento de correção da voz local
-  finish.sh                    Narração disponível → alinhamento → vídeo
 ```
-
-## Fluxo original por linha de comando
-
-<details>
-<summary><strong>Renderizar o primeiro Short sem o estúdio</strong></summary>
-
-Execute a partir da raiz do projeto, em Linux ou WSL. Requisitos: Python 3.12, `uv`, FFmpeg com `ffprobe` e fontes DejaVu. Em Ubuntu, as dependências de sistema podem ser instaladas com:
-
-```bash
-sudo apt-get update
-sudo apt-get install ffmpeg fonts-dejavu-core
-```
-
-Com `uv` disponível, prepare o ambiente mínimo para renderizar:
-
-```bash
-uv venv --python 3.12 .venv-narration
-uv pip install --python .venv-narration/bin/python numpy Pillow
-.venv-narration/bin/python shorts/claude-cloud/render.py --preview
-```
-
-Em uma cópia nova, sem áudio nem `timing.json`, esse comando cria uma **prévia sem narração, com tempos estimados**. Abra `shorts/claude-cloud/index.html` no navegador para assistir. O comando `--assets` gera somente as imagens das cenas, o storyboard e a cópia da capa.
-
-As saídas são locais e ignoradas pelo Git. O renderizador não sobrescreve um MP4 existente: mova a versão anterior antes de renderizar novamente. Se já houver `timing.json`, ele exigirá o áudio correspondente e usará os tempos reais.
-
-#### Produção com narração
-
-No ambiente já preparado, com a narração selecionada em `shorts/claude-cloud/audio/` e seu manifesto:
-
-```bash
-bash shorts/claude-cloud/finish.sh
-```
-
-O comando alinha a fala e renderiza o vídeo. Ele requer a biblioteca `faster-whisper` e o modelo `Systran/faster-whisper-large-v3` disponível no cache local `~/.cache/huggingface/hub/`; o alinhamento roda em CPU e não baixa pesos automaticamente. Na ausência do manifesto de áudio, o script tenta gerar a narração com o perfil Qwen local, que também precisa estar preparado.
-
-A narração ElevenLabs do primeiro Short foi importada manualmente. O MP3 escolhido, os WAVs, os manifestos de áudio e os perfis pessoais não são distribuídos neste repositório. Uma cópia nova permite gerar a prévia visual; a produção com voz depende da preparação desses materiais locais.
-
-Saídas principais:
-
-| Arquivo local | Conteúdo |
-| --- | --- |
-| `shorts/claude-cloud/short.mp4` | Vídeo final com narração |
-| `shorts/claude-cloud/previa.mp4` | Prévia de menor resolução |
-| `shorts/claude-cloud/index.html` | Página para assistir e navegar pelas cenas |
-| `shorts/claude-cloud/capa.png` | Cópia da capa usada na apresentação |
-| `shorts/claude-cloud/legendas.srt` | Legendas alinhadas |
-| `shorts/claude-cloud/render-manifest.json` | Hashes e informações do render |
-
-Nenhum desses comandos publica no YouTube. A revisão final e o envio ainda são manuais.
-
-</details>
-
-<details>
-<summary><strong>Experimentos de voz local (Qwen3-TTS)</strong></summary>
-
-Os experimentos usam Qwen3-TTS e foram executados pelo proprietário em uma RTX 5070 Ti de 16 GB. Eles dependem de gravações, recortes, transcrições e perfis locais que não estão no Git.
-
-Com as referências preparadas, o executor instala as dependências e baixa os modelos necessários:
-
-```bash
-bash experiments/narration/run.sh
-```
-
-`--cpu` permite executar a comparação sem CUDA. O refinamento e a geração com o perfil pessoal reutilizam versões e pesos já disponíveis; não são um assistente de configuração para uma instalação nova. Consulte o [histórico de experimentos](docs/visao-e-experimentos.md) para os requisitos e as avaliações de cada rodada.
-
-Para usar o mesmo Qwen com uma referência própria no leitor Leia, veja
-[Qwen3-TTS do MyCut no Leia](docs/leia-qwen.md). Com o perfil local preparado,
-`bash scripts/leia-tts.sh` disponibiliza a voz em `http://127.0.0.1:8323`.
-
-</details>
 
 ## Arquivos versionados e arquivos locais
 
-O Git inclui código, documentação, roteiros, fontes, metadados de publicação e os materiais de `brand/` necessários à capa. A arte final da capa é um recurso usado pelo renderizador, com prompt e origem registrados.
+O Git inclui código, documentação e a identidade visual do MyCut em `assets/brand/`. O material de cada Short (`shorts/`), os experimentos de voz (`experiments/`) e as gravações (`audios/`) ficam só no computador.
 
 O `.gitignore` exclui gravações pessoais, perfis de voz, resultados de experimentos, vídeos, áudios, renders derivados, versões antigas, caches, pesos de modelos, ambientes virtuais, credenciais e configurações locais. Esses arquivos continuam no computador; ignorá-los não os apaga.
 
@@ -487,5 +396,3 @@ O `.gitignore` exclui gravações pessoais, perfis de voz, resultados de experim
 1. Qualificar os provedores com os logins/voz reais e ampliar a direção visual para ilustrações e logos quando necessários.
 2. Integrar coleta recorrente de tendências, upload e agendamento no canal.
 3. Automatizar duas produções diárias, com retomada após falhas e acompanhamento de desempenho.
-
-O [histórico de visão e experimentos](docs/visao-e-experimentos.md) preserva as propostas e decisões anteriores.

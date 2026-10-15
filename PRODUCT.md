@@ -24,7 +24,7 @@ Estado inicial corrigido nesta rodada: o primeiro app entregou somente edição 
 Nome MyCut. Português brasileiro. Os vídeos usam animações e fluxos, sem apresentadores realistas. O laranja do Claude é específico do primeiro Short; não é uma restrição de marca do aplicativo.
 
 ## Evidence on Hand
-shorts/claude-cloud contém roteiro, fontes, thumbnail, áudio e vídeo locais. Nenhuma métrica de audiência ou execução automática deve ser inventada.
+shorts/claude-cloud (local, fora do Git) contém roteiro, fontes, thumbnail, áudio e vídeo. Nenhuma métrica de audiência ou execução automática deve ser inventada.
 
 ## Product Principles
 - Manter rastreabilidade e versões dos materiais.
