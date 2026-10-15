@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit
 from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
-from . import bridge, costs, integrations, elevenlabs, store, visuals, scene_images
+from . import bridge, costs, integrations, elevenlabs, store, visuals, scene_images, flow
 from .config import DATA
 from .media import data_path
 from .models import Scene
-from .scene_layout import new_scene, VisualObject
+from .scene_layout import new_scene, VisualObject, geometry
+from .flow import FlowSpec
 
 
 class Output(BaseModel):
@@ -57,6 +58,7 @@ class Visual(Output):
     items: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]] = Field(min_length=1, max_length=4)
     image_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     image_fit: str = Field(default='contain', pattern=r'^(contain|cover)$')
+    flow: FlowSpec | None = None
 
     @model_validator(mode='after')
     def complete_diagram(self):
@@ -64,6 +66,8 @@ class Visual(Output):
             raise ValueError('Um fluxo precisa de 2 a 4 textos em items.')
         if self.layout == 'comparison' and len(self.items) != 2:
             raise ValueError('Uma comparação precisa de exatamente 2 textos em items.')
+        if self.flow is not None and self.image_id is not None:
+            raise ValueError('Use flow ou image_id na cena, não os dois.')
         return self
 
 
@@ -152,6 +156,7 @@ def create_direction(job, script, research, issues, attempt=1):
     snapshot = job['snapshot']
     preferred = snapshot['accent'] if snapshot.get('accent_locked', True) else None
     style = visuals.resolve(snapshot)
+    blocks = uses_blocks(snapshot)
     available_images = scene_images.eligible(snapshot)
     corrections = list(issues)
     for correction in range(2):
@@ -169,15 +174,30 @@ def create_direction(job, script, research, issues, attempt=1):
                 'Se available_images tiver imagens pertinentes à fala, use o id em image_id nas cenas que se beneficiam delas; '
                 'nas demais use image_id=null. Nunca invente ids. Prefira image_fit=contain para não cortar informações. '
                 'No modo animations, todas as cenas devem ter image_id=null. '
-                'Sem pessoas realistas, contadores, "esquema ilustrativo" ou "fontes na descrição".',
+                'Sem pessoas realistas, contadores, "esquema ilustrativo" ou "fontes na descrição". '
+                + ('Em cada cena, monte um flow (Fluxo animado) sempre que possível; ele ocupa a área central da cena '
+                   '(a área do objeto é a de flow_area) e substitui imagem e lista. Use flow=null somente quando a fala não tiver '
+                   'nenhuma relação, sequência ou número a mostrar; items continua obrigatório como resumo textual. '
+                   + flow.GUIDE if blocks else 'Use flow=null em todas as cenas: esta produção usa o layout anterior.'),
                 {'script': script, 'research': research, 'preferred_accent': preferred, 'issues_to_fix': corrections,
-                 'visual_style': style, 'available_images': [{k: v for k,v in item.items() if k != 'path'} for item in available_images]},
+                 'visual_style': style, 'available_images': [{k: v for k,v in item.items() if k != 'path'} for item in available_images],
+                 'flow_icons': flow.icon_names() if blocks else [], 'flow_area': {'width': round(FLOW_BOX[2]), 'height': round(FLOW_BOX[3])}},
                 Direction, attempt=(attempt - 1) * 2 + correction + 1)
             if len(direction.scenes) != len(script['narration']):
                 raise AgentOutputError('scenes: mantenha exatamente uma cena por parágrafo de narration.')
             allowed_images = {item['id'] for item in available_images}
             if any(scene.image_id and scene.image_id not in allowed_images for scene in direction.scenes):
                 raise AgentOutputError('image_id: escolha somente uma imagem disponível ou use null para animação.')
+            for index, (visual, narration) in enumerate(zip(direction.scenes, script['narration'])):
+                if visual.flow is None:
+                    continue
+                if not blocks:
+                    visual.flow = None
+                    continue
+                obj = VisualObject(type='flow', font_size=FLOW_FONT, flow=visual.flow).model_dump()
+                notes = flow.check_for_agent(obj, FLOW_BOX, style, narration)
+                if notes:
+                    raise AgentOutputError(f'scenes[{index}].flow: ' + ' '.join(notes))
             if preferred is not None:
                 direction.accent = preferred
             return direction
@@ -209,7 +229,7 @@ def recreate_scenes(job, folder):
     else:
         store.step(job['id'], 'reviewer', 'failed', 'Cenas reprovadas após a correção')
         raise ValueError('A conferência não aprovou as cenas: ' + '; '.join(issues)[:600])
-    values = {'scenes': [Scene(**visual.model_dump(), narration=narration).model_dump()
+    values = {'scenes': [Scene(**visual.model_dump(exclude={'flow'}), narration=narration).model_dump()
                          for visual, narration in zip(direction.scenes, script['narration'])],
               'accent': direction.accent, 'visual_review': review.model_dump(),
               'images': project.get('images', []), 'image_notes': project.get('image_notes', [])}
@@ -219,14 +239,25 @@ def recreate_scenes(job, folder):
     return job
 
 
+def uses_blocks(project):
+    return any(s.get('blocks') is not None for s in project['scenes'])
+
+
+# The central block of a new scene (20/60/20) is where the director's animated flow lives.
+FLOW_BOX = geometry(new_scene()['blocks'])[1]['block']
+FLOW_FONT = 30
+
+
 def directed_scene(visual, narration, project):
     """New productions use blocks; legacy productions keep their existing contract."""
-    if not any(s.get('blocks') is not None for s in project['scenes']):
-        return Scene(**visual.model_dump(), narration=narration).model_dump()
-    scene = {**new_scene(visual.title, narration), **visual.model_dump()}
+    values = visual.model_dump(exclude={'flow'})
+    if not uses_blocks(project):
+        return Scene(**values, narration=narration).model_dump()
+    scene = {**new_scene(visual.title, narration), **values}
     scene['blocks'][0]['object'] = VisualObject(type='title', text=visual.title, font_size=64).model_dump()
-    scene['blocks'][1]['object'] = (VisualObject(type='image', asset_id=visual.image_id, fit=visual.image_fit)
-                                  if visual.image_id else VisualObject(type='paragraph', text='\n\n'.join(visual.items), font_size=40)).model_dump()
+    scene['blocks'][1]['object'] = (VisualObject(type='flow', font_size=FLOW_FONT, flow=visual.flow) if visual.flow else
+                                    VisualObject(type='image', asset_id=visual.image_id, fit=visual.image_fit)
+                                    if visual.image_id else VisualObject(type='paragraph', text='\n\n'.join(visual.items), font_size=40)).model_dump()
     return Scene.model_validate(scene).model_dump()
 
 

@@ -256,14 +256,15 @@ def save_png(image, target, project, **content):
     image.save(target, format='PNG', pnginfo=info)
 
 
-def preview_png(scene, project, width=360):
+def preview_png(scene, project, width=360, elapsed=None, clock=None):
+    """Static composition; with elapsed, the animated flow state at that scene time (videos keep their poster)."""
+    caption = scene.get('narration', '')[:115] + ('…' if len(scene.get('narration', '')) > 115 else '')
     if scene.get('blocks') is not None:
         from .block_render import BlockComposition
-        composition = BlockComposition(scene, project, width)
+        composition = BlockComposition(scene, project, width, clock=clock)
+        image = composition.frame(elapsed, caption=caption, videos=False)
     else:
-        composition = Composition(scene, project, width, scene_asset(scene, project))
-    image = composition.frame(
-        caption=scene.get('narration', '')[:115] + ('…' if len(scene.get('narration', '')) > 115 else ''))
+        image = Composition(scene, project, width, scene_asset(scene, project)).frame(caption=caption)
     stream = io.BytesIO()
     save_png(image, stream, project, scene=scene)
     return stream.getvalue()

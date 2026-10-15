@@ -11,8 +11,8 @@ o modal. A navegação fica indisponível enquanto uma operação está em andam
 mantém alterações pendentes no rascunho; elas ainda precisam ser salvas.
 
 Cada cena nova começa com três blocos vazios de alturas
-20%, 60% e 20%. Cada bloco ocupa uma linha exclusiva e aceita um título,
-parágrafo, imagem ou vídeo. O limite desta versão é de 100 blocos por cena.
+20%, 60% e 20%. Cada bloco ocupa uma linha exclusiva e aceita um Fluxo animado,
+título, parágrafo, imagem ou vídeo. O limite desta versão é de 100 blocos por cena.
 
 Selecione o bloco na composição ou na lista e escolha **Objeto do bloco**.
 O painel separa as propriedades nas abas **Bloco**, **Objeto** e **Agente**.
@@ -96,6 +96,43 @@ rascunho, mas bloqueiam a exportação. Corrija o conteúdo ou as dimensões; pa
 texto, **Ajustar fonte ao espaço** aplica explicitamente o tamanho sugerido.
 Não há redução automática do tamanho escolhido.
 
+## Fluxo animado
+
+O **Fluxo animado** é o objeto principal do editor: um motion graphics
+explicativo em que nós entram em ordem, conexões são traçadas, pulsos levam
+pedidos e resultados de um nó a outro e gráficos se formam aos poucos, em
+sincronia com a narração. Cada nó que recebe um pulso acende, mostra um anel
+de processamento e dispara a etapa seguinte. Pedidos (ida) são círculos na cor
+de destaque; resultados (volta) são losangos na cor do texto, em trilha
+tracejada. O fluxo completo fica na tela até o fim da cena.
+
+Quem monta o fluxo é o agente de direção. Ao escolher **Fluxo animado** em
+**Objeto do bloco**, o editor abre a aba **Agente** e envia o pedido
+automaticamente. O agente decide nós, ícones, posições, conexões, etapas,
+gráficos e âncoras na narração. Revise a proposta e aceite ou descarte, como
+qualquer outra. Na aba **Objeto** ficam o resumo das etapas, com a palavra da
+fala que dispara cada uma, o botão **Pedir nova versão ao agente** e o
+**Tamanho dos rótulos**. Na criação de um Short em **Novo**, o diretor já usa
+o Fluxo animado no bloco central sempre que a fala descreve um processo, uma
+sequência, causa e efeito ou números.
+
+Abaixo da composição, **Reproduzir animação**, **Pausar animação** e o
+controle **Tempo da cena** mostram os quadros gerados pelo mesmo código da
+exportação. **Mostrar estado final** volta à composição estática. Com a
+narração gerada e ainda correspondente ao roteiro, os tempos seguem a fala
+alinhada; antes disso, seguem a mesma estimativa da exportação sem narração,
+e o editor indica isso. Uma âncora que não está mais na narração aparece no
+resumo e passa à distribuição automática. Um Fluxo animado ainda não montado,
+ou com rótulo que não cabe, pode ser salvo, mas bloqueia a exportação.
+
+Os ícones são um subconjunto do [Lucide](https://lucide.dev) (licença ISC),
+com licença e proveniência em `backend/mycut/flow_icons/`. Para refazer o
+subconjunto a partir do pacote da interface, use
+`node scripts/extract-flow-icons.mjs web/node_modules/lucide-react`. O desenho
+é um SVG por instante, rasterizado pelo resvg com o arquivo da fonte Google
+Fonts do projeto. A decisão está na
+[ADR do Fluxo animado](adr/0003-fluxo-animado-com-estados-no-tempo.md).
+
 ## Conversas e propostas
 
 A aba **Agente** abre uma conversa com alcance explícito:
@@ -126,8 +163,9 @@ o modal oferece **Tentar abrir novamente** e permite voltar a outra cena.
 Textos internos de diagramas convertidos deixam de ser editáveis individualmente.
 
 As decisões de domínio estão no [glossário](../GLOSSARY.md), na
-[ADR de composição](adr/0001-composicao-de-cenas-em-blocos.md) e na
-[ADR de propostas](adr/0002-propostas-de-agente-por-objeto.md).
+[ADR de composição](adr/0001-composicao-de-cenas-em-blocos.md), na
+[ADR de propostas](adr/0002-propostas-de-agente-por-objeto.md) e na
+[ADR do Fluxo animado](adr/0003-fluxo-animado-com-estados-no-tempo.md).
 
 ## Verificação
 
@@ -229,3 +267,20 @@ O cabeçalho com botões numerados passou nos quatro cenários de navegação e
 recuperação em desktop/celular. A conferência visual com seis cenas confirmou
 posição, destaque da cena atual e contraste sob hover; o teste de navegação
 também verifica esse contraste.
+
+No Fluxo animado, 115 testes de backend passaram, 10 deles novos em
+`backend/tests/test_animated_flow.py`. Eles cobrem validação e persistência,
+âncoras na narração e distribuição automática, a ordem de entrada, traçado,
+pulso e reação, gráficos crescendo e a correção automática de propostas do
+agente na conversa e em **Novo**. Também confirmam que objetos existentes
+continuam estáticos. A paridade compara, por pixels, a prévia do servidor com o
+MP4 exportado em três instantes da cena. Em `web/tests/animated-flow.spec.ts`,
+seis cenários passaram em desktop e celular: reprodução e quadros iguais aos do
+servidor em três instantes, edição, salvamento e reabertura, a pendência sem
+montagem e o pedido automático ao agente simulado, com revisão e aceite.
+
+A suíte completa de navegador teve 74 cenários aprovados. Os dois que falharam
+são de `costs.spec.ts` (edição de preços), e falham igualmente na `main`, sem
+relação com esta entrega. Para rodar o cenário com o agente simulado, exporte
+`MYCUT_BLOCK_TEST_DATA` com uma pasta em `/tmp`: o servidor de testes passa a
+usar esse mesmo diretório.

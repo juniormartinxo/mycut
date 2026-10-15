@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, UploadFile, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from . import store, google_fonts, scene_media, scene_chat, block_render, visuals
+from . import store, google_fonts, scene_media, scene_chat, block_render, visuals, flow
 from .models import ScenePreview
 from .scene_layout import new_id, empty_blocks, VisualObject
 from .media import data_path
@@ -47,8 +47,12 @@ def font_file(family: str = Query(max_length=150)):
 @router.post('/scene-layout/inspect')
 def inspect_layout(body: ScenePreview):
     if body.scene.blocks is None:
-        return {'issues': [], 'geometry': []}
-    return block_render.inspect(body.scene.model_dump(), preview_project(body))
+        return {'issues': [], 'warnings': [], 'geometry': []}
+    scene = body.scene.model_dump()
+    owner = store.get_project(body.project_id) if body.project_id else {}
+    clock = flow.scene_clock(owner, scene)
+    return {**block_render.inspect(scene, preview_project(body)),
+            'clock': {'duration': clock['duration'], 'source': clock['source']}}
 
 
 @router.post('/projects/{project_id}/scene-videos')
