@@ -20,6 +20,10 @@ em ordem, as conexões são traçadas, os pulsos percorrem as conexões e cada n
 reage (destaque, processamento, envio). O estado final, com o fluxo completo,
 permanece até o fim da cena.
 
+A [ADR 0004](0004-planos-fundo-e-comportamentos-no-tempo.md) amplia esta exceção com
+planos, revelação de texto e movimento de câmera. Dentro de um plano, o fluxo
+segue as âncoras da narração na janela daquele plano.
+
 A exceção vale só para este objeto porque o movimento é o próprio conteúdo:
 mostrar quem envia, quem recebe e o que acontece depois. Título, parágrafo,
 imagem e vídeo continuam sem animação. Não há linha do tempo por objeto nem

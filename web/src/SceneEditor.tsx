@@ -1,18 +1,23 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
-import { ArrowDown, ArrowUp, Copy, Plus, Redo2, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
-import type { Project, Scene, SceneBlock, SceneClock, SceneIssue, SceneThread, ShortFormat, VisualObject } from "./types";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Plus, Redo2, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
+import type { Background, Motion, Project, Scene, SceneBlock, SceneClock, SceneIssue, SceneThread, ShortFormat, ShotWindow, VisualObject } from "./types";
 import { request } from "./api";
 import { RenderedScene } from "./FormatPicker";
 import { GoogleFontPicker } from "./GoogleFontPicker";
 import { SceneConversation } from "./SceneConversation";
 import { FlowControls, useFlowPlayer } from "./FlowPlayer";
-import { appendBlock, mediaExtent, newObject, removeBlock, resizeBlock, resizeBlockEdge } from "./sceneLayout";
+import { appendBlock, insertShot, mapObject, MAX_PROJECT_SHOTS, MAX_SHOTS, mediaExtent, moveShot, newObject, removeBlock, removeShot, resizeBlock, resizeBlockEdge, shotCount, shotsOf, shotView, withShot } from "./sceneLayout";
 import "./SceneEditor.css";
 
 const labels = { flow: "Fluxo animado", title: "Título", paragraph: "Parágrafo", image: "Imagem", video: "Vídeo" };
 const FLOW_REQUEST = "Monte um Fluxo animado para este objeto a partir da narração da cena: você decide nós, posições, conexões, etapas e a animação.";
 const horizontal = { left: "Esquerda", center: "Centro", right: "Direita" };
+const motions: Record<Motion, string> = { none: "Parada", zoom_in: "Aproximar", zoom_out: "Afastar", pan_left: "Panorâmica para a esquerda",
+  pan_right: "Panorâmica para a direita", pan_up: "Panorâmica para cima", pan_down: "Panorâmica para baixo" };
+const backgrounds = { project: "Fundo do projeto", color: "Cor", gradient: "Degradê", image: "Imagem em tela cheia", video: "Vídeo em tela cheia" };
+const TABS = [["shot", "Plano"], ["block", "Bloco"], ["object", "Objeto"], ["agent", "Agente"]] as const;
+const seconds = (value: number) => `${value.toFixed(1).replace(".", ",")} s`;
 
 function NumberField({ label, value, onChange, max = 100, min = .1 }: {
   label: string; value: number; onChange: (value: number) => void; max?: number; min?: number;
@@ -32,7 +37,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   project: Project; scene: Scene; disabled: boolean; onChange: (scene: Scene) => void;
   save: () => Promise<Project>; onProject: (project: Project) => void; onBusy: (busy: boolean) => void;
 }) {
+  const [shotIndex, setShotIndex] = useState(0);
   const [selected, setSelected] = useState(scene.blocks?.[0]?.id || "");
+  const [windows, setWindows] = useState<ShotWindow[]>([]);
   const [past, setPast] = useState<Scene[]>([]);
   const [future, setFuture] = useState<Scene[]>([]);
   const [threads, setThreads] = useState<SceneThread[]>([]);
@@ -55,10 +62,15 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   const mediaBackground = project.visual_style?.background || formats.find(format => format.id === (project.visual_style?.format_id || "editorial"))?.background;
   const canvas = useRef<HTMLDivElement>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
+  const backgroundInput = useRef<HTMLInputElement>(null);
   const drag = useRef<{ scene: Scene; x: number; y: number; mode: "block" | "object" | "top" | "bottom" | "media"; width: number; height: number } | null>(null);
   const latest = useRef(scene);
   latest.current = scene;
-  const blocks = scene.blocks || [];
+  const planos = shotsOf(scene);
+  const current = Math.min(shotIndex, planos.length-1);
+  const shot = planos[current];
+  const blocks = shot.blocks;
+  const background = shot.background;
   const block = blocks.find(b => b.id === selected) || blocks[0];
   const obj = block?.object;
   const media = obj?.type === "image" ? project.images?.find(asset => asset.id === obj.asset_id)
@@ -78,20 +90,27 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
     if (!scene.blocks) { setIssues([]); return; }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      request<{ issues: SceneIssue[]; warnings?: SceneIssue[]; clock?: SceneClock }>("/scene-layout/inspect", { method: "POST", body: inspectBody, signal: controller.signal })
-        .then(result => { if (!controller.signal.aborted) { setIssues(result.issues); setWarnings(result.warnings || []); setClock(result.clock || null); setInspectionError(""); } })
+      request<{ issues: SceneIssue[]; warnings?: SceneIssue[]; clock?: SceneClock; shots?: ShotWindow[] }>("/scene-layout/inspect", { method: "POST", body: inspectBody, signal: controller.signal })
+        .then(result => { if (!controller.signal.aborted) { setIssues(result.issues); setWarnings(result.warnings || []); setClock(result.clock || null); setWindows(result.shots || []); setInspectionError(""); } })
         .catch(e => { if (!controller.signal.aborted) setInspectionError(e.message); });
     }, 300);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [inspectBody, scene.blocks]);
-  const animated = blocks.some(b => b.object?.type === "flow" && b.object.flow);
+  // Anything that changes over the scene's time is played with frames from the server (ADR 0003, ADR 0004).
+  const animated = planos.length > 1 || planos.some(s => (s.background?.motion ?? "none") !== "none" || s.background?.kind === "video"
+    || s.blocks.some(b => b.object && (b.object.type === "flow" && b.object.flow || (b.object.reveal ?? "none") !== "none" || (b.object.motion ?? "none") !== "none")));
   const player = useFlowPlayer(inspectBody, animated ? clock : null);
   const askAgent = (text = FLOW_REQUEST) => { setActiveTab("agent"); setAgentRequest({ key: Date.now(), text }); };
   const nodeName = (id: string | null) => obj?.flow?.nodes.find(n => n.id === id)?.label ?? id;
   const change = (next: Scene) => {
     setPast(old => [...old.slice(-99), structuredClone(scene)]); setFuture([]); onChange(next);
   };
-  const changeBlocks = (next: SceneBlock[]) => change({ ...scene, blocks: next });
+  const changeBlocks = (next: SceneBlock[]) => change(withShot(scene, current, { blocks: next }));
+  const patchShot = (values: Parameters<typeof withShot>[2]) => change(withShot(scene, current, values));
+  const patchBackground = (values: Partial<Background>) => patchShot({ background: { ...background!, ...values } });
+  const chooseShot = (index: number) => { setShotIndex(index); setSelected(shotsOf(scene)[index]?.blocks[0]?.id || ""); };
+  const changeShots = (next: Scene, index: number) => { change(next); setShotIndex(index); setSelected(shotsOf(next)[index]?.blocks[0]?.id || ""); };
+  const shotLimit = planos.length >= MAX_SHOTS || shotCount(project.scenes.map(s => s.id === scene.id ? scene : s)) >= MAX_PROJECT_SHOTS;
   const patchBlock = (values: Partial<SceneBlock>) => changeBlocks(blocks.map(b => b.id === block.id ? { ...b, ...values } : b));
   const patchObject = (values: Partial<VisualObject>) => patchBlock({ object: { ...obj!, ...values } });
   const undo = () => {
@@ -119,7 +138,24 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
       const savedScene = saved.scenes.find(s => s.id === scene.id)!;
       if (uploaded) {
         setPast(old => [...old, structuredClone(savedScene)]); setFuture([]);
-        onChange({ ...savedScene, blocks: savedScene.blocks!.map(b => b.object?.id === capturedId ? { ...b, object: { ...b.object, asset_id: uploaded.id } } : b) });
+        onChange(mapObject(savedScene, capturedId, object => ({ ...object, asset_id: uploaded.id })));
+      }
+    });
+  };
+  const uploadBackground = (file?: File) => {
+    if (!file || !background) return;
+    const kind = background.kind, index = current;
+    void action(async () => {
+      const before = await save();
+      const form = new FormData(); form.append("file", file);
+      const saved = await request<Project>(`/projects/${project.id}/${kind === "video" ? "scene-videos" : "images"}?revision=${before.revision}`, { method: "POST", body: form });
+      onProject(saved);
+      const uploaded = (kind === "video" ? saved.videos : saved.images)?.at(-1);
+      const savedScene = saved.scenes.find(s => s.id === scene.id)!;
+      if (uploaded) {
+        setPast(old => [...old, structuredClone(savedScene)]); setFuture([]);
+        const plano = shotsOf(savedScene)[index];
+        onChange(withShot(savedScene, index, { background: { ...plano.background!, asset_id: uploaded.id } }));
       }
     });
   };
@@ -132,7 +168,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   const moveDrag = (event: PointerEvent<HTMLButtonElement>) => {
     const start = drag.current;
     if (!start) return;
-    const original = start.scene.blocks!.find(b => b.id === block.id)!;
+    const startBlocks = shotsOf(start.scene)[current].blocks;
+    const resized = (next: SceneBlock[]) => onChange(withShot(start.scene, current, { blocks: next }));
+    const original = startBlocks.find(b => b.id === block.id)!;
     const dx = event.clientX-start.x, dy = event.clientY-start.y;
     const clamp = (n: number) => Math.max(.1, Math.min(100, n));
     if (start.mode === "media" && media) {
@@ -142,17 +180,17 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
       const excessY = start.height*original.height/100*object.height/100*(size.height/100-1);
       const crop_x = excessX > .01 ? Math.max(0, Math.min(100, (object.crop_x ?? 50)-dx/excessX*100)) : (object.crop_x ?? 50);
       const crop_y = excessY > .01 ? Math.max(0, Math.min(100, (object.crop_y ?? 50)-dy/excessY*100)) : (object.crop_y ?? 50);
-      onChange({ ...start.scene, blocks: start.scene.blocks!.map(b => b.id === original.id ? { ...b, object: { ...object, crop_x, crop_y } } : b) });
+      resized(startBlocks.map(b => b.id === original.id ? { ...b, object: { ...object, crop_x, crop_y } } : b));
     } else if (start.mode === "block") {
-      const sized = resizeBlockEdge(start.scene.blocks!, original.id, "bottom", dy/start.height*100);
-      onChange({ ...start.scene, blocks: sized.map(b => b.id === original.id ? { ...b, width: clamp(original.width+dx/start.width*100) } : b) });
+      const sized = resizeBlockEdge(startBlocks, original.id, "bottom", dy/start.height*100);
+      resized(sized.map(b => b.id === original.id ? { ...b, width: clamp(original.width+dx/start.width*100) } : b));
     } else if (start.mode === "top" || start.mode === "bottom") {
-      onChange({ ...start.scene, blocks: resizeBlockEdge(start.scene.blocks!, original.id, start.mode, dy/start.height*100) });
+      resized(resizeBlockEdge(startBlocks, original.id, start.mode, dy/start.height*100));
     } else {
-      onChange({ ...start.scene, blocks: start.scene.blocks!.map(b => b.id === original.id ? { ...b, object: { ...b.object!,
+      resized(startBlocks.map(b => b.id === original.id ? { ...b, object: { ...b.object!,
         width: clamp(original.object!.width+dx/(start.width*original.width/100)*100),
         height: clamp(original.object!.height+dy/(start.height*original.height/100)*100),
-      } } : b) });
+      } } : b));
     }
   };
   const endDrag = (cancelled = false) => {
@@ -170,7 +208,19 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   </div>;
   let top = 0;
   return <section className="block-editor" aria-label="Editor de blocos">
-    <div className="block-editor-heading"><div><h3>Composição da cena</h3><p>{blocks.length} blocos · um objeto por bloco</p></div>{toolbar}</div>
+    <div className="block-editor-heading"><div><h3>Composição da cena</h3><p>{planos.length > 1 ? `Plano ${current+1} de ${planos.length} · ` : ""}{blocks.length} blocos · um objeto por bloco</p></div>{toolbar}</div>
+    <nav className="shot-strip" aria-label="Planos da cena">
+      {planos.map((s, index) => {
+        const window = windows.find(w => w.id === s.id), pending = issues.some(i => i.shot_id === s.id);
+        return <button key={s.id} type="button" className="button secondary"
+          aria-current={index === current ? "step" : undefined} disabled={locked && index !== current} onClick={() => chooseShot(index)}
+          aria-label={`Plano ${index+1}${window ? `, começa em ${seconds(window.start)}` : ""}${pending ? ", com pendência" : ""}`}
+          title={window ? `${seconds(window.start)} a ${seconds(window.end)}` : undefined}>
+          Plano {index+1}{window && <small>{seconds(window.start)}</small>}{pending && <span className="shot-alert" aria-hidden="true">!</span>}
+        </button>;
+      })}
+      <button type="button" className="button secondary" disabled={locked || shotLimit} onClick={() => { changeShots(insertShot(scene, current), current+1); setActiveTab("shot"); }}><Plus size={15} /> Plano</button>
+    </nav>
     <div className="block-workbench">
       <div className="block-canvas-column">
         <div className="block-stage">
@@ -182,7 +232,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             <button type="button" className="text-button destructive" disabled={locked || blocks.length === 1} onClick={() => changeBlocks(removeBlock(blocks, block.id))}><Trash2 size={15} /> Excluir bloco</button>
           </aside>
         <div ref={canvas} className="block-canvas" aria-label="Composição com áreas editáveis">
-          <RenderedScene scene={scene} style={project.visual_style || null} accent={project.accent} projectId={project.id} />
+          <RenderedScene scene={shotView(scene, current)} style={project.visual_style || null} accent={project.accent} projectId={project.id} />
           {player.frame && <img className="flow-frame" src={player.frame} alt="Quadro da animação no tempo selecionado" />}
           <div className="block-canvas-area">
             {blocks.map((b, index) => {
@@ -238,19 +288,65 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
           }}><option value="">Vazio</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         </fieldset>
         <div className="block-tabs" role="tablist" aria-label="Propriedades do bloco">
-          {[["block", "Bloco"], ["object", "Objeto"], ["agent", "Agente"]].map(([value, label]) =>
+          {TABS.map(([value, label]) =>
             <button key={value} type="button" role="tab" id={`${tabId}-${value}-tab`} aria-controls={`${tabId}-${value}-panel`}
               aria-selected={activeTab === value} tabIndex={activeTab === value ? 0 : -1} onClick={() => setActiveTab(value)}
               onKeyDown={event => {
                 const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
                 if (!keys.includes(event.key)) return;
                 event.preventDefault();
-                const tabs = ["block", "object", "agent"];
+                const tabs = TABS.map(([tab]) => tab);
                 const index = tabs.indexOf(value);
-                const next = event.key === "Home" ? 0 : event.key === "End" ? 2 : (index+(event.key === "ArrowRight" ? 1 : 2))%3;
+                const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length-1 : (index+(event.key === "ArrowRight" ? 1 : tabs.length-1))%tabs.length;
                 setActiveTab(tabs[next]);
                 document.getElementById(`${tabId}-${tabs[next]}-tab`)?.focus();
               }}>{label}</button>)}
+        </div>
+        <div className="block-panel" role="tabpanel" id={`${tabId}-shot-panel`} aria-labelledby={`${tabId}-shot-tab`} hidden={activeTab !== "shot"} tabIndex={0}>
+        <fieldset key={shot.id} disabled={locked}>
+          <legend>Plano {current+1}{(() => { const window = windows.find(w => w.id === shot.id); return window ? ` · ${seconds(window.start)} a ${seconds(window.end)}` : ""; })()}</legend>
+          {current === 0 ? <p className="block-hint">O primeiro plano começa com a cena. A troca entre cenas é sempre um corte seco.</p> : <>
+            <label>Começa na fala<input type="text" maxLength={200} value={shot.anchor ?? ""} placeholder="Trecho da narração; vazio distribui automaticamente"
+              onChange={e => patchShot({ anchor: e.target.value || null })} /></label>
+            <label>Transição de entrada<select value={shot.transition} onChange={e => patchShot({ transition: e.target.value as "cut" | "fade" })}>
+              <option value="cut">Corte seco</option><option value="fade">Fusão</option></select></label>
+          </>}
+          {warnings.filter(w => w.shot_id === shot.id && w.object_id === null).map(w => <p key={w.kind} className="notice">{w.message}</p>)}
+          <label>Fundo<select value={background?.kind ?? "project"} onChange={e => {
+            const kind = e.target.value as Background["kind"] | "project";
+            const base = project.visual_style?.background || mediaBackground || "#f7f3eb";
+            patchShot({ background: kind === "project" ? null : kind === "color" ? { kind, color: base }
+              : kind === "gradient" ? { kind, color: base, color_to: project.accent, angle: 180 } : { kind, asset_id: null, motion: "none", dim: 0 } });
+          }}>{Object.entries(backgrounds).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          {background && (background.kind === "color" || background.kind === "gradient") && <div className="block-field-grid">
+            <label className="block-color">{background.kind === "gradient" ? "Cor inicial" : "Cor do fundo"}<input type="color" value={background.color || "#000000"} onChange={e => patchBackground({ color: e.target.value })} /></label>
+            {background.kind === "gradient" && <label className="block-color">Cor final<input type="color" value={background.color_to || "#000000"} onChange={e => patchBackground({ color_to: e.target.value })} /></label>}
+            {background.kind === "gradient" && <NumberField label="Ângulo (°)" value={background.angle ?? 180} min={0} max={360} onChange={angle => patchBackground({ angle })} />}
+          </div>}
+          {background && (background.kind === "image" || background.kind === "video") && <>
+            <label>Arquivo da biblioteca<select value={background.asset_id || ""} onChange={e => patchBackground({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{(background.kind === "image" ? project.images : project.videos)?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
+            <div className="block-media-import">
+              <button type="button" className="button secondary" disabled={locked} onClick={() => backgroundInput.current?.click()}><Upload size={16} /> Importar {background.kind === "image" ? "imagem" : "vídeo"}</button>
+              <small>Ocupa o quadro inteiro, atrás dos blocos. {background.kind === "video" ? "Sem áudio; repete até o fim do plano." : "Preenche com corte."}</small>
+              <input ref={backgroundInput} type="file" hidden aria-label={`Importar ${background.kind === "image" ? "imagem" : "vídeo"} do fundo`} disabled={locked}
+                accept={background.kind === "image" ? "image/png,image/jpeg,image/webp" : "video/mp4,video/quicktime,video/webm"}
+                onChange={e => { uploadBackground(e.target.files?.[0]); e.target.value = ""; }} />
+            </div>
+            {background.kind === "image" && <label>Movimento de câmera<select value={background.motion ?? "none"} onChange={e => patchBackground({ motion: e.target.value as Motion })}>
+              {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+            <label>Escurecer o fundo · {Math.round(background.dim ?? 0)}%
+              <input type="range" aria-label="Escurecer o fundo" min="0" max="80" step="5" value={background.dim ?? 0} onChange={e => patchBackground({ dim: e.currentTarget.valueAsNumber })} /></label>
+          </>}
+          {issues.filter(i => i.shot_id === shot.id && i.object_id === null).map(i => <p key={i.kind} className="notice danger" role="alert">{i.message}</p>)}
+          <label className="block-check"><input type="checkbox" checked={shot.brand} onChange={e => patchShot({ brand: e.target.checked })} /> Mostrar a marca do canal</label>
+        </fieldset>
+        <div className="block-actions">
+          <button type="button" className="button secondary" disabled={locked || shotLimit} onClick={() => changeShots(insertShot(scene, current, shot), current+1)}><Copy size={15} /> Duplicar plano</button>
+          <button type="button" className="button secondary" aria-label="Mover plano para antes" disabled={locked || current === 0} onClick={() => changeShots(moveShot(scene, current, -1), current-1)}><ArrowLeft size={16} /></button>
+          <button type="button" className="button secondary" aria-label="Mover plano para depois" disabled={locked || current === planos.length-1} onClick={() => changeShots(moveShot(scene, current, 1), current+1)}><ArrowRight size={16} /></button>
+          <button type="button" className="text-button destructive" disabled={locked || planos.length === 1} onClick={() => changeShots(removeShot(scene, current), Math.max(0, current-1))}><Trash2 size={15} /> Excluir plano</button>
+        </div>
+        <p className="block-hint">Cada plano tem a própria composição e entra no trecho da narração indicado. A narração e a legenda são da cena.</p>
         </div>
         <div className="block-panel" role="tabpanel" id={`${tabId}-block-panel`} aria-labelledby={`${tabId}-block-tab`} hidden={activeTab !== "block"} tabIndex={0}>
         <fieldset key={block.id} disabled={locked}>
@@ -293,6 +389,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             <label>Alinhamento vertical do texto<select value={obj.text_vertical ?? "top"} onChange={e => patchObject({ text_vertical: e.target.value as VisualObject["text_vertical"] })}>
               <option value="top">Topo</option><option value="center">Centro</option><option value="bottom">Rodapé</option>
             </select></label>
+            <label>Entrada do texto<select value={obj.reveal ?? "none"} onChange={e => patchObject({ reveal: e.target.value as VisualObject["reveal"] })}>
+              <option value="none">Fixo durante o plano</option><option value="lines">Linha a linha</option><option value="typing">Digitação</option>
+            </select></label>
             <label className="block-color">Cor do texto<input type="color" value={obj.color || project.visual_style?.text_color || "#292e29"} onChange={e => patchObject({ color: e.target.value })} /></label>
             <button type="button" className="text-button" disabled={!obj.color} onClick={() => patchObject({ color: null })}>{obj.color ? "Herdar cor do projeto" : "Cor herdada do projeto"}</button>
           </> : <>
@@ -315,6 +414,8 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
               <button type="button" className="button secondary" disabled={(obj.crop_x ?? 50) === 50 && (obj.crop_y ?? 50) === 50}
                 onClick={() => patchObject({ crop_x: 50, crop_y: 50 })}>Centralizar recorte</button>
             </>}
+            {obj.type === "image" && <label>Movimento de câmera<select value={obj.motion ?? "none"} onChange={e => patchObject({ motion: e.target.value as Motion })}>
+              {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
             {obj.type === "video" && <><p className="block-hint">Sem áudio original. Repete ou termina junto com a cena. MP4, MOV ou WebM · até 100 MB e 180 s.</p>{obj.asset_id && <video className="object-video" controls muted loop playsInline src={project.videos?.find(v => v.id === obj.asset_id)?.url} aria-label="Reproduzir vídeo do objeto" />}</>}
           </>}
           {issues.filter(issue => issue.object_id === obj.id).map(issue => <div key={issue.kind} className="notice danger" role="alert">{issue.message}
@@ -324,9 +425,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
         </fieldset>}
         {!obj && <p className="block-hint">Este bloco está vazio. Escolha um objeto no dropdown ou peça uma proposta ao agente.</p>}
         </div>
-        {issues.some(issue => issue.object_id !== obj?.id) && <p className="notice">Há pendências em outros blocos. Revise cada objeto antes de exportar.</p>}
+        {issues.some(issue => issue.object_id !== obj?.id) && <p className="notice">Há pendências em outros blocos ou planos. Revise cada um antes de exportar.</p>}
         <div className="block-panel" role="tabpanel" id={`${tabId}-agent-panel`} aria-labelledby={`${tabId}-agent-tab`} hidden={!conversation} tabIndex={0}>
-          <SceneConversation project={project} scene={scene} blockId={block.id} objectId={obj?.id} disabled={locked} save={save} onBusy={onBusy} onThreads={setThreads} autoRequest={agentRequest} onAccepted={updated => {
+          <SceneConversation project={project} scene={shotView(scene, current)} shotId={shot.id} shots={planos.length} blockId={block.id} objectId={obj?.id} disabled={locked} save={save} onBusy={onBusy} onThreads={setThreads} autoRequest={agentRequest} onAccepted={updated => {
             setPast(old => [...old, structuredClone(scene)]); setFuture([]); onProject(updated);
           }} />
         </div>

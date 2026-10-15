@@ -21,7 +21,7 @@ O primeiro Short e sua voz ElevenLabs já foram escolhidos na conversa. Preserva
 Estado inicial corrigido nesta rodada: o primeiro app entregou somente edição e render manuais; essa redução de escopo foi feita pelo implementador, não autorizada como substituição do objetivo. Integração solicitada: Codex CLI, Claude Code CLI e Grok CLI para agentes; ElevenLabs para voz. Agendamento e publicação continuam requisitos a implementar, não exclusões decididas pelo usuário. Interface deve distinguir trabalho em fila, execução, falha, resultado desatualizado e pronto para revisão. Arquivos pessoais e dados de execução não vão para o Git.
 
 ## Brand Commitments
-Nome MyCut. Português brasileiro. Os vídeos usam animações e fluxos, sem apresentadores realistas. O laranja do Claude é específico do primeiro Short; não é uma restrição de marca do aplicativo.
+Nome MyCut. Português brasileiro. Os Shorts com formato usam animações e fluxos, sem apresentadores realistas. No Short livre, personagens fictícios realistas e avatares são permitidos quando o contexto justifica; pessoas reais identificáveis continuam proibidas (ADR 0005). O laranja do Claude é específico do primeiro Short; não é uma restrição de marca do aplicativo.
 
 ## Evidence on Hand
 shorts/claude-cloud (local, fora do Git) contém roteiro, fontes, thumbnail, áudio e vídeo. Nenhuma métrica de audiência ou execução automática deve ser inventada.
@@ -31,6 +31,9 @@ shorts/claude-cloud (local, fora do Git) contém roteiro, fontes, thumbnail, áu
 - Permitir refazer uma etapa sem apagar o resultado anterior.
 - Apresentar falhas e limitações com uma ação de recuperação.
 - Priorizar a operação por agentes; manter revisão e edição como controles opcionais sobre resultados reais.
+
+## Short livre
+Decidido em 15/10/2026 (MYC-2, ADRs 0004 e 0005): um quinto caminho em Novo, em que o prompt é a especificação. Cenas têm planos ancorados na narração, com fundo em tela cheia, revelação de texto, movimento de câmera e fusão. A pesquisa só roda para afirmações factuais externas. Um papel Arte gera as imagens com referências, e B-rolls em vídeo ficam numa lista de materiais com importação manual.
 
 ## Open Decisions
 Distribuição para terceiros e uso remoto ainda não foram definidos. Publicação automática exige a conexão do canal e faz parte do objetivo original. Aparência da interface foi delegada junto à implementação; decisões visuais desta rodada são escolhas de implementação, não preferências permanentes do proprietário.

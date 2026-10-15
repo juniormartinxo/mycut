@@ -1,4 +1,4 @@
-import type { Scene, SceneBlock, VisualObject } from "./types";
+import type { Scene, SceneBlock, Shot, VisualObject } from "./types";
 
 export const identity = () => crypto.randomUUID().replaceAll("-", "");
 export const emptyBlocks = (): SceneBlock[] => [20, 60, 20].map(height => ({
@@ -46,3 +46,51 @@ export function removeBlock(blocks: SceneBlock[], id: string): SceneBlock[] {
   const total = remaining.reduce((sum, b) => sum + b.height, 0);
   return remaining.map(b => ({ ...b, height: b.height / total * 100 }));
 }
+
+export const MAX_SHOTS = 12;
+export const MAX_PROJECT_SHOTS = 60;
+/** Every plano of a block scene; the first is the scene's own composition (ADR 0004). */
+export function shotsOf(scene: Scene): Shot[] {
+  return [{ id: scene.id!, anchor: null, transition: "cut", background: scene.background ?? null, brand: scene.brand ?? true, blocks: scene.blocks || [] },
+    ...(scene.shots || [])];
+}
+/** Rebuilds the scene from its planos in order; the first keeps the scene's identity.
+ * Values stay explicit (never deleted) because scene edits are merged into the draft. */
+export function fromShots(scene: Scene, planos: Shot[]): Scene {
+  const [first, ...rest] = planos;
+  return { ...scene, blocks: first.blocks, background: first.background, brand: first.brand,
+    shots: rest.map(s => s.id === scene.id ? { ...s, id: identity() } : s) };
+}
+export const withShot = (scene: Scene, index: number, values: Partial<Shot>) =>
+  fromShots(scene, shotsOf(scene).map((s, i) => i === index ? { ...s, ...values } : s));
+/** The scene as seen in one plano, for the static preview and agent proposals. */
+export function shotView(scene: Scene, index: number): Scene {
+  const shot = shotsOf(scene)[index] ?? shotsOf(scene)[0];
+  const view: Scene = { ...scene, blocks: shot.blocks };
+  delete view.shots; delete view.background; delete view.brand;
+  if (shot.background) view.background = shot.background;
+  if (!shot.brand) view.brand = false;
+  return view;
+}
+const copyBlocks = (blocks: SceneBlock[]) => blocks.map(b => ({ ...structuredClone(b), id: identity(), object: b.object ? { ...structuredClone(b.object), id: identity() } : null }));
+export function insertShot(scene: Scene, after: number, source?: Shot): Scene {
+  const planos = shotsOf(scene);
+  const shot: Shot = source ? { ...structuredClone(source), id: identity(), anchor: null, blocks: copyBlocks(source.blocks) }
+    : { id: identity(), anchor: null, transition: "cut", background: null, brand: true, blocks: emptyBlocks() };
+  return fromShots(scene, [...planos.slice(0, after+1), shot, ...planos.slice(after+1)]);
+}
+export function removeShot(scene: Scene, index: number): Scene {
+  const planos = shotsOf(scene);
+  return planos.length === 1 ? scene : fromShots(scene, planos.filter((_, i) => i !== index));
+}
+export function moveShot(scene: Scene, index: number, offset: -1 | 1): Scene {
+  const planos = shotsOf(scene);
+  const target = index + offset;
+  if (target < 0 || target >= planos.length) return scene;
+  [planos[index], planos[target]] = [planos[target], planos[index]];
+  return fromShots(scene, planos);
+}
+export const shotCount = (scenes: Scene[]) => scenes.reduce((sum, s) => sum + 1 + (s.shots?.length ?? 0), 0);
+/** Applies a change to one object wherever it sits among the planos. */
+export const mapObject = (scene: Scene, id: string, change: (obj: VisualObject) => VisualObject) =>
+  fromShots(scene, shotsOf(scene).map(s => ({ ...s, blocks: s.blocks.map(b => b.object?.id === id ? { ...b, object: change(b.object) } : b) })));

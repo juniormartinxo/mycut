@@ -351,7 +351,7 @@ def update(project_id: str, body: ProjectInput):
         google_fonts.entry(body.visual_style.google_font)
     for scene in body.scenes:
         scene_layout.validate_assets(scene.model_dump(), current)
-        for block in scene.blocks or []:
+        for block in [*(scene.blocks or []), *(b for shot in scene.shots for b in shot.blocks)]:
             if block.object and block.object.font:
                 google_fonts.entry(block.object.font)
     if any(scene.image_id and scene.image_id not in images for scene in body.scenes):

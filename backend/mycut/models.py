@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator, model_validator
-from .scene_layout import Id, SceneBlock, validate_blocks
+from .scene_layout import Id, SceneBlock, Background, Shot, validate_blocks, MAX_SHOTS, MAX_PROJECT_SHOTS
 
 
 class VisualStyle(BaseModel):
@@ -25,6 +25,10 @@ class Scene(BaseModel):
     items: list[str] = Field(default_factory=list, max_length=4)
     image_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     image_fit: Literal['contain', 'cover'] = 'contain'
+    # The first plano is this composition; later planos change it in time (ADR 0004).
+    background: Background | None = Field(default=None, exclude_if=lambda value: value is None)
+    brand: bool = Field(default=True, exclude_if=lambda value: value)
+    shots: list[Shot] = Field(default_factory=list, max_length=MAX_SHOTS-1, exclude_if=lambda value: not value)
 
     @field_validator('blocks')
     @classmethod
@@ -48,6 +52,8 @@ class Scene(BaseModel):
     def comparison_has_two_sides(self):
         if self.layout == 'comparison' and len(self.items) > 2:
             raise ValueError('Uma comparação pode ter até duas opções.')
+        if self.blocks is None and (self.shots or self.background or not self.brand):
+            raise ValueError('Planos e fundo exigem uma cena em blocos.')
         return self
 
 
@@ -68,8 +74,12 @@ class ProjectInput(BaseModel):
     @model_validator(mode='after')
     def unique_scene_ids(self):
         ids = [scene.id for scene in self.scenes if scene.id]
-        ids += [block.id for scene in self.scenes for block in scene.blocks or []]
-        ids += [block.object.id for scene in self.scenes for block in scene.blocks or [] if block.object]
+        ids += [shot.id for scene in self.scenes for shot in scene.shots]
+        compositions = [blocks for scene in self.scenes for blocks in (scene.blocks or [], *(s.blocks for s in scene.shots))]
+        ids += [block.id for blocks in compositions for block in blocks]
+        ids += [block.object.id for blocks in compositions for block in blocks if block.object]
+        if sum(1+len(scene.shots) for scene in self.scenes) > MAX_PROJECT_SHOTS:
+            raise ValueError(f'Um Short pode ter até {MAX_PROJECT_SHOTS} planos.')
         if len(ids) != len(set(ids)):
             raise ValueError('Cenas, blocos e objetos devem ter identificações únicas no projeto.')
         if any(scene.blocks is not None and not scene.id for scene in self.scenes):

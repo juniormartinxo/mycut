@@ -51,7 +51,7 @@ def inspect_layout(body: ScenePreview):
     scene = body.scene.model_dump()
     owner = store.get_project(body.project_id) if body.project_id else {}
     clock = flow.scene_clock(owner, scene)
-    return {**block_render.inspect(scene, preview_project(body)),
+    return {**block_render.inspect(scene, preview_project(body), clock),
             'clock': {'duration': clock['duration'], 'source': clock['source']}}
 
 
