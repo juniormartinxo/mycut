@@ -25,7 +25,10 @@ def script(project):
 
 
 def script_hash(project):
-    return hashlib.sha256(script(project).encode()).hexdigest()
+    # Pauses change what the voice says; without any, the hash stays the one of the text alone.
+    pauses = [scene.get('pauses') or [] for scene in project['scenes']]
+    text = script(project) + (json.dumps(pauses) if any(pauses) else '')
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 @contextmanager

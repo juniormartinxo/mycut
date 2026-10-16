@@ -260,6 +260,8 @@ Em **Novo**, a opção **Livre** fica ao lado dos quatro formatos. O prompt é a
 3. Direção visual compõe cenas e planos com blocos e fundos, sem o esqueleto 20/60/20. Após uma correção, problemas restantes são reparados (alturas, mídia inexistente, texto que não cabe, âncoras) em vez de falhar; texto encurtado para caber vira aviso.
 4. Conferência verifica fatos e fidelidade ao prompt. Se reprovar também depois da correção, se falhar ou se a correção não puder ser feita, roteiro e cenas já pagos ficam salvos com os problemas como avisos, e a produção para antes da voz.
 
+Sem formato de base, o diretor tira do tom do prompt o fundo, as cores, a fonte (Google Fonts) e a legenda: de 2 a 4 palavras por vez, palavras-chave na cor de destaque e posição sempre na área segura, fora dos 15% inferiores e da faixa direita dos botões do YouTube. O resumo aparece em **Estilo gerado**, na aba **Pauta e agentes**. Uma pausa pedida no roteiro, como “(pausa)”, vira silêncio real entre trechos da voz e adia as legendas e os planos seguintes; ela aparece na aba **Roteiro**. Se o prompt pede loop, o último quadro funde no primeiro, a menos que haja um vídeo de encerramento. O roteirista também entrega o pacote de publicação (opções de título, descrição, hashtags e comentário fixado), que fica na aba **Publicação** e no `publicacao.txt`.
+
 Os avisos aparecem na aba **Pauta e agentes**. Personagens fictícios realistas e avatares são permitidos quando o contexto justifica; pessoas reais identificáveis continuam proibidas ([ADR 0005](docs/adr/0005-short-livre.md)).
 
 A conferência automática é uma etapa editorial, não uma garantia de verdade. A revisão final continua disponível antes de publicar. O agente de direção usa cenas de fluxo, comparação e destaque; no modo com imagens, pode selecionar uma imagem pertinente da biblioteca ou das fontes verificadas. As cenas não usam ilustrações geradas por modelo de imagem; isso acontece somente no chat da capa.
@@ -365,6 +367,8 @@ O cenário cobre criação, salvamento, proteção de texto não salvo, compara�
 Na validação de 15/10/2026, passaram **105 testes do backend**, **14 testes dos scripts de inicialização** e **9 testes de navegação** com histórico controlado, além do TypeScript e build Vite. Os testes cobrem persistência, limites de edição, propostas com agentes simulados e renderização real com FFmpeg.
 
 Na rodada do Short livre (MYC-4, 16/10/2026), passaram **146 testes do backend**, os 10 testes dos scripts de inicialização, os testes de navegação, o TypeScript e o build Vite, além de 14 cenários de navegador em desktop e celular (Livre, formatos e estúdio). Os agentes foram simulados; essa rodada não comprova roteiro, pesquisa ou direção reais nos CLIs.
+
+Na rodada de estilo gerado, legendas, pausas, loop e pacote de publicação (MYC-5, 16/10/2026), passaram **154 testes do backend**, os testes dos scripts de inicialização, os testes de navegação, o TypeScript e o build Vite, além de 80 cenários de navegador em desktop e celular. Os dois cenários de edição de preços (`costs.spec.ts`) já falhavam antes desta rodada, com o mesmo erro de seletor. Agentes e ElevenLabs foram simulados; a paridade prévia × MP4 das legendas e do loop foi verificada por pixels com FFmpeg real.
 
 Também passaram **38 cenários de navegador** em desktop e celular, cobrindo edição em blocos, fontes, mídia, recorte, navegação, propostas, renderização e download. Dezesseis casos foram repetidos após uma interrupção da API temporária de testes; a repetição passou integralmente.
 

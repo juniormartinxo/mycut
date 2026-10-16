@@ -14,8 +14,13 @@ FONT_FILES = {
 FONT_NAMES = {'sans': 'Sans', 'serif': 'Serifada', 'mono': 'Monoespaçada', 'condensed': 'Condensada'}
 
 
+# Base of a Short livre (ADR 0005): never offered as a format; the director replaces its colors and font.
+FREE = {'id': 'free', 'name': 'Livre', 'font': 'sans', 'background': '#101418', 'text_color': '#F2F4F5', 'accent': '#F2B544',
+        'direction': ''}
+
+
 def preset(format_id='editorial'):
-    return next(item for item in FORMATS if item['id'] == format_id)
+    return FREE if format_id == 'free' else next(item for item in FORMATS if item['id'] == format_id)
 
 
 def resolve(project):
@@ -256,12 +261,13 @@ def save_png(image, target, project, **content):
     image.save(target, format='PNG', pnginfo=info)
 
 
-def preview_png(scene, project, width=360, elapsed=None, clock=None):
-    """Static composition; with elapsed, the animated flow state at that scene time (videos keep their poster)."""
+def preview_png(scene, project, width=360, elapsed=None, clock=None, loop_to=None):
+    """Static composition; with elapsed, the animated flow state at that scene time (videos keep their poster).
+    loop_to is the first frame a looping Short's last scene fades into."""
     caption = scene.get('narration', '')[:115] + ('…' if len(scene.get('narration', '')) > 115 else '')
     if scene.get('blocks') is not None:
         from .block_render import BlockComposition
-        composition = BlockComposition(scene, project, width, clock=clock)
+        composition = BlockComposition(scene, project, width, clock=clock, loop_to=loop_to)
         image = composition.frame(elapsed, caption=caption, videos=False)
     else:
         image = Composition(scene, project, width, scene_asset(scene, project)).frame(caption=caption)

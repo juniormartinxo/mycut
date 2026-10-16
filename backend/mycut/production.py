@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
-from . import visuals, endings, block_render, graphics, alignment, flow
+from . import visuals, endings, block_render, graphics, alignment, flow, captions
 from .config import DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
 
@@ -81,10 +81,10 @@ def estimated_timing(project):
     scenes, captions, spoken, current = [], [], [], 0.0
     for i, scene in enumerate(project['scenes']):
         words = scene['narration'].split()
-        duration = max(2.0, len(words)/2.7 + .3)
+        clock = flow.estimate_clock(scene['narration'], flow.pause_points(scene))
+        duration = clock['duration']
         scenes.append({'index': i, 'start': current, 'end': current+duration})
-        spoken += [{'scene': i, 'start': current+duration*k/len(words), 'end': current+duration*(k+1)/len(words)}
-                   for k in range(len(words))]
+        spoken += [{'scene': i, 'start': current+start, 'end': current+end} for start, end in zip(clock['words'], clock['ends'])]
         chunks, chunk = [], []
         for word in words:
             if chunk and (len(chunk) >= 6 or len(' '.join(chunk+[word])) > 42):
@@ -95,9 +95,9 @@ def estimated_timing(project):
             chunks.append(chunk)
         offset = 0
         for chunk in chunks:
-            start = current + duration*offset/len(words)
+            start = current + clock['words'][offset]
             offset += len(chunk)
-            captions.append({'start': start, 'end': current+duration*offset/len(words), 'text': ' '.join(chunk)})
+            captions.append({'start': start, 'end': current+clock['ends'][offset-1], 'text': ' '.join(chunk)})
         current += duration
     return {'duration_seconds': current, 'scenes': scenes, 'captions': captions, 'words': spoken,
             'timing_source': 'estimated_preview_only'}
@@ -160,6 +160,12 @@ def make_video(job):
         raise ValueError('A duração deve ficar entre 1 e 180 segundos. Encurte o roteiro.')
     if ending and timing['duration_seconds'] + ending['duration'] > 180:
         raise ValueError('O Short com encerramento ultrapassa 3 minutos. Encurte as cenas ou desative o encerramento.')
+    style = visuals.resolve(project)
+    if style.get('captions'):
+        # The Short livre's captions, as the compositions draw them, so the subtitles file says the same.
+        timing['captions'] = [{'start': bounds['start']+c['start'], 'end': bounds['start']+c['end'], 'text': ' '.join(c['words'])}
+                              for index, bounds in enumerate(timing['scenes'])
+                              for c in captions.timed(project['scenes'][index], flow.clock_from_timing(timing, index), style['captions'])]
     (folder / 'timing.json').write_text(json.dumps(timing, ensure_ascii=False, indent=2))
     graphics.write_subtitles(timing, folder)
     frames = [scene_image(scene, project['accent']) for scene in project['scenes']]
@@ -172,6 +178,9 @@ def make_video(job):
                         visuals.Composition(scene, project, 540 if job['mode'] == 'preview' else 1080,
                                             visuals.scene_asset(scene, project)) if project.get('visual_style') else None
                         for index, scene in enumerate(project['scenes'])]
+        last = compositions[-1]
+        if block_render.loops(project) and isinstance(last, block_render.BlockComposition):
+            last.loop_to = block_render.first_frame(project, flow.clock_from_timing(timing, 0))
     if project.get('cover'):
         source_cover = data_path(project['cover']['path'])
         concept = None
@@ -269,7 +278,9 @@ def make_video(job):
         store.progress(job_id, 96, 'Acrescentando o vídeo de encerramento')
         ending = endings.append_clip(target, ending, width, height, fps, bool(audio))
         duration = ending['total_duration']
+    from .pipeline import package_text
     publication = f'TÍTULO\n{project["title"]}\n\nDESCRIÇÃO\n{project["description"]}\n\nFONTES\n{project["sources"]}\n\nTAGS\n{project["tags"]}\n'
+    publication += package_text(project)
     (folder / 'publicacao.txt').write_text(publication)
     manifest = {'project_id': project['id'], 'job_id': job_id, 'revision': project['revision'],
                 'visual_style': project.get('visual_style'), 'accent': project['accent'],

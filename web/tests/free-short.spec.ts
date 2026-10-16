@@ -149,3 +149,62 @@ test("Livre aceita o prompt inteiro com anexos e abre o projeto sem formato", as
   await expect(page.getByText("Afirmação não verificada: O Runway custa US$ 12 por mês.")).toBeVisible();
   await page.screenshot({ path: info.outputPath("free-brief.png"), fullPage: true });
 });
+
+test("Short livre mostra o estilo gerado, a pausa do roteiro e o pacote de publicação", async ({ page }, info) => {
+  await builtApp(page);
+  await agents(page);
+  const project: Project = {
+    ...freeProject(prompt),
+    title: "Por que seu vídeo de IA muda o rosto do personagem",
+    description: "O erro número 1 em vídeo com IA é pular a pré-produção.",
+    visual_style: {
+      format_id: "free", channel_name: "MYCUT", font: "sans", google_font: "Roboto", background: "#0b2a33",
+      text_color: "#e6f1f2", media_mode: "mixed", image_source: "library", loop: true,
+      captions: { words: 3, position: "middle", font_size: 72, keywords: ["ficha", "cenário"] },
+    },
+    publication: {
+      titles: ["Por que seu vídeo de IA muda o rosto do personagem", "Da ideia ao filme com IA em 4 etapas"],
+      description: "O erro número 1 em vídeo com IA é pular a pré-produção.",
+      hashtags: ["#Shorts", "#IA", "#FilmeComIA"],
+      pinned_comment: "Prompt-mestre: você é um diretor de cinema.\nJunto de cada prompt em inglês, traga a tradução em português.",
+    },
+  };
+  project.scenes = [{ ...project.scenes[0], narration: "Resultado: isso. O prompt completo está no comentário fixado.",
+    pauses: [{ after: "Resultado: isso.", seconds: 0.8 }] }];
+  let saved: Project | null = null;
+  await page.route("**/api/projects", (route) => route.fulfill({ json: [project] }));
+  await page.route(`**/api/projects/${id}`, (route) => {
+    if (route.request().method() === "PUT") {
+      saved = { ...project, ...JSON.parse(route.request().postData()!), revision: project.revision + 1 };
+      return route.fulfill({ json: saved });
+    }
+    return route.fulfill({ json: saved || project });
+  });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto(`/#/producoes/${id}`);
+  const style = page.getByRole("region", { name: "Estilo gerado" });
+  await expect(style).toContainText("#0B2A33");
+  await expect(style).toContainText("#F2B544");
+  await expect(style).toContainText("Roboto");
+  await expect(style).toContainText("3 palavras por vez");
+  await expect(style).toContainText("Loop");
+  await page.getByRole("tab", { name: "Roteiro" }).click();
+  await expect(page.getByText("Pausa de 0,8 s depois de “Resultado: isso.”")).toBeVisible();
+  await page.getByRole("tab", { name: "Publicação" }).click();
+  const titles = page.getByRole("list", { name: "Opções de título" });
+  await expect(titles.getByRole("listitem")).toHaveCount(2);
+  await titles.getByRole("button", { name: "Usar o título “Da ideia ao filme com IA em 4 etapas”" }).click();
+  await expect(page.getByLabel("Título no YouTube")).toHaveValue("Da ideia ao filme com IA em 4 etapas");
+  await expect(page.getByText("#Shorts #IA #FilmeComIA")).toBeVisible();
+  await page.getByRole("button", { name: "Copiar comentário fixado" }).click();
+  await expect(page.getByRole("button", { name: "Copiar comentário fixado" })).toContainText("Copiado");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(project.publication!.pinned_comment);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: info.outputPath("free-publication.png"), fullPage: true });
+  await page.getByRole("button", { name: "Salvar" }).first().click();
+  await expect.poll(() => saved?.title).toBe("Da ideia ao filme com IA em 4 etapas");
+  // The pauses travel with the scenes, so saving never drops them.
+  expect(saved!.scenes[0].pauses).toEqual([{ after: "Resultado: isso.", seconds: 0.8 }]);
+});

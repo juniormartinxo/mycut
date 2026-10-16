@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import type { ProductionDraft } from "./Automation";
+import { GeneratedStyle, PublicationPackage, ScenePauses } from "./FreeShort";
 import { Connections } from "./Connections";
 import { CoverStudio } from "./CoverStudio";
 import { SceneEditor } from "./SceneEditor";
@@ -876,6 +877,9 @@ function Editor({
                     disabled={locked}
                   />
                 )}
+                {project.free && draft.visual_style?.format_id === "free" && (
+                  <GeneratedStyle style={draft.visual_style} accent={draft.accent} />
+                )}
                 {(project.warnings || []).length > 0 && (
                   <div className="notice agent-warnings" role="status">
                     <strong>Avisos dos agentes</strong>
@@ -953,6 +957,7 @@ function Editor({
                           }
                           placeholder="Escreva o que será narrado nesta cena…"
                         />
+                        <ScenePauses pauses={s.pauses} />
                       </div>
                     </label>
                   ))}
@@ -1461,6 +1466,10 @@ function Editor({
                     />
                   </label>
                 </fieldset>
+                {project.publication && (
+                  <PublicationPackage publication={project.publication} title={draft.title}
+                    onTitle={(title) => change({ title })} disabled={locked} />
+                )}
                 <div className="scene-note">
                   <Upload size={17} />O pacote inclui esses textos. O envio ao
                   YouTube é manual nesta versão.
