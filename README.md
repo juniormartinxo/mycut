@@ -256,9 +256,9 @@ Os seletores recebem IDs do cache local de modelos do Codex/Grok e da inicializa
 Em **Novo**, a opção **Livre** fica ao lado dos quatro formatos. O prompt é a especificação: uma ideia solta ou um roteiro completo em Markdown, com tabelas e blocos de código, até 40.000 caracteres. Imagens de referência (até 8) entram na biblioteca da produção; arquivos de texto e Markdown anexados são acrescentados ao prompt.
 
 1. Roteiro lê o prompt primeiro. Num roteiro completo, narração, texto na tela e ordem dos trechos seguem o texto ao pé da letra, só com ajustes de grafia e pontuação. Numa ideia, o agente escreve com liberdade de estrutura. Ele também lista as afirmações factuais externas.
-2. Pesquisa só roda se essa lista não estiver vazia, e só para esses itens. Afirmação não verificada vira aviso no roteiro do usuário, ou é suavizada no roteiro do agente; nunca recusa a produção.
-3. Direção visual compõe cenas e planos com blocos e fundos, sem o esqueleto 20/60/20. Após uma correção, problemas restantes são reparados (alturas, mídia inexistente, texto que não cabe, âncoras) em vez de falhar.
-4. Conferência verifica fatos e fidelidade ao prompt. Se reprovar também depois da correção, roteiro e cenas ficam salvos com os problemas como avisos, e a produção para antes da voz.
+2. Pesquisa só roda se essa lista não estiver vazia, e só para esses itens. Afirmação não verificada vira aviso no roteiro do usuário, ou é suavizada no roteiro do agente; nunca recusa a produção, nem quando o CLI da pesquisa falha.
+3. Direção visual compõe cenas e planos com blocos e fundos, sem o esqueleto 20/60/20. Após uma correção, problemas restantes são reparados (alturas, mídia inexistente, texto que não cabe, âncoras) em vez de falhar; texto encurtado para caber vira aviso.
+4. Conferência verifica fatos e fidelidade ao prompt. Se reprovar também depois da correção, se falhar ou se a correção não puder ser feita, roteiro e cenas já pagos ficam salvos com os problemas como avisos, e a produção para antes da voz.
 
 Os avisos aparecem na aba **Pauta e agentes**. Personagens fictícios realistas e avatares são permitidos quando o contexto justifica; pessoas reais identificáveis continuam proibidas ([ADR 0005](docs/adr/0005-short-livre.md)).
 
@@ -364,7 +364,7 @@ O cenário cobre criação, salvamento, proteção de texto não salvo, compara�
 
 Na validação de 15/10/2026, passaram **105 testes do backend**, **14 testes dos scripts de inicialização** e **9 testes de navegação** com histórico controlado, além do TypeScript e build Vite. Os testes cobrem persistência, limites de edição, propostas com agentes simulados e renderização real com FFmpeg.
 
-Na rodada do Short livre (MYC-4, 16/10/2026), passaram **142 testes do backend**, os 10 testes dos scripts de inicialização, os testes de navegação, o TypeScript e o build Vite, além de 14 cenários de navegador em desktop e celular (Livre, formatos e estúdio). Os agentes foram simulados; essa rodada não comprova roteiro, pesquisa ou direção reais nos CLIs.
+Na rodada do Short livre (MYC-4, 16/10/2026), passaram **146 testes do backend**, os 10 testes dos scripts de inicialização, os testes de navegação, o TypeScript e o build Vite, além de 14 cenários de navegador em desktop e celular (Livre, formatos e estúdio). Os agentes foram simulados; essa rodada não comprova roteiro, pesquisa ou direção reais nos CLIs.
 
 Também passaram **38 cenários de navegador** em desktop e celular, cobrindo edição em blocos, fontes, mídia, recorte, navegação, propostas, renderização e download. Dezesseis casos foram repetidos após uma interrupção da API temporária de testes; a repetição passou integralmente.
 

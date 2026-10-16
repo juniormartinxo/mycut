@@ -332,7 +332,7 @@ export function NewProduction({
           value={visual_style}
           accent={accent || "#BE4D2A"}
           onChange={(visual_style, accent) =>
-            onDraftChange({ ...draft, visual_style, accent })
+            onDraftChange({ ...draft, visual_style, accent, free: false })
           }
           disabled={busy}
           free={free}

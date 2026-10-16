@@ -111,7 +111,15 @@ test("Livre aceita o prompt inteiro com anexos e abre o projeto sem formato", as
     route.fulfill({ json: saved }),
   );
   await page.goto("/#/novo");
-  await page.getByRole("radio", { name: "Livre", exact: true }).check();
+  const livre = page.getByRole("radio", { name: "Livre", exact: true });
+  await livre.check();
+  await expect(page.getByLabel("Prompt do Short livre")).toBeVisible();
+  // Choosing a format leaves Livre, and Livre can be chosen again.
+  await page.getByRole("radio", { name: "Radar tech", exact: true }).check();
+  await expect(livre).not.toBeChecked();
+  await expect(page.getByLabel("Pauta ou link")).toBeVisible();
+  await expect(page.getByLabel("Cor de fundo", { exact: true })).toHaveValue("#121c24");
+  await livre.check();
   await expect(page.getByLabel("Cor de fundo", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Abrir editor vazio")).toHaveCount(0);
   const field = page.getByLabel("Prompt do Short livre");

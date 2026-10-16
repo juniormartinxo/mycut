@@ -166,15 +166,18 @@ def write(ask, project, issues):
     raise ValueError('O roteiro livre continuou fora do formato após a correção. ' + corrections[-1])
 
 
-def research(ask, claims, known):
-    """Checks for the claims not yet checked; any output problem leaves a claim unverified, never refuses."""
+def research(ask, claims, known, notes):
+    """Checks for the claims not yet checked; any failure leaves a claim unverified, never refuses."""
     pending = [claim for claim in claims if claim not in known]
     if not pending:
         return
     try:
         result = ask('research', RESEARCH, {'claims': pending, 'date': datetime.now(timezone.utc).isoformat()},
                      ClaimResearch, web=True)
-    except AgentOutputError:
+    except ValueError as exc:
+        # Invalid output, CLI error or timeout: the production goes on with the claims as warnings.
+        store.step(ask.job['id'], 'research', 'failed', f'Pesquisa indisponível: {exc}'[:500])
+        notes.append(f'Pesquisa indisponível: {exc}'[:500])
         result = ClaimResearch(sources=[], checks=[])
     sources = {source.url: source.model_dump() for source in result.sources if public_url(source.url)}
     for check in result.checks:
@@ -198,7 +201,8 @@ def verify(ask, project, script, issues, known):
     if not script.claims:
         store.step(ask.job['id'], 'research', 'skipped', 'Sem afirmações factuais externas: pesquisa dispensada')
         return script, []
-    research(ask, script.claims, known)
+    notes = []
+    research(ask, script.claims, known, notes)
     doubtful = unverified(script, known)
     if doubtful and script.mode == 'idea':
         try:
@@ -208,13 +212,14 @@ def verify(ask, project, script, issues, known):
             softened = None  # The script is already paid: keep it, with its claims as warnings.
         if softened is not None:
             # Claims the softened script still makes are checked once; what stays unverified is a warning.
-            research(ask, softened.claims, known)
+            research(ask, softened.claims, known, notes)
             script = softened
-    return script, [f'Afirmação não verificada: {claim}' for claim in unverified(script, known)]
+    return script, notes + [f'Afirmação não verificada: {claim}' for claim in unverified(script, known)]
 
 
 def direct(ask, project, script, issues):
-    """One bounded correction; then the composition is repaired, or rebuilt from the script if unusable."""
+    """One bounded correction; then the composition is repaired, or rebuilt from the script if unusable.
+    Returns the direction, the scenes and the warnings about what the repair changed."""
     images = project.get('images', [])
     style = visuals.resolve(project)
     payload = {'prompt': project['brief'], 'script': script.model_dump(), 'flow_icons': flow.icon_names(),
@@ -225,18 +230,22 @@ def direct(ask, project, script, issues):
     for final in (False, True):
         try:
             direction = ask('director', DIRECTOR + flow.GUIDE, {**payload, 'issues_to_fix': corrections}, FreeDirection)
-        except AgentOutputError as exc:
+        except ValueError as exc:
             if final:
-                return None, [fallback(scene) for scene in script.scenes]
+                message = f'A direção não pôde ser usada ({exc}); as cenas mostram o texto na tela do roteiro.'[:500]
+                store.step(ask.job['id'], 'director', 'failed', message)
+                notes = [message]
+                return None, [fallback(scene, index, project, notes) for index, scene in enumerate(script.scenes)], notes
             corrections = [*issues, str(exc)]
             continue
-        problems, scenes = compose(direction, script, project, final)
+        notes = []
+        problems, scenes = compose(direction, script, project, final, notes)
         if final or not problems:
-            return direction, scenes
+            return direction, scenes, notes
         corrections = [*issues, *problems[:8]]
 
 
-def compose(direction, script, project, repair):
+def compose(direction, script, project, repair, notes):
     """Project scenes from the director's output, with the problems found; with repair, fixes them instead."""
     problems = []
     if len(direction.scenes) != len(script.scenes):
@@ -247,7 +256,7 @@ def compose(direction, script, project, repair):
     for index, source in enumerate(script.scenes):
         visual = direction.scenes[index] if index < len(direction.scenes) else None
         if visual is None:
-            scenes.append(fallback(source))
+            scenes.append(fallback(source, index, project, notes))
             budget -= 1
             continue
         remaining = len(script.scenes) - index - 1
@@ -260,7 +269,7 @@ def compose(direction, script, project, repair):
                  'narration': source.narration, 'layout': 'statement', 'items': items(source),
                  'shots': [Shot(id=new_id(), **shot).model_dump() for shot in built[1:]]}
         del scene['anchor'], scene['transition']
-        scenes.append(settle(scene, index, project, problems, repair))
+        scenes.append(settle(scene, index, project, problems, repair, notes))
     return problems, scenes
 
 
@@ -309,8 +318,9 @@ def visual_object(value, where, images, problems):
                         flow=value.flow if value.type == 'flow' else None).model_dump()
 
 
-def settle(scene, index, project, problems, repair):
-    """Text that does not fit, flows that do not fit and unknown anchors: reported, or fixed on the last attempt."""
+def settle(scene, index, project, problems, repair, notes):
+    """Text that does not fit, flows that do not fit and unknown anchors: reported, or fixed on the last attempt.
+    A repaired scene is measured again, so nothing the render would refuse survives after the voice is paid."""
     scene = Scene.model_validate(scene).model_dump()
     report = inspect(scene, project)
     for item in report['warnings']:
@@ -319,52 +329,62 @@ def settle(scene, index, project, problems, repair):
             for shot in scene.get('shots', []):
                 if shot['id'] == item['shot_id']:
                     shot['anchor'] = None
-    for item in report['issues']:
-        problems.append(f'scenes[{index}]: ' + item['message'])
-        if repair and item['kind'] == 'overflow':
-            shrink(scene, item, project)
-    for shot in [scene, *scene.get('shots', [])]:
-        for block in shot['blocks']:
-            obj = block.get('object')
-            if repair and obj and obj['type'] == 'flow':
-                for step in flow.anchor_warnings(obj['flow'], scene['narration']):
-                    obj['flow']['steps'][step]['anchor'] = None
-    return Scene.model_validate(scene).model_dump()
-
-
-def shrink(scene, issue, project):
-    style = visuals.resolve(project)
+    problems += [f'scenes[{index}]: ' + item['message'] for item in report['issues']]
+    if not repair:
+        return scene
     for shot in [scene, *scene.get('shots', [])]:
         for block, info in zip(shot['blocks'], geometry(shot['blocks'])):
             obj = block.get('object')
-            if not obj or obj['id'] != issue['object_id']:
-                continue
-            if obj['type'] == 'flow':
-                if (issue.get('font_size') or 0) >= 22:
-                    obj['font_size'] = issue['font_size']
-                else:
-                    # The flow's labels cannot be read on a phone: its nodes become a paragraph.
-                    labels = '\n'.join(node['label'] for node in obj['flow']['nodes'])
-                    block['object'] = VisualObject(id=obj['id'], type='paragraph', text=labels, font_size=40).model_dump()
-                continue
-            while True:
-                size = next((s for s in range(int(obj['font_size']), MIN_TEXT-1, -1)
-                             if not text_layout(obj, info['object'], style, s)[3]), None)
-                if size is not None:
-                    obj['font_size'] = size
-                    break
-                words = obj['text'].rstrip('…').split(' ')
-                obj['text'] = ' '.join(words[:max(1, len(words) * 3 // 4)]) + '…'
-                if len(words) == 1:
-                    obj['font_size'] = MIN_TEXT
-                    break
+            if obj and obj['type'] == 'flow':
+                for step in flow.anchor_warnings(obj['flow'], scene['narration']):
+                    obj['flow']['steps'][step]['anchor'] = None
+            issue = next((item for item in report['issues'] if obj and item.get('object_id') == obj['id']), None)
+            if issue and issue['kind'] == 'overflow':
+                block['object'] = fit(obj, issue, info['object'], project, index, notes)
+    for item in inspect(scene, project)['issues']:
+        # Whatever still cannot be drawn leaves the plano, and the user is told.
+        for shot in [scene, *scene.get('shots', [])]:
+            for block in shot['blocks']:
+                if block.get('object') and block['object']['id'] == item.get('object_id'):
+                    block['object'] = None
+                    notes.append(f'Cena {index+1}: um objeto que não cabia no bloco foi removido.')
+    return Scene.model_validate(scene).model_dump()
+
+
+def fit(obj, issue, box, project, index, notes):
+    """The smallest change that makes an object fit its block: a smaller font, then a shorter text."""
+    if obj['type'] == 'flow':
+        if (issue.get('font_size') or 0) >= 22:
+            return {**obj, 'font_size': issue['font_size']}
+        # The flow's labels cannot be read on a phone: its nodes become a paragraph.
+        labels = '\n'.join(node['label'] for node in obj['flow']['nodes'])
+        obj = VisualObject(id=obj['id'], type='paragraph', text=labels, font_size=40).model_dump()
+    style = visuals.resolve(project)
+    original = obj['text']
+    while True:
+        size = next((s for s in range(int(obj['font_size']), MIN_TEXT-1, -1) if not text_layout(obj, box, style, s)[3]), None)
+        if size is not None:
+            obj['font_size'] = size
+            break
+        body = obj['text'].rstrip('…')
+        words = body.split(' ')
+        if len(words) > 1:
+            body = ' '.join(words[:len(words) * 3 // 4 or 1])
+        elif len(body) > 1:
+            body = body[:len(body) * 3 // 4 or 1]
+        else:
+            break  # Not even one character fits: the scene's last check removes the object.
+        obj['text'] = body + '…'
+    if obj['text'] != original:
+        notes.append(f'Cena {index+1}: o texto na tela foi encurtado para caber: “{original[:120]}”.')
+    return obj
 
 
 def items(source):
     return [text[:100] for text in source.screen_text if text.strip()][:4]
 
 
-def fallback(source):
+def fallback(source, index, project, notes):
     """The script's scene with its text on screen, when the director's composition could not be used."""
     lines = [text for text in source.screen_text if text.strip()]
     title = VisualObject(type='title', text=(lines[0] if lines else source.visual or 'Cena')[:300], font_size=64,
@@ -373,7 +393,7 @@ def fallback(source):
     blocks = [SceneBlock(height=30, object=title), SceneBlock(height=70, object=rest)]
     scene = {'id': new_id(), 'title': title.text[:100], 'narration': source.narration, 'layout': 'statement',
              'items': items(source), 'blocks': [block.model_dump() for block in blocks]}
-    return Scene.model_validate(scene).model_dump()
+    return settle(scene, index, project, [], True, notes)
 
 
 def summary(script, scenes):
@@ -388,27 +408,37 @@ def produce(job, folder):
     """Script, optional research, direction and conference of a Short livre, saved as one checkpoint."""
     project = job['snapshot']
     ask = Calls(job)
-    issues, known = [], {}
+    issues, known, interrupted, kept = [], {}, [], None
     for _ in (1, 2):
-        script = write(ask, project, issues)
-        script, warnings = verify(ask, project, script, issues, known)
-        direction, scenes = direct(ask, project, script, issues)
+        try:
+            script = write(ask, project, issues)
+            script, warnings = verify(ask, project, script, issues, known)
+            direction, scenes, notes = direct(ask, project, script, issues)
+        except ValueError as exc:
+            if kept is None:
+                raise
+            # The correction failed: the first round's paid work is kept for review.
+            interrupted = [f'A correção pedida pela conferência não pôde ser feita: {exc}'[:500]]
+            break
         checked = [known[claim] for claim in script.claims if claim in known]
         try:
             review = ask('reviewer', REVIEWER, {'prompt': project['brief'], 'script': script.model_dump(),
                                                 'scenes': summary(script, scenes), 'research': checked, 'warnings': warnings}, Review)
-        except AgentOutputError as exc:
-            # The script and scenes are paid: an unreadable conference counts as a rejection, never loses them.
+        except ValueError as exc:
+            # Invalid output, CLI error or timeout: the paid script and scenes are kept, as after a rejection.
             review = Review(approved=False, issues=[str(exc)[:500]])
+        kept = script, warnings + notes, direction, scenes, checked, review
         if review.approved:
             break
         issues = review.issues or ['A conferência não aprovou a fidelidade ao prompt.']
+    script, warnings, direction, scenes, checked, review = kept
     sources = list(dict.fromkeys(item['source']['url'] for item in checked if item['verified']))
     accent = project['accent'] if project.get('accent_locked') or direction is None else direction.accent
+    if not review.approved:
+        warnings = warnings + [f'Conferência: {issue}' for issue in issues] + interrupted
     values = {'title': script.title, 'description': script.description, 'tags': script.tags, 'sources': '\n'.join(sources),
               'scenes': scenes, 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
-              'agent_review': review.model_dump(), 'audio': None,
-              'warnings': warnings + ([] if review.approved else [f'Conferência: {issue}' for issue in issues])}
+              'agent_review': review.model_dump(), 'audio': None, 'warnings': warnings}
     ProjectInput.model_validate({'title': script.title, 'scenes': scenes})
     job = store.checkpoint(job['id'], values)
     save_editorial(job, folder)

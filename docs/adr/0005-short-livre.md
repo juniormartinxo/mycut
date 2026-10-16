@@ -40,10 +40,14 @@ continua valendo.
 Implementado no MYC-4. A conferência pede uma correção ao roteiro e à direção.
 Se reprovar de novo, o roteiro e as cenas já pagos ficam salvos no projeto, com
 os problemas como avisos, e a produção para antes da voz, para não gastar
-créditos ElevenLabs num roteiro infiel (decisão do usuário em 16/10/2026). A
+créditos ElevenLabs num roteiro infiel (decisão do usuário em 16/10/2026). O
+mesmo vale quando a conferência falha (erro do CLI, tempo esgotado, saída
+ilegível) e quando a correção não pode ser feita: fica o trabalho da primeira
+rodada. Uma pesquisa que falha deixa as afirmações como não verificadas. A
 direção tem uma correção; depois disso, alturas, mídias inexistentes, textos
 que não cabem e âncoras fora da fala são reparados, e uma saída inutilizável
-vira uma composição simples com o texto na tela do roteiro. Os anexos de
+vira uma composição simples com o texto na tela do roteiro. Todo reparo é
+medido de novo; texto encurtado ou objeto removido para caber vira aviso. Os anexos de
 imagem entram na biblioteca da produção; os de texto são acrescentados ao
 prompt.
 

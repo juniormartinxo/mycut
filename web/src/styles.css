@@ -2230,8 +2230,6 @@ progress::-moz-progress-bar {
 }
 
 .free-prompt {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
   line-height: 1.6;
   min-height: 320px;
 }
@@ -2252,7 +2250,7 @@ progress::-moz-progress-bar {
 }
 .free-attachments > label:has(input:focus-visible) {
   outline: 3px solid var(--accent);
-  outline-offset: 3px;
+  outline-offset: 4px;
 }
 .free-attachments small {
   color: var(--muted);
@@ -2274,7 +2272,7 @@ progress::-moz-progress-bar {
   max-width: 100%;
   padding: 5px 6px 5px 10px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 7px;
   font-size: 12px;
   overflow-wrap: anywhere;
 }

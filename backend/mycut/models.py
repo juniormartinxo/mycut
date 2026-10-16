@@ -70,18 +70,10 @@ class ProjectInput(BaseModel):
     brief: str = Field(default='', max_length=BRIEF_LIMIT)
     accent: str = Field(default='#c85e37', pattern=r'^#[0-9a-fA-F]{6}$')
     accent_locked: bool = True
-    # Short livre (ADR 0005): the brief is the prompt and no format, arc or scene skeleton applies.
-    free: bool = Field(default=False, exclude_if=lambda value: not value)
     visual_style: VisualStyle | None = None
     ending_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
     scenes: list[Scene] = Field(min_length=1, max_length=12)
     revision: int = Field(default=0, ge=0)
-
-    @model_validator(mode='after')
-    def format_brief_size(self):
-        if not self.free and len(self.brief) > FORMAT_BRIEF_LIMIT:
-            raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta.')
-        return self
 
     @model_validator(mode='after')
     def unique_scene_ids(self):

@@ -140,7 +140,8 @@ export function FormatPicker({
   accent: string;
   onChange: (style: VisualStyle, accent: string) => void;
   disabled?: boolean;
-  /** With onFreeChange, the gallery offers Livre (Short livre, ADR 0005) next to the four formats. */
+  /** With onFreeChange, the gallery offers Livre (Short livre, ADR 0005) next to the four formats;
+   * onChange then also means "not Livre". */
   free?: boolean;
   onFreeChange?: (free: boolean) => void;
 }) {
@@ -170,8 +171,8 @@ export function FormatPicker({
   const selected = free
     ? undefined
     : catalog?.formats.find((item) => item.id === style.format_id);
+  // Choosing a format leaves Livre: the parent's onChange owns that, in the same draft update.
   const apply = (format: ShortFormat) => {
-    onFreeChange?.(false);
     onChange(
       {
         ...style,

@@ -390,6 +390,9 @@ def update(project_id: str, body: ProjectInput):
     if body.ending_id:
         endings.get(body.ending_id)
     current = store.get_project(project_id)
+    # The saved project decides the mode; a Short livre is created as such and stays one (ADR 0005).
+    if not current.get('free') and len(body.brief) > FORMAT_BRIEF_LIMIT:
+        raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta.')
     images = {item['id'] for item in current.get('images', [])}
     if body.visual_style and body.visual_style.google_font:
         google_fonts.entry(body.visual_style.google_font)

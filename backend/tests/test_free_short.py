@@ -66,6 +66,7 @@ def png(color):
 class FreeShortTests(unittest.TestCase):
     setUp = test_studio.StudioTests.setUp
     tearDown = test_studio.StudioTests.tearDown
+    edit = test_studio.StudioTests.edit
 
     def online(self):
         integrations.save_section('elevenlabs', {**integrations.DEFAULTS['elevenlabs'], 'api_key': 'test-only-secret',
@@ -177,6 +178,64 @@ class FreeShortTests(unittest.TestCase):
         response = self.client.post('/api/projects', json={'title': 'Formato', 'brief': PROMPT, 'automation': 'plan'})
         self.assertEqual(response.status_code, 422, response.text)
         self.assertIn('Livre', response.json()['detail'])
+        # The saved project decides the mode: an edit can neither turn a format into Livre nor pass the limit.
+        self.assertEqual(self.edit(brief=PROMPT).status_code, 422)
+        self.assertEqual(self.edit(free=True, brief=PROMPT).status_code, 422)
+        self.assertFalse(store.get_project(self.project['id']).get('free'))
+
+    def test_a_free_short_with_a_long_prompt_saves_in_the_editor(self):
+        self.online()
+        self.project = self.create_free().json()
+        store.cancel(self.project['jobs'][0]['id'])
+        response = self.edit(brief=PROMPT + '\n\nMais um ajuste.')
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertTrue(response.json()['free'])
+
+    def test_cli_failures_in_research_and_conference_never_refuse_or_lose_the_paid_work(self):
+        project, job = self.start_free()
+        claims = ['O Kling gera clipes de até 10 segundos.']
+        timeout = ValueError('O agente excedeu 15 minutos.')
+        with patch.object(bridge, 'invoke', side_effect=[{**FREE_SCRIPT, 'claims': claims}, timeout, free_direction(), timeout,
+                                                         ValueError('O CLI encerrou com erro.')]):
+            with self.assertRaisesRegex(ValueError, 'salvos'):
+                pipeline.produce(job)
+        saved = store.get_project(project['id'])
+        self.assertEqual([s['narration'] for s in saved['scenes']], [n for _, n, _ in BLOCKS])
+        self.assertIn(f'Afirmação não verificada: {claims[0]}', saved['warnings'])
+        self.assertTrue(any('15 minutos' in warning for warning in saved['warnings']))
+
+    def test_repaired_text_always_fits_and_a_shortened_text_is_a_warning(self):
+        project, job = self.start_free()
+        unreadable = {'nodes': [{'id': f'n{i}', 'label': f'Etapa número {i} longa', 'icon': None, 'shape': 'circle',
+                                 'x': 50, 'y': 10 + i * 10, 'size': 18, 'chart': None} for i in range(8)],
+                      'links': [], 'steps': [{'source': None, 'target': 'n0', 'kind': 'request', 'anchor': None}]}
+        crowded = free_direction()
+        crowded['scenes'][1]['shots'][0]['blocks'] = [
+            {'height': 4, 'object': text('flow', '', font_size=40, flow=unreadable)},
+            {'height': 96, 'object': None}]
+        crowded['scenes'][2]['shots'][0]['blocks'][0]['object'] = text('title', 'Supercalifragilístico' * 6, font_size=200)
+        crowded['scenes'][4]['shots'][0]['blocks'] = [
+            {'height': 5, 'object': text('paragraph', 'Uma ficha longa demais para caber no bloco estreito ' * 8, font_size=60)},
+            {'height': 95, 'object': None}]
+        with patch.object(bridge, 'invoke', side_effect=[FREE_SCRIPT, crowded, crowded, APPROVED]):
+            pipeline.produce(job)
+        saved = store.get_project(project['id'])
+        from mycut.block_render import validate_project
+        validate_project(saved)  # Nothing left that the render would refuse after the voice is paid.
+        self.assertTrue(any(w.startswith('Cena 5: o texto na tela foi encurtado') for w in saved['warnings']), saved['warnings'])
+
+    def test_a_failed_second_round_keeps_the_first_rounds_work(self):
+        project, job = self.start_free('pipeline')
+        rejected = {'approved': False, 'issues': ['A cena 2 trocou o texto na tela.']}
+        with patch.object(bridge, 'invoke', side_effect=[FREE_SCRIPT, free_direction(), rejected,
+                                                         ValueError('O CLI encerrou com erro.')]), \
+                patch.object(elevenlabs, 'synthesize') as voice:
+            with self.assertRaisesRegex(ValueError, 'salvos'):
+                pipeline.produce(job)
+            voice.assert_not_called()
+        saved = store.get_project(project['id'])
+        self.assertEqual(len(saved['scenes']), len(BLOCKS))
+        self.assertIn('Conferência: A cena 2 trocou o texto na tela.', saved['warnings'])
 
     def test_direction_problems_get_one_correction_and_are_then_repaired_instead_of_failing(self):
         project, job = self.start_free()
