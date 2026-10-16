@@ -9,6 +9,8 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from pydantic import Field, StringConstraints
 from . import flow, store, visuals, google_fonts
+from . import art as artwork
+from .art import ArtKey, ArtRequest, Bible
 from .block_render import inspect, text_layout
 from .flow import FlowSpec
 from .models import Scene, ProjectInput, CaptionStyle, Pause, VisualStyle
@@ -66,6 +68,8 @@ class FreeObject(Output):
     align: Literal['left', 'center', 'right']
     reveal: Literal['none', 'lines', 'typing']
     image_id: ImageId | None
+    # An image the Arte will generate: the key of one of the director's image requests (ADR 0005).
+    art: ArtKey | None = None
     motion: Motion
     flow: FlowSpec | None
 
@@ -81,6 +85,7 @@ class FreeBackground(Output):
     color_to: Color | None
     angle: float = Field(ge=0, le=360, allow_inf_nan=False)
     image_id: ImageId | None
+    art: ArtKey | None = None
     motion: Motion
     dim: float = Field(ge=0, le=80, allow_inf_nan=False)
 
@@ -110,6 +115,10 @@ class FreeDirection(Output):
     captions: CaptionStyle
     loop: bool
     scenes: list[FreeScene] = Field(min_length=1, max_length=12)
+    # Visual bible and image requests for the Arte; empty when the Short has no generated images.
+    bible: Bible | None = None
+    # Unbounded here: requests past the limit get a correction and are then dropped, never a failed direction.
+    images: list[ArtRequest] = Field(default_factory=list)
 
 
 WRITER = (
@@ -247,28 +256,34 @@ def direct(ask, project, script, issues):
     """One bounded correction; then the composition is repaired, or rebuilt from the script if unusable.
     Returns the direction, the scenes and the warnings about what the repair changed."""
     images = project.get('images', [])
+    generating = artwork.mode(project) != 'none'
     payload = {'prompt': project['brief'], 'script': script.model_dump(), 'flow_icons': flow.icon_names(),
                'available_images': [{k: v for k, v in item.items() if k != 'path'} for item in images],
-               'area': {'width': AREA[2], 'height': AREA[3]}}
+               'area': {'width': AREA[2], 'height': AREA[3]},
+               'art': {'max_images': artwork.MAX_IMAGES, 'max_bases': artwork.MAX_BASES} if generating else None}
     corrections = list(issues)
     for final in (False, True):
         try:
-            direction = ask('director', DIRECTOR + flow.GUIDE, {**payload, 'issues_to_fix': corrections}, FreeDirection)
+            direction = ask('director', DIRECTOR + artwork.GUIDE + flow.GUIDE, {**payload, 'issues_to_fix': corrections},
+                            FreeDirection)
         except ValueError as exc:
             if final:
                 message = f'A direção não pôde ser usada ({exc}); as cenas mostram o texto na tela do roteiro.'[:500]
                 store.step(ask.job['id'], 'director', 'failed', message)
                 notes, style = [message], generated_style(None, [], True, [])
                 styled = {**project, 'visual_style': style}
-                return None, [fallback(scene, index, styled, notes) for index, scene in enumerate(script.scenes)], notes, style
+                return None, [fallback(scene, index, styled, notes) for index, scene in enumerate(script.scenes)], notes, style, []
             corrections = [*issues, str(exc)]
             continue
         notes, problems = [], []
         # Text is measured with the font the Short will be drawn with.
         style = generated_style(direction, problems, final, notes)
-        problems, scenes = compose(direction, script, {**project, 'visual_style': style}, final, notes, problems)
+        available = {item['id'] for item in images}
+        requests = artwork.requests(direction, available, problems, final) if generating else []
+        problems, scenes = compose(direction, script, {**project, 'visual_style': style}, final, notes, problems, requests)
+        requests = artwork.unused(requests, problems, final)
         if final or not problems:
-            return direction, scenes, notes, style
+            return direction, scenes, notes, style, requests
         corrections = [*issues, *problems[:8]]
 
 
@@ -292,11 +307,13 @@ def generated_style(direction, problems, repair, notes):
                        captions=direction.captions, loop=direction.loop).model_dump()
 
 
-def compose(direction, script, project, repair, notes, problems):
-    """Project scenes from the director's output, with the problems found; with repair, fixes them instead."""
+def compose(direction, script, project, repair, notes, problems, requests=()):
+    """Project scenes from the director's output, with the problems found; with repair, fixes them instead.
+    An image the Arte will generate leaves its place empty and the request records where it goes."""
     if len(direction.scenes) != len(script.scenes):
         problems.append(f'scenes: crie exatamente {len(script.scenes)} cenas, uma por cena do roteiro.')
     images = {item['id'] for item in project.get('images', [])}
+    art = {item['key']: item for item in requests}
     budget = MAX_PROJECT_SHOTS
     scenes = []
     for index, source in enumerate(script.scenes):
@@ -310,16 +327,19 @@ def compose(direction, script, project, repair, notes, problems):
         if len(planos) < len(visual.shots):
             problems.append(f'Use até {MAX_PROJECT_SHOTS} planos no Short inteiro.')
         budget -= len(planos)
-        built = [plano(shot, index, number, images, problems) for number, shot in enumerate(planos)]
+        built = [plano(shot, index, number, images, problems, art) for number, shot in enumerate(planos)]
+        markers = [(shot.pop('_art', None), [block.pop('_art', None) for block in shot['blocks']]) for shot in built]
         scene = {**built[0], 'id': new_id(), 'title': visual.title or (source.screen_text or [''])[0][:100] or f'Cena {index+1}',
                  'narration': source.narration, 'layout': 'statement', 'items': items(source),
                  'shots': [Shot(id=new_id(), **shot).model_dump() for shot in built[1:]], 'pauses': pauses(source, index, notes)}
         del scene['anchor'], scene['transition']
+        for (background, blocks), stored in zip(markers, [scene, *scene['shots']]):
+            artwork.add_placements(art, scene['id'], stored, background, blocks)
         scenes.append(settle(scene, index, project, problems, repair, notes))
     return problems, scenes
 
 
-def plano(shot, scene, number, images, problems):
+def plano(shot, scene, number, images, problems, art):
     where = f'scenes[{scene}].shots[{number}]'
     total = sum(block.height for block in shot.blocks)
     heights = [block.height * 100 / total for block in shot.blocks]
@@ -328,10 +348,21 @@ def plano(shot, scene, number, images, problems):
     # Rounding is absorbed by the last block so the composition always sums to 100.
     heights = [round(h, 4) for h in heights[:-1]]
     heights.append(round(100 - sum(heights), 4))
-    blocks = [SceneBlock(height=height, object=visual_object(block.object, f'{where}.blocks[{i}]', images, problems)).model_dump()
-              for i, (block, height) in enumerate(zip(shot.blocks, heights))]
-    background = None
-    if shot.background:
+    blocks = []
+    for i, (block, height) in enumerate(zip(shot.blocks, heights)):
+        value, marker = block.object, None
+        if value is not None and value.type == 'image' and value.art is not None and value.image_id not in images:
+            marker = requested(value.art, art, f'{where}.blocks[{i}].object', problems) and {'key': value.art, 'motion': value.motion}
+            value = None
+        blocks.append({**SceneBlock(height=height, object=visual_object(value, f'{where}.blocks[{i}]', images, problems)).model_dump(),
+                       **({'_art': marker} if marker else {})})
+    background, marker = None, None
+    if shot.background and shot.background.kind == 'image' and shot.background.art is not None \
+            and shot.background.image_id not in images:
+        value = shot.background
+        marker = requested(value.art, art, f'{where}.background', problems) and {'key': value.art, 'motion': value.motion,
+                                                                                  'dim': value.dim}
+    elif shot.background:
         value = shot.background
         try:
             if value.kind == 'image' and value.image_id not in images:
@@ -342,7 +373,15 @@ def plano(shot, scene, number, images, problems):
         except ValueError as exc:
             problems.append(f'{where}.background: {exc}')
     return {'anchor': shot.anchor or None if number else None, 'transition': shot.transition, 'brand': shot.brand,
-            'background': background, 'blocks': blocks}
+            'background': background, 'blocks': blocks, **({'_art': marker} if marker else {})}
+
+
+def requested(key, art, where, problems):
+    """Whether an object or background uses an image the director asked the Arte for."""
+    if key in art:
+        return True
+    problems.append(f'{where}: use em art a key de uma imagem de images, ou um image_id de available_images.')
+    return False
 
 
 def visual_object(value, where, images, problems):
@@ -470,7 +509,7 @@ def produce(job, folder):
         try:
             script = write(ask, project, issues)
             script, warnings = verify(ask, project, script, issues, known)
-            direction, scenes, notes, style = direct(ask, project, script, issues)
+            direction, scenes, notes, style, requests = direct(ask, project, script, issues)
         except ValueError as exc:
             if kept is None:
                 raise
@@ -484,20 +523,22 @@ def produce(job, folder):
         except ValueError as exc:
             # Invalid output, CLI error or timeout: the paid script and scenes are kept, as after a rejection.
             review = Review(approved=False, issues=[str(exc)[:500]])
-        kept = script, warnings + notes, direction, scenes, style, checked, review
+        kept = script, warnings + notes, direction, scenes, style, checked, review, requests
         if review.approved:
             break
         issues = review.issues or ['A conferência não aprovou a fidelidade ao prompt.']
-    script, warnings, direction, scenes, style, checked, review = kept
+    script, warnings, direction, scenes, style, checked, review, requests = kept
     sources = list(dict.fromkeys(item['source']['url'] for item in checked if item['verified']))
     accent = project['accent'] if project.get('accent_locked') or direction is None else direction.accent
     if not review.approved:
         warnings = warnings + [f'Conferência: {issue}' for issue in issues] + interrupted
     values = {'title': script.titles[0], 'description': script.description, 'tags': script.tags, 'sources': '\n'.join(sources),
-              'scenes': scenes, 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
+              'scenes': scenes, 'images': artwork.library(project.get('images', []), scenes, requests), 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
               'agent_review': review.model_dump(), 'audio': None, 'warnings': warnings, 'visual_style': style,
               'publication': {'titles': script.titles, 'description': script.description, 'hashtags': script.hashtags,
-                              'pinned_comment': script.pinned_comment}}
+                              'pinned_comment': script.pinned_comment},
+              'art': {'mode': artwork.mode(project), 'bible': direction.bible.model_dump() if direction and direction.bible else None,
+                      'requests': requests, 'estimate': None, 'then': None}}
     ProjectInput.model_validate({'title': script.titles[0], 'scenes': scenes, 'visual_style': style})
     job = store.checkpoint(job['id'], values)
     save_editorial(job, folder)

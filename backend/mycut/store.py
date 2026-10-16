@@ -175,13 +175,15 @@ def get_job(job_id, private=False):
         return job_row(db.execute('SELECT * FROM jobs WHERE id=?', (job_id,)).fetchone(), private)
 
 
-def enqueue(project_id, mode, revision, kind='render', settings=None):
+def enqueue(project_id, mode, revision, kind='render', settings=None, request=None):
     with connect() as db:
         db.execute('BEGIN IMMEDIATE')
         project = project_row(db.execute('SELECT * FROM projects WHERE id=?', (project_id,)).fetchone())
         if project['revision'] != revision:
             raise Conflict('Salve e atualize o projeto antes de produzir.')
-        if kind in ('render', 'voice') and any(not s['narration'].strip() or not s['title'].strip() for s in project['scenes']):
+        # An Arte run that resumes a production stopped for the bases goes on to the voice.
+        voiced = kind in ('render', 'voice') or kind == 'art' and (project.get('art') or {}).get('then') == 'pipeline'
+        if voiced and any(not s['narration'].strip() or not s['title'].strip() for s in project['scenes']):
             raise Conflict('Preencha o título e a narração de todas as cenas.')
         if kind == 'scenes' and any(not s['narration'].strip() for s in project['scenes']):
             raise Conflict('Gere ou salve o roteiro antes de criar as cenas com agentes.')
@@ -200,6 +202,8 @@ def enqueue(project_id, mode, revision, kind='render', settings=None):
             project['_kind'] = kind
             project['_agents'] = (settings or {}).get('agents', {})
             project['_voice'] = {k: v for k,v in (settings or {}).get('elevenlabs', {}).items() if k != 'api_key'}
+        if request is not None:
+            project['_art'] = request
         job_id, now = uid(), time.time()
         try:
             db.execute('INSERT INTO jobs VALUES(?,?,?,?,?,?,?,?,?,?)',
@@ -319,6 +323,17 @@ def usage_finish(usage_id, state, entries=None, credits=None, estimated=False):
     with connect() as db:
         db.execute("UPDATE usage SET state=?, entries=?, credits=?, credits_estimated=?, updated_at=? WHERE id=? AND state='running'",
                    (state, json.dumps(entries or []), credits, int(estimated), time.time(), usage_id))
+
+
+def usage_images(usage_id, count):
+    """The images a call generated, priced per image; the CLI reports only the tokens around them."""
+    if not count:
+        return
+    with connect() as db:
+        row = db.execute('SELECT entries FROM usage WHERE id=?', (usage_id,)).fetchone()
+        entries = [*json.loads(row['entries']), {'model': 'imagem', 'input': 0, 'cache_read': 0, 'cache_write': 0, 'output': 0,
+                                                  'reasoning': 0, 'web_searches': 0, 'images': count, 'cost_usd': None}]
+        db.execute('UPDATE usage SET entries=?, updated_at=? WHERE id=?', (json.dumps(entries), time.time(), usage_id))
 
 
 def usage_rows(project_id):

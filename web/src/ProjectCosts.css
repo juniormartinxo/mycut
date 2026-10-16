@@ -75,6 +75,8 @@
   font-size: 13px;
 }
 .cost-table-wrap {
+  /* Contains the visually hidden headers too, which would otherwise widen the page on a phone. */
+  position: relative;
   max-width: 100%;
   overflow-x: auto;
 }

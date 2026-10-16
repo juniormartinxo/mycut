@@ -61,6 +61,7 @@ async function api(page: Page) {
           writer: { provider: "claude", model: "" },
           director: { provider: "codex", model: "" },
           reviewer: { provider: "codex", model: "" },
+          art: { provider: "codex", model: "" },
         },
         runner: {
           online: true,

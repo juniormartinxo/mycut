@@ -296,9 +296,18 @@ def produce(job):
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
     kind = job['kind']
-    if kind in ('pipeline', 'plan') and job['snapshot'].get('free'):
-        from . import free
+    resuming = False
+    if kind == 'art':
+        from . import art
+        job, resuming = art.produce(job)
+        # The images a production stopped for are ready: it goes on to the voice and the video.
+        kind = 'pipeline' if resuming else 'art'
+    elif kind in ('pipeline', 'plan') and job['snapshot'].get('free'):
+        from . import free, art
         job = free.produce(job, folder)
+        job, complete = art.after_production(job, kind)
+        if not complete:
+            kind = 'art'  # Bases to review first: no voice nor video until the scene images exist.
     elif kind in ('pipeline', 'plan'):
         research = agent(job, 'research',
             'Pesquise a pauta usando WebSearch/WebFetch. Abra o link informado e procure fontes primárias. '
@@ -360,6 +369,8 @@ def produce(job):
             # Only a call that never reached the provider is still open here.
             store.usage_finish(usage_id, 'failed')
         job = store.checkpoint(job['id'], {'audio': record})
+        if resuming:
+            job = art.resumed(job)
         store.step(job['id'], 'voice', 'succeeded', 'Narração e tempos de fala recebidos')
         if kind == 'voice':
             save_editorial(job, folder)

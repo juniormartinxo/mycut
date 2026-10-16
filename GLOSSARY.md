@@ -63,6 +63,15 @@ roteirista entrega com um Short livre.
 Tom, fichas de personagem e de cenário extraídos do prompt de um Short livre,
 que servem de referência para todas as imagens geradas.
 
+**Arte**:
+Papel de agente que gera as imagens de um Short livre a partir da bíblia
+visual, com Codex ou Grok.
+
+**Imagem-base**:
+Ficha de personagem ou cenário vazio gerado primeiro pela Arte e anexado como
+referência às imagens que precisam manter aquele rosto ou lugar.
+_Evitar_: Imagem de referência, para não confundir com os anexos do prompt.
+
 **Lista de materiais**:
 Relação dos B-rolls externos de um Short livre, cada um com prompt, ferramenta
 sugerida, referências e duração.

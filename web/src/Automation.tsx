@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { request } from "./api";
 import { FormatPicker } from "./FormatPicker";
-import type { Integrations, Job, Project, VisualStyle } from "./types";
+import { money, providers } from "./ProjectCosts";
+import type { ArtMode, Integrations, Job, Project, VisualStyle } from "./types";
 
 export function useIntegrations() {
   const [settings, setSettings] = useState<Integrations | null>(null);
@@ -43,11 +44,13 @@ export function useIntegrations() {
   return { settings, error };
 }
 
-export function readiness(settings: Integrations | null) {
+/** The Arte only counts for a Short livre that generates images. */
+export function readiness(settings: Integrations | null, art = false) {
   const agents =
     !!settings?.runner.online &&
-    Object.values(settings.agents).every(
-      (a) => settings.runner.providers[a.provider],
+    Object.entries(settings.agents).every(
+      ([role, a]) =>
+        (role === "art" && !art) || settings.runner.providers[a.provider],
     );
   const voice =
     !!settings?.elevenlabs.connected && !!settings.elevenlabs.voice_id;
@@ -86,19 +89,27 @@ const stepNames: Record<string, string> = {
   writer: "Roteiro",
   director: "Animações",
   reviewer: "Conferência",
+  art: "Arte",
   voice: "Narração",
   render: "Vídeo",
 };
 export function AgentSteps({ job }: { job?: Job }) {
   if (!job || job.kind === "render") return null;
+  const started = (name: string) => job.steps.some((s) => s.name === name);
   const names =
     job.kind === "voice"
       ? ["voice"]
       : job.kind === "scenes"
         ? ["director", "reviewer"]
-        : job.kind === "plan"
-          ? ["research", "writer", "director", "reviewer"]
-          : Object.keys(stepNames);
+        : job.kind === "art"
+          ? ["art", ...["voice", "render"].filter(started)]
+          : job.kind === "plan"
+            ? ["research", "writer", "director", "reviewer", "art"].filter(
+                (name) => name !== "art" || started(name),
+              )
+            : Object.keys(stepNames).filter(
+                (name) => name !== "art" || started(name),
+              );
   return (
     <ol className="agent-steps" aria-label="Etapas dos agentes">
       {names.map((name) => {
@@ -132,6 +143,8 @@ export type ProductionDraft = {
   /** Short livre (ADR 0005): the brief is the prompt and the images go to the agents as references. */
   free: boolean;
   attachments: File[];
+  /** Short livre: what the Arte generates before the voice. */
+  art: ArtMode;
 };
 
 export const emptyDraft = (visual_style: VisualStyle): ProductionDraft => ({
@@ -142,7 +155,27 @@ export const emptyDraft = (visual_style: VisualStyle): ProductionDraft => ({
   visual_style,
   free: false,
   attachments: [],
+  art: "bases",
 });
+const artModes: [ArtMode, string, string][] = [
+  [
+    "bases",
+    "Conferir as imagens-base primeiro",
+    "A Arte gera as fichas de personagem e os cenários e espera você conferir e orientar antes das demais imagens.",
+  ],
+  [
+    "all",
+    "Gerar todas as imagens",
+    "Bases e imagens das cenas de uma vez, sem parar antes da voz.",
+  ],
+  [
+    "none",
+    "Sem imagens geradas",
+    "As cenas usam só os anexos, textos e animações.",
+  ],
+];
+// The director asks for at most this many images per Short.
+const MAX_ART_IMAGES = 12;
 const MAX_ATTACHMENTS = 8;
 export const FREE_BRIEF_LIMIT = 40000;
 const isText = (file: File) => /\.(md|markdown|txt)$/i.test(file.name);
@@ -160,8 +193,16 @@ export function NewProduction({
   onCancel: () => void;
   onConnect: () => void;
 }) {
-  const { title, brief, automation, accent, visual_style, free, attachments } =
-    draft;
+  const {
+    title,
+    brief,
+    automation,
+    accent,
+    visual_style,
+    free,
+    attachments,
+    art,
+  } = draft;
   const setTitle = (title: string) => onDraftChange({ ...draft, title });
   const setBrief = (brief: string) => onDraftChange({ ...draft, brief });
   const setAutomation = (automation: ProductionDraft["automation"]) =>
@@ -192,7 +233,9 @@ export function NewProduction({
     });
   };
   const { settings, error: connectionError } = useIntegrations();
-  const ready = readiness(settings);
+  const ready = readiness(settings, free && art !== "none");
+  const artist = settings?.agents.art?.provider;
+  const perImage = artist ? settings?.pricing?.images?.[artist] : null;
   const enabled =
     automation === "none"
       ? !!title.trim()
@@ -223,6 +266,7 @@ export function NewProduction({
                   title: title.trim() || "Short livre",
                   brief,
                   automation,
+                  art,
                 }),
               );
               attachments.forEach((file) => body.append("files", file));
@@ -346,6 +390,36 @@ export function NewProduction({
             })
           }
         />
+        {free && (
+          <fieldset className="template-choice art-choice" disabled={busy}>
+            <legend>Imagens da Arte</legend>
+            {artModes.map(([value, name, detail]) => (
+              <label key={value} className={art === value ? "chosen" : ""}>
+                <input
+                  type="radio"
+                  name="art"
+                  checked={art === value}
+                  onChange={() => onDraftChange({ ...draft, art: value })}
+                />
+                <span>
+                  <strong>{name}</strong>
+                  <small>{detail}</small>
+                </span>
+              </label>
+            ))}
+            {art !== "none" && (
+              <p className="connection-help" role="status">
+                Até {MAX_ART_IMAGES} imagens
+                {artist && ` com ${providers[artist]}`}
+                {typeof perImage === "number"
+                  ? ` · estimativa de até ${money(MAX_ART_IMAGES * perImage)} (${money(perImage)} por imagem)`
+                  : " · sem preço por imagem configurado"}
+                . A estimativa exata aparece antes de cada geração, e o valor
+                registrado fica em Custos.
+              </p>
+            )}
+          </fieldset>
+        )}
         <fieldset className="template-choice" disabled={busy}>
           <legend>O que produzir</legend>
           {(

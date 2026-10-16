@@ -8,10 +8,12 @@ from .config import DATA, configure
 from .commands import DEFAULTS as COMMANDS
 from .costs import DEFAULTS as PRICING
 
-ROLES = ('research', 'writer', 'director', 'reviewer')
+ROLES = ('research', 'writer', 'director', 'reviewer', 'art')
+# Roles of every production; the Arte only works for a Short livre that generates images.
+TEXT_ROLES = ('research', 'writer', 'director', 'reviewer')
 DEFAULTS = {
     'agents': {role: {'provider': provider, 'model': ''} for role, provider in zip(
-        ROLES, ('grok', 'claude', 'codex', 'codex'))},
+        ROLES, ('grok', 'claude', 'codex', 'codex', 'codex'))},
     'elevenlabs': {'api_key': '', 'voice_id': '', 'voice_name': '',
                   'model_id': 'eleven_multilingual_v2', 'stability': .5,
                   'similarity_boost': .75, 'speed': 1.0},

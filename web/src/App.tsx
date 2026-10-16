@@ -24,11 +24,13 @@ import {
   Save,
   Settings2,
   Trash2,
+  Palette,
   Upload,
   X,
 } from "lucide-react";
 import type { ProductionDraft } from "./Automation";
 import { GeneratedStyle, PublicationPackage, ScenePauses } from "./FreeShort";
+import { ArtStudio } from "./ArtStudio";
 import { Connections } from "./Connections";
 import { CoverStudio } from "./CoverStudio";
 import { SceneEditor } from "./SceneEditor";
@@ -82,6 +84,8 @@ const tabs: { id: Tab; name: string; icon: typeof FileText }[] = [
   { id: "cover", name: "Capa", icon: ImagePlus },
   { id: "ending", name: "Encerramento", icon: Film },
   { id: "publication", name: "Publicação", icon: Upload },
+  // Short livre only: the visual bible and the Arte's images (ADR 0005).
+  { id: "art", name: "Arte", icon: Palette },
   { id: "versions", name: "Versões", icon: Film },
   { id: "costs", name: "Custos", icon: Coins },
 ];
@@ -521,7 +525,10 @@ function Editor({
     project.brief || (/^https?:\/\/\S+$/.test(legacyLink) ? legacyLink : "");
   const [draft, setDraft] = useState({ ...project, brief: initialBrief });
   const { settings, error: connectionError } = useIntegrations();
-  const ready = readiness(settings);
+  const ready = readiness(
+    settings,
+    !!project.free && (project.art?.mode ?? "none") !== "none",
+  );
   const visualReady =
     !!settings?.runner.online &&
     [settings.agents.director, settings.agents.reviewer].every(
@@ -644,6 +651,13 @@ function Editor({
       onUpdate(await request<Project>(`/projects/${project.id}`));
       setNotice("Produção adicionada à fila. Acompanhe cada etapa abaixo.");
       setViewedJob(null);
+    });
+  const runArt = (send: (revision: number) => Promise<unknown>) =>
+    void action(async () => {
+      const current = dirty ? await save() : draft;
+      await send(current.revision);
+      onUpdate(await request<Project>(`/projects/${project.id}`));
+      setNotice("Arte adicionada à fila. Acompanhe a geração abaixo.");
     });
   const upload = (kind: string, file: File | undefined) => {
     if (!file) return;
@@ -817,7 +831,7 @@ function Editor({
             role="tablist"
             aria-label="Etapas da produção"
           >
-            {tabs.map((t) => (
+            {tabs.filter((t) => t.id !== "art" || project.free).map((t) => (
               <button
                 key={t.id}
                 role="tab"
@@ -1476,6 +1490,47 @@ function Editor({
                 </div>
               </>
             )}
+            {tab === "art" && project.free && (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <h2>As imagens do seu Short</h2>
+                    <p>
+                      A Arte gera as imagens a partir da bíblia visual que o
+                      diretor extraiu do prompt.
+                    </p>
+                  </div>
+                </div>
+                <ArtStudio
+                  project={project}
+                  locked={locked}
+                  perImage={
+                    settings?.agents.art &&
+                    settings.pricing?.images?.[settings.agents.art.provider]
+                  }
+                  onGenerate={() =>
+                    runArt((revision) =>
+                      request(`/projects/${project.id}/art`, {
+                        method: "POST",
+                        body: JSON.stringify({ revision }),
+                      }),
+                    )
+                  }
+                  onRedo={(key, text, files) =>
+                    runArt((revision) => {
+                      const body = new FormData();
+                      body.append("text", text);
+                      body.append("revision", String(revision));
+                      files.forEach((file) => body.append("files", file));
+                      return request(`/projects/${project.id}/art/${key}`, {
+                        method: "POST",
+                        body,
+                      });
+                    })
+                  }
+                />
+              </>
+            )}
             {tab === "costs" && <ProjectCosts project={project} />}
             {tab === "versions" && (
               <>
@@ -1501,7 +1556,9 @@ function Editor({
                           <strong>
                             {j.kind === "plan"
                               ? "Roteiro e cenas"
-                              : j.kind === "scenes"
+                              : j.kind === "art"
+                                ? "Imagens da Arte"
+                                : j.kind === "scenes"
                                 ? "Cenas"
                                 : j.kind === "voice"
                                   ? "Narração"
@@ -1790,7 +1847,9 @@ function Queue({
                   {date(j.created_at)} ·{" "}
                   {j.kind === "plan"
                     ? "Roteiro e cenas"
-                    : j.kind === "scenes"
+                    : j.kind === "art"
+                      ? "Imagens da Arte"
+                      : j.kind === "scenes"
                       ? "Cenas"
                       : j.kind === "voice"
                         ? "Narração"

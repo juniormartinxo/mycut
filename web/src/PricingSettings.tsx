@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Coins, Plus, Save, Trash2 } from "lucide-react";
 import { request } from "./api";
 import type { Integrations, Pricing } from "./types";
+import { providers } from "./ProjectCosts";
 import "./ProjectCosts.css";
 
 type Row = { model: string; input: string; cache_read: string; output: string };
@@ -31,6 +32,10 @@ export function PricingSettings({
   const [credits, setCredits] = useState(
     String(pricing.elevenlabs_usd_per_1k_credits ?? ""),
   );
+  const [images, setImages] = useState({
+    codex: String(pricing.images?.codex ?? ""),
+    grok: String(pricing.images?.grok ?? ""),
+  });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const missing = settings.agent_models.codex.models.filter(
@@ -63,6 +68,7 @@ export function PricingSettings({
             usd_brl: optional(rate),
             elevenlabs_usd_per_1k_credits: optional(credits),
             models,
+            images: { codex: optional(images.codex), grok: optional(images.grok) },
           }),
         })
           .then((result) => {
@@ -111,7 +117,25 @@ export function PricingSettings({
               onChange={(e) => setCredits(e.target.value)}
             />
           </label>
+          {(["codex", "grok"] as const).map((provider) => (
+            <label key={provider}>
+              Arte com {providers[provider]}: US$ por imagem
+              <input
+                inputMode="decimal"
+                value={images[provider]}
+                placeholder="Sem preço"
+                onChange={(e) =>
+                  setImages({ ...images, [provider]: e.target.value })
+                }
+              />
+            </label>
+          ))}
         </div>
+        <p className="cost-note">
+          Os CLIs não informam o custo das imagens. O preço por imagem serve só
+          para ter uma ideia: os padrões são GPT Image 1.5 (qualidade média,
+          1024×1536) e grok-imagine na qualidade alta.
+        </p>
         <div className="cost-table-wrap">
           <table className="cost-table">
             <thead>
