@@ -52,17 +52,23 @@ def run_once(covers=False):
     if store.get_job(job['id'])['state'] != 'cancelled':
         if code == 0:
             output = json.loads((folder / 'result.json').read_text())
-            message = MESSAGES.get(job['kind'], 'Pronto para revisar')
-            if job['kind'] == 'pipeline' and output is None:
-                # Stopped in the Arte tab: the production said why (art.stopped).
-                message = store.get_job(job['id'])['message']
-            elif job['kind'] == 'art' and output:
-                message = 'Imagens da Arte, narração e vídeo prontos'
-            store.finish(job['id'], 'succeeded', message, output)
+            store.finish(job['id'], 'succeeded', final_message(job, output), output)
         else:
             message = (folder / 'worker.log').read_text(errors='replace').strip().splitlines()
             store.finish(job['id'], 'failed', message[-1][:600] if message else 'Falha na produção. Tente novamente.')
     return True
+
+
+def final_message(job, output):
+    """What a finished production says; one that stopped in the Arte tab says why it waits for the author."""
+    if job['kind'] in ('pipeline', 'plan'):
+        art = store.get_project(job['project_id']).get('art') or {}
+        if art.get('then') == job['kind']:
+            from .art import stopped
+            return stopped(art['requests'])
+    if job['kind'] == 'art' and output:
+        return 'Imagens da Arte, narração e vídeo prontos'
+    return MESSAGES.get(job['kind'], 'Pronto para revisar')
 
 
 def main():

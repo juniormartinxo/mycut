@@ -333,9 +333,8 @@ def after_production(job, kind):
     job, _ = generate(job, only_bases=current == 'bases')
     if current == 'bases' and any(not item['base'] for item in job['snapshot']['art']['requests']):
         art = job['snapshot']['art']
+        # The worker reads `then` to finish the production with the reason it waits (stopped).
         job = store.checkpoint(job['id'], {'art': {**art, 'then': kind}})
-        # The worker keeps this as the production's final message.
-        store.progress(job['id'], 100, stopped(art['requests']))
         return job, False
     return job, True
 

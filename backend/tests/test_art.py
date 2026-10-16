@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 from PIL import Image
 import test_studio  # Sets isolated DATA before the application modules are imported.
-from mycut import bridge, elevenlabs, integrations, pipeline, production, store
+from mycut import bridge, elevenlabs, integrations, pipeline, production, store, worker
 from mycut.models import ProjectInput
 from mycut.config import DATA
 import test_free_short as free  # Imported as a module so its tests are not collected twice.
@@ -147,23 +147,33 @@ class ArtTests(unittest.TestCase):
         art_step = next(s for s in store.get_job(job['id'])['steps'] if s['name'] == 'art')
         self.assertEqual(art_step['state'], 'succeeded')
         self.assertNotIn('voice', {s['name'] for s in store.get_job(job['id'])['steps']})
-        self.assertEqual(store.get_job(job['id'])['message'], 'Imagens-base prontas: confira e oriente na aba Arte')
 
-    def stopped_message(self, direction, fail=()):
-        project, job = self.start('pipeline', 'bases')
+    def stopped_message(self, direction, fail=(), kind='pipeline'):
+        """The message the worker finishes a production with when it stopped in the Arte tab."""
+        project, job = self.start(kind, 'bases')
         with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, direction, APPROVED], fail=fail)):
             pipeline.produce(job)
-        return store.get_job(job['id'])['message']
+        return worker.final_message(store.get_job(job['id']), None)
 
     def test_the_stopped_production_says_what_happened_to_the_bases(self):
-        self.assertEqual(self.stopped_message(art_direction(), fail={1, 2}),
-                         'As imagens-base não puderam ser geradas: veja os avisos e refaça na aba Arte')
+        for kind in ('pipeline', 'plan'):
+            self.assertEqual(self.stopped_message(art_direction(), kind=kind),
+                             'Imagens-base prontas: confira e oriente na aba Arte')
+            self.assertEqual(self.stopped_message(art_direction(), fail={1, 2}, kind=kind),
+                             'As imagens-base não puderam ser geradas: veja os avisos e refaça na aba Arte')
+        self.assertEqual(self.stopped_message(art_direction(), fail={1}),
+                         '1 de 2 imagens-base prontas: veja os avisos e refaça as demais na aba Arte')
         without_bases = art_direction()
         without_bases['images'] = [{**REQUESTS[2], 'references': []}]
         for scene in (3, 4):
             without_bases['scenes'][scene] = free_direction()['scenes'][scene]
         self.assertEqual(self.stopped_message(without_bases),
                          'Nenhuma imagem-base para conferir: gere as imagens das cenas na aba Arte')
+        # A plan that did not stop keeps its usual message.
+        project, job = self.start('plan', 'all')
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, art_direction(), APPROVED])):
+            pipeline.produce(job)
+        self.assertEqual(worker.final_message(store.get_job(job['id']), None), 'Roteiro e cenas prontos')
 
     def produce_bases(self, kind='pipeline'):
         project, job = self.start(kind, 'bases')
