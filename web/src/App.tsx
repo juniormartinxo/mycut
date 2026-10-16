@@ -88,7 +88,7 @@ const tabs: { id: Tab; name: string; icon: typeof FileText }[] = [
   { id: "publication", name: "Publicação", icon: Upload },
   // Short livre only: the visual bible and the Arte's images (ADR 0005).
   { id: "art", name: "Arte", icon: Palette },
-  // Short livre only: the lista de materiais, B-rolls in video brought from outside (ADR 0005).
+  // Short livre only: the lista de materiais, B-rolls in video or image brought from outside (ADR 0005).
   { id: "materials", name: "Materiais", icon: ListVideo },
   { id: "versions", name: "Versões", icon: Film },
   { id: "costs", name: "Custos", icon: Coins },
@@ -1556,9 +1556,9 @@ function Editor({
                   <div>
                     <h2>Os clipes que você traz</h2>
                     <p>
-                      B-rolls em vídeo feitos fora do MyCut, em ferramentas como
-                      Kling, Runway e Luma: o prompt, a ferramenta sugerida, as
-                      referências e a duração de cada um.
+                      B-rolls feitos fora do MyCut, em vídeo (Kling, Runway,
+                      Luma) ou imagem (Midjourney, Flux): o prompt, a ferramenta
+                      sugerida, as referências e a duração de cada um.
                     </p>
                   </div>
                 </div>

@@ -9,9 +9,12 @@ const CLIP_TYPES = "video/mp4,video/quicktime,video/webm,image/png,image/jpeg,im
 const placeName = (place: Place) => `cena ${place.scene}, plano ${place.shot}`;
 const toolAndLength = (item: Broll) => `${item.tool} · ${String(item.seconds).replace(".", ",")} s`;
 
-/** A plano background still waiting for its B-roll's clip: not a video and not the image imported for it (ADR 0005). */
+/** A plano background still waiting for its B-roll's clip: no file, or neither a video nor the image imported for it
+ * (ADR 0005). */
 export function waitingClip(background: Background | null | undefined, brolls: Broll[] = []) {
-  if (!background?.broll || background.kind === "video") return false;
+  if (!background?.broll) return false;
+  if (!background.asset_id) return true;
+  if (background.kind === "video") return false;
   const clip = brolls.find((item) => item.key === background.broll)?.clip;
   return !clip || background.asset_id !== clip.id;
 }

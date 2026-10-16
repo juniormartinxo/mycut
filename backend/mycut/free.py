@@ -122,7 +122,7 @@ class FreeDirection(Output):
     bible: Bible | None = None
     # Unbounded here: requests past the limit get a correction and are then dropped, never a failed direction.
     images: list[ArtRequest] = Field(default_factory=list)
-    # Lista de materiais: the B-rolls in video made outside the MyCut; same correction as the images.
+    # Lista de materiais: the B-rolls in video or image made outside the MyCut; same correction as the images.
     brolls: list[Broll] = Field(default_factory=list)
 
 

@@ -81,9 +81,12 @@ def uses(scenes, key):
 
 
 def waiting(background, broll):
-    """A plano waits until it shows a video or the clip imported for its B-roll, which may be an image."""
+    """A plano waits until it shows a video or the clip imported for its B-roll, which may be an image; a background
+    with no file waits whatever its kind."""
     clip = (broll.get('clip') or {}).get('id')
-    return background['kind'] != 'video' and (clip is None or background.get('asset_id') != clip)
+    if not background.get('asset_id'):
+        return True
+    return background['kind'] != 'video' and (clip is None or background['asset_id'] != clip)
 
 
 def with_clip(scenes, key, kind, asset_id):

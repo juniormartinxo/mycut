@@ -146,7 +146,7 @@ export type Project = {
   publication?: Publication | null;
   /** Short livre: the visual bible and the Arte's image requests (ADR 0005). */
   art?: Art | null;
-  /** Short livre: the lista de materiais, the B-rolls in video made outside the MyCut (ADR 0005). */
+  /** Short livre: the lista de materiais, the B-rolls in video or image made outside the MyCut (ADR 0005). */
   brolls?: Broll[];
   scenes: Scene[];
   revision: number;

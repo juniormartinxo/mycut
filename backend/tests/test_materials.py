@@ -201,6 +201,18 @@ class MaterialsTests(unittest.TestCase):
         self.assertEqual([place['waiting'] for item in project['brolls'] for place in item['places']
                           if item['key'] == 'corredor-vivo'], [False, False])
 
+    def test_a_b_roll_plano_without_a_file_waits_again_even_as_a_video_background(self):
+        saved, _ = self.produce()
+        project = self.import_clip(saved, 'corredor-vivo', self.clip()).json()
+        scenes = copy.deepcopy(project['scenes'])
+        # The author cleared the file in the editor: the background stays a video of the B-roll, with no file.
+        scenes[2]['background'] = {**scenes[2]['background'], 'asset_id': None}
+        edited = self.client.put(f'/api/projects/{saved["id"]}', json={
+            'title': project['title'], 'scenes': scenes, 'visual_style': project['visual_style'], 'revision': project['revision']})
+        self.assertEqual(edited.status_code, 200, edited.text)
+        places = next(item['places'] for item in edited.json()['brolls'] if item['key'] == 'corredor-vivo')
+        self.assertEqual(places, [{'scene': 3, 'shot': 1, 'waiting': True}, {'scene': 5, 'shot': 1, 'waiting': False}])
+
     def test_a_clip_needs_a_b_roll_of_the_list_that_a_plano_still_shows(self):
         saved, _ = self.produce()
         self.assertEqual(self.import_clip(saved, 'inventado', self.clip()).status_code, 404)

@@ -119,7 +119,7 @@ dos planos ou plano que cita um B-roll fora da lista recebem uma correção e
 depois são descartados. O B-roll fica marcado no fundo do plano, e não no
 plano: assim ele acompanha a composição quando o autor reordena os planos, e
 some quando o autor troca o fundo por outro tipo. Um plano aguarda o clipe
-enquanto o fundo não é vídeo; sem imagem provisória, ele usa o fundo do projeto
+enquanto o fundo não tem arquivo ou não é vídeo; sem imagem provisória, ele usa o fundo do projeto
 e mesmo assim não bloqueia a exportação. O selo "aguardando clipe" fica só na
 interface (editor, faixa de planos, aba Materiais e avisos), nunca na prévia
 nem no MP4, para um vídeo exportado antes do clipe sair publicável (decisão do
