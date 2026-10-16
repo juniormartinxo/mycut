@@ -11,6 +11,7 @@ from unittest.mock import patch
 import test_studio  # Sets isolated DATA before the application modules are imported.
 from mycut import agent_runner, bridge, commands, costs, elevenlabs, integrations, pipeline, store
 from mycut.config import DATA
+from test_free_short import fake_voice
 
 CATALOG = {'voices': [{'id':'junior123','name':'Junior','category':'cloned'}],
            'models':[{'id':'eleven_multilingual_v2','name':'Multilingual v2'}]}
@@ -267,6 +268,24 @@ class AutomationTests(unittest.TestCase):
             agent_runner.run_request(request)
             process.assert_not_called()
 
+
+    def test_the_author_edits_a_format_script_before_the_voice_and_the_voice_says_the_edited_text(self):
+        # "Roteiro e cenas primeiro" stops before the voice: the author has the last word on the speech (ADR 0005).
+        job=self.start('plan')
+        with patch.object(bridge,'invoke',side_effect=[RESEARCH,SCRIPT,DIRECTION,{'approved':True,'issues':[]}]), \
+                patch.object(elevenlabs,'api',side_effect=AssertionError('Sem voz antes da edição.')):
+            pipeline.produce(job)
+        store.finish(job['id'],'succeeded','Roteiro pronto')
+        self.project=self.client.get(f'/api/projects/{self.project["id"]}').json()
+        edited='Uma tarefa continua na nuvem enquanto você acompanha tudo pelo celular.'
+        self.assertEqual(self.edit(scenes=[dict(self.project['scenes'][0],narration=edited),*self.project['scenes'][1:]]).status_code,200)
+        response=self.client.post(f'/api/projects/{self.project["id"]}/run',json={'kind':'voice','revision':self.project['revision']})
+        self.assertEqual(response.status_code,202,response.text)
+        requests=[]
+        with patch.object(elevenlabs,'api',side_effect=fake_voice(requests)):
+            pipeline.produce(store.get_job(store.claim()['id'],private=True))
+        self.assertTrue(requests[0]['text'].startswith(edited+'\n\n'+PARAGRAPHS[1]),requests[0]['text'])
+        self.assertNotIn(PARAGRAPHS[0],requests[0]['text'])
 
     def test_plan_versions_keep_downloadable_text_without_cover_or_video(self):
         job=self.start('plan')

@@ -117,8 +117,9 @@ test("o prompt de referência vira um Short livre: criação, bases, materiais, 
     await dialog.getByRole("button", { name: "Revisar proposta", exact: true }).click({ timeout: 60_000 });
     expect((await project()).scenes[3].shots[0].blocks[1].object.text).toContain("Idade: 38 anos");
     await dialog.getByRole("button", { name: "Aceitar proposta", exact: true }).click();
-    await expect(dialog.getByText("Proposta aceita", { exact: true })).toBeVisible();
     await expect.poll(async () => (await project()).scenes[3].shots[0].blocks[1].object.text).toBe("Uma ideia mais clara");
+    await dialog.getByRole("tab", { name: "Agente", exact: true }).click();
+    await expect(dialog.getByText("Proposta aceita", { exact: true })).toBeVisible();
     await shot("referencia-proposta");
   } finally {
     runner.kill("SIGTERM");

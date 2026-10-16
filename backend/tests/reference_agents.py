@@ -7,10 +7,10 @@ from pathlib import Path
 
 PROMPT = (Path(__file__).parent / 'fixtures' / 'prompt-de-referencia.md').read_text()
 
-ACCENT, BACKGROUND, TEXT = '#f2b544', '#0b2a33', '#e6f1f2'  # Âmbar da flor contra o azul-petróleo da nave.
+ACCENT, BACKGROUND, TEXT = '#f2b544', '#0b2a33', '#e6f1f2'  # The flower's amber against the ship's teal.
 
-# (tempo, narração, texto na tela, visual): the prompt's "Roteiro segundo a segundo", in order.
-BLOCKS = [
+# The passages of the prompt's "Roteiro segundo a segundo", in order: (time, narration, text on screen, visual).
+PASSAGES = [
     ('0–3 s', 'Seus vídeos de IA mudam de rosto a cada cena? O problema não é a ferramenta.', 'O PROBLEMA NÃO É A IA',
      'Mesmo personagem com 3 rostos diferentes (B-roll 1).'),
     ('3–8 s', 'É que você pula a pré-produção. Olha: tudo começa com uma frase simples.', '1 FRASE → 1 FILME',
@@ -39,7 +39,7 @@ PINNED = ('Prompt-mestre: você é um diretor de cinema e transforma a minha his
 def script():
     description = next(line[2:] for line in PROMPT.splitlines() if line.startswith('> '))
     scenes = [{'timing': timing, 'narration': narration, 'screen_text': [screen], 'visual': visual, 'pauses': []}
-              for timing, narration, screen, visual in BLOCKS]
+              for timing, narration, screen, visual in PASSAGES]
     scenes[-1]['pauses'] = [dict(PAUSE)]
     return {'mode': 'script', 'titles': TITLES, 'description': description, 'tags': 'IA, filme com IA, Midjourney, Kling',
             'hashtags': HASHTAGS, 'pinned_comment': PINNED, 'claims': [], 'scenes': scenes}
@@ -131,7 +131,7 @@ def caption(screen):
 
 
 def direction():
-    on_screen = [screen for _, _, screen, _ in BLOCKS]
+    on_screen = [screen for _, _, screen, _ in PASSAGES]
     scenes = [
         [plano(caption(on_screen[0]), background=full_screen('rostos-still', 'rostos')),
          plano(caption(on_screen[0]), 'de rosto a cada cena?', full_screen('rostos-still', 'rostos', 'pan_left')),

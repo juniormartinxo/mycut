@@ -48,8 +48,9 @@ A duração de um Short livre é o tempo da fala (decisão do usuário em 16/10/
 no MYC-8). Os tempos por trecho do prompt ("16–28 s") orientam o roteirista, o
 ritmo de corte do diretor e a conferência, mas o MyCut não acrescenta silêncio
 para alcançá-los: só as pausas explícitas viram silêncio. Por isso o Short de
-referência, com 107 palavras de narração, dura uns 42 s com a voz num ritmo
-natural, e não os 55–60 s da tabela do prompt.
+referência, com 107 palavras de narração, deve ficar por volta de 40 s num ritmo
+de fala comum (2,5 a 3 palavras por segundo), e não nos 55–60 s da tabela do
+prompt. É uma estimativa: a duração real depende da voz da ElevenLabs.
 
 A fala é sempre decisão do autor. Nos dois modos, **Roteiro e cenas primeiro**
 para antes da voz, e no Short livre a conferência das imagens-base também para

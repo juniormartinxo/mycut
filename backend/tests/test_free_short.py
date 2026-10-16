@@ -101,12 +101,12 @@ def ink(image, box):
     return sum(1 for pixel in image.crop(box).get_flattened_data() if max(abs(a-b) for a, b in zip(pixel, (0x0b, 0x2a, 0x33))) > 60)
 
 
-def fake_voice(requests):
-    """ElevenLabs HTTP: one second of tone per 20 characters, with the provider's character times over it."""
+def fake_voice(requests, pace=20):
+    """ElevenLabs HTTP: one second of tone per `pace` characters, with the provider's character times over it."""
     def api(key, method, path, meta=None, **kwargs):
         text = kwargs['json']['text']
         requests.append(kwargs['json'])
-        length = len(text) / 20
+        length = len(text) / pace
         mp3 = subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', f'sine=frequency=330:duration={length}',
                               '-f', 'mp3', 'pipe:1'], capture_output=True, check=True).stdout
         step = length / len(text)
