@@ -71,7 +71,7 @@ export function ScenePauses({ narration, pauses }: { narration: string; pauses?:
   );
 }
 
-function CopyButton({ label, text }: { label: string; text: string }) {
+export function CopyButton({ label, text }: { label: string; text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button type="button" className="button secondary" aria-label={label}

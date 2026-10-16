@@ -162,7 +162,15 @@ Na aba **Plano**:
   180° vai de cima para baixo), **Imagem em tela cheia** ou **Vídeo em tela
   cheia**. Imagem e vídeo ocupam o quadro inteiro, atrás dos blocos;
   **Escurecer o fundo** ajuda a ler textos e legendas. A imagem aceita
-  **Movimento de câmera**. Um fundo de mídia sem arquivo bloqueia a exportação.
+  **Movimento de câmera**. Um fundo de mídia sem arquivo bloqueia a exportação,
+  salvo o de um B-roll que ainda aguarda o clipe.
+- **B-roll deste plano** (Short livre): quando o diretor pôs um B-roll da lista
+  de materiais no fundo, o painel mostra o B-roll, a ferramenta, a duração e o
+  prompt. Enquanto o clipe não chega, o plano mostra a imagem provisória, a
+  faixa de planos marca o plano e a composição tem o selo **Aguardando clipe**,
+  que não aparece na prévia nem no MP4. **Importar clipe** troca o fundo de
+  todos os planos desse B-roll pelo vídeo ou pela imagem. Como a importação
+  muda também os outros planos, ela limpa o histórico de desfazer.
 - **Mostrar a marca do canal** pode ser desligado, por exemplo para B-rolls em
   tela cheia.
 - **Duplicar plano**, **Mover plano para antes/depois** e **Excluir plano**.

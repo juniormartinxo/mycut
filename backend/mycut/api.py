@@ -16,7 +16,7 @@ from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
 from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice, ArtRun
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
-from . import voice_tests, covers, endings, flow, art
+from . import voice_tests, covers, endings, flow, art, materials
 from . import visuals, scene_layout, scene_media, google_fonts, block_render
 from .scene_api import router as scene_router
 from .models import ScenePreview
@@ -85,6 +85,7 @@ def present(project):
             project[key] = {k: v for k, v in project[key].items() if k not in ('path', 'alignment')}
             project[key]['url'] = f'/api/projects/{project["id"]}/assets/{key}?v={project["revision"]}'
     project['videos'] = [scene_media.public(project['id'], item) for item in project.get('videos', [])]
+    project['brolls'] = materials.listed(project)
     project['usage_total'] = costs.project(project['id'], integrations.read()['pricing'])['total']
     project['audio_matches_script'] = bool(project.get('audio') and project['audio']['script_hash'] == store.script_hash(project))
     from .scene_images import public
@@ -484,6 +485,7 @@ def update(project_id: str, body: ProjectInput):
     images = {item['id'] for item in current.get('images', [])}
     if body.visual_style and body.visual_style.google_font:
         google_fonts.entry(body.visual_style.google_font)
+    materials.check([scene.model_dump() for scene in body.scenes], current)
     for scene in body.scenes:
         scene_layout.validate_assets(scene.model_dump(), current)
         for block in [*(scene.blocks or []), *(b for shot in scene.shots for b in shot.blocks)]:
@@ -675,7 +677,7 @@ def job_material(job_id: str, name: str):
     return FileResponse(path, filename=name)
 
 
-EXPORTS = {'short.mp4', 'capa.png', 'legendas.srt', 'publicacao.txt', 'roteiro.txt', 'render-manifest.json'}
+EXPORTS = {'short.mp4', 'capa.png', 'legendas.srt', 'publicacao.txt', 'roteiro.txt', 'materiais.txt', 'render-manifest.json'}
 
 
 def completed(job_id):

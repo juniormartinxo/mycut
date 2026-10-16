@@ -8,6 +8,7 @@ import { GoogleFontPicker } from "./GoogleFontPicker";
 import { SceneConversation } from "./SceneConversation";
 import { ImageLibrary, imagesInUse } from "./ImageLibrary";
 import { FlowControls, useFlowPlayer } from "./FlowPlayer";
+import { BrollPlano, waitingClip } from "./Materials";
 import { appendBlock, insertShot, mapObject, MAX_PROJECT_SHOTS, MAX_SHOTS, mediaExtent, moveShot, newObject, removeBlock, removeShot, resizeBlock, resizeBlockEdge, shotCount, shotsOf, shotView, withShot } from "./sceneLayout";
 import "./SceneEditor.css";
 
@@ -172,6 +173,17 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
       }
     });
   };
+  // The clip of a B-roll fills every plano that shows it, in this scene and in the others (ADR 0005).
+  const importClip = (key: string, file: File) => {
+    void action(async () => {
+      const before = await save();
+      const form = new FormData(); form.append("file", file);
+      const saved = await request<Project>(`/projects/${project.id}/brolls/${key}/clip?revision=${before.revision}`, { method: "POST", body: form });
+      // The import also changed the other planos of the B-roll on the server: undoing it here would split them.
+      setPast([]); setFuture([]);
+      onProject(saved);
+    });
+  };
   const beginDrag = (event: PointerEvent<HTMLButtonElement>, mode: "block" | "object" | "top" | "bottom" | "media") => {
     if (locked || !canvas.current || event.button !== 0) return;
     event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId);
@@ -224,12 +236,13 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
     <div className="block-editor-heading"><div><h3>Composição da cena</h3><p>{planos.length > 1 ? `Plano ${current+1} de ${planos.length} · ` : ""}{blocks.length} blocos · um objeto por bloco</p></div>{toolbar}</div>
     <nav className="shot-strip" aria-label="Planos da cena">
       {planos.map((s, index) => {
-        const window = windows.find(w => w.id === s.id), pending = issues.some(i => i.shot_id === s.id);
+        const window = windows.find(w => w.id === s.id), pending = issues.some(i => i.shot_id === s.id), clip = waitingClip(s.background, project.brolls);
         return <button key={s.id} type="button" className="button secondary"
           aria-current={index === current ? "step" : undefined} disabled={locked && index !== current} onClick={() => chooseShot(index)}
-          aria-label={`Plano ${index+1}${window ? `, começa em ${seconds(window.start)}` : ""}${pending ? ", com pendência" : ""}`}
+          aria-label={`Plano ${index+1}${window ? `, começa em ${seconds(window.start)}` : ""}${pending ? ", com pendência" : ""}${clip ? ", aguardando clipe" : ""}`}
           title={window ? `${seconds(window.start)} a ${seconds(window.end)}` : undefined}>
           Plano {index+1}{window && <small>{seconds(window.start)}</small>}{pending && <span className="shot-alert" aria-hidden="true">!</span>}
+          {clip && <span className="shot-waiting" aria-hidden="true" />}
         </button>;
       })}
       <button type="button" className="button secondary" disabled={locked || shotLimit} onClick={() => { changeShots(insertShot(scene, current), current+1); setActiveTab("shot"); }}><Plus size={15} /> Plano</button>
@@ -247,6 +260,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
         <div ref={canvas} className="block-canvas" aria-label="Composição com áreas editáveis">
           <RenderedScene scene={shotView(scene, current)} style={project.visual_style || null} accent={project.accent} projectId={project.id} />
           {player.frame && <img className="flow-frame" src={player.frame} alt="Quadro da animação no tempo selecionado" />}
+          {waitingClip(background, project.brolls) && <span className="broll-seal">Aguardando clipe</span>}
           <div className="block-canvas-area">
             {blocks.map((b, index) => {
               const y = top; top += b.height;
@@ -325,6 +339,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
               <option value="cut">Corte seco</option><option value="fade">Fusão</option></select></label>
           </>}
           {warnings.filter(w => w.shot_id === shot.id && w.object_id === null).map(w => <p key={w.kind} className="notice">{w.message}</p>)}
+          {background?.broll && <BrollPlano project={project} background={background} disabled={locked} onImport={importClip} />}
           <label>Fundo<select value={background?.kind ?? "project"} onChange={e => {
             const kind = e.target.value as Background["kind"] | "project";
             const base = project.visual_style?.background || mediaBackground || "#f7f3eb";

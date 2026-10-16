@@ -60,12 +60,20 @@ def run_once(covers=False):
 
 
 def final_message(job, output):
-    """What a finished production says; one that stopped in the Arte tab says why it waits for the author."""
-    if job['kind'] in ('pipeline', 'plan'):
-        art = store.get_project(job['project_id']).get('art') or {}
-        if art.get('then') == job['kind']:
-            from .art import stopped
-            return stopped(art['requests'])
+    """What a finished production says: one that stopped in the Arte tab says why it waits for the author, and a
+    Short livre says which B-roll clips are still missing."""
+    if job['kind'] not in ('pipeline', 'plan', 'art'):
+        return MESSAGES.get(job['kind'], 'Pronto para revisar')
+    from .materials import note
+    project = store.get_project(job['project_id'])
+    return outcome(job, output, project.get('art') or {}) + note(project)
+
+
+def outcome(job, output, art):
+    """The message of the production itself, before the clips still missing."""
+    if art.get('then') == job['kind']:
+        from .art import stopped
+        return stopped(art['requests'])
     if job['kind'] == 'art' and output:
         return 'Imagens da Arte, narração e vídeo prontos'
     return MESSAGES.get(job['kind'], 'Pronto para revisar')

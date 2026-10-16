@@ -7,20 +7,19 @@ production. Scenes never point at an image that does not exist yet: each request
 the image takes that place when it is ready."""
 import json
 import uuid
-from typing import Annotated, Literal
-from pydantic import Field, StringConstraints
+from typing import Literal
+from pydantic import Field
 from . import bridge, costs, covers, integrations, store
 from .config import DATA
 from .media import data_path, digest
 from .pipeline import Output, schema
-from .scene_layout import VisualObject, Background
+from .scene_layout import VisualObject, Background, Key as ArtKey
 
 MAX_IMAGES = 12
 MAX_BASES = 4
 # Same library limit as the editor's uploads.
 MAX_LIBRARY = 24
 MAX_REFERENCES = 4
-ArtKey = Annotated[str, StringConstraints(pattern=r'^[a-z0-9][a-z0-9-]{0,39}$')]
 NAMES = covers.NAMES
 
 
@@ -161,7 +160,15 @@ def place(scenes, request, image_id, previous=None):
         elif plano.get('background') is None:
             plano['background'] = Background(kind='image', asset_id=image_id, motion=placement['motion'],
                                              dim=placement['dim']).model_dump()
+        elif waiting_image(plano['background']):
+            # A B-roll's plano holds its image until the clip arrives.
+            plano['background']['asset_id'] = image_id
     return scenes
+
+
+def waiting_image(background):
+    """A B-roll background with no image yet: the Arte's image goes there, the clip later replaces both."""
+    return bool(background.get('broll')) and background['kind'] == 'image' and not background.get('asset_id')
 
 
 def price(provider):

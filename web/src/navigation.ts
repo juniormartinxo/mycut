@@ -10,6 +10,7 @@ export type Tab =
   | "ending"
   | "publication"
   | "art"
+  | "materials"
   | "versions"
   | "costs";
 export type SettingsSection = "agents" | "voices" | "environment" | "costs";
@@ -42,6 +43,7 @@ const tabs = new Set<Tab>([
   "ending",
   "publication",
   "art",
+  "materials",
   "versions",
   "costs",
 ]);

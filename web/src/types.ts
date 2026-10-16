@@ -29,6 +29,8 @@ export type Background = {
   motion?: Motion;
   playback?: Playback;
   dim?: number;
+  /** Short livre: the B-roll of the lista de materiais this plano shows; it waits for its clip while not a video. */
+  broll?: string | null;
 };
 export type Shot = {
   id: string;
@@ -144,6 +146,8 @@ export type Project = {
   publication?: Publication | null;
   /** Short livre: the visual bible and the Arte's image requests (ADR 0005). */
   art?: Art | null;
+  /** Short livre: the lista de materiais, the B-rolls in video made outside the MyCut (ADR 0005). */
+  brolls?: Broll[];
   scenes: Scene[];
   revision: number;
   created_at: number;
@@ -181,6 +185,20 @@ export type Art = {
   estimate: { images: number; provider: string; usd_per_image: number | null; usd: number | null } | null;
   /** The production that stopped for the bases and goes on once the remaining images exist. */
   then: "pipeline" | "plan" | null;
+};
+
+/** A B-roll of the lista de materiais and the planos it fills, numbered from 1 as the editor shows them. */
+export type Broll = {
+  key: string;
+  title: string;
+  prompt: string;
+  tool: string;
+  /** Keys of the Arte's bases or ids of the production's images, to attach in the tool. */
+  references: string[];
+  seconds: number;
+  /** The clip imported for it, a video or, for a B-roll made as an image, an image of the library. */
+  clip?: { kind: "video" | "image"; id: string } | null;
+  places: { scene: number; shot: number; waiting: boolean }[];
 };
 
 export type Publication = {

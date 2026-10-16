@@ -1,11 +1,13 @@
 """HTTP adapters for the block editor; rendering and conversations own the rules."""
 import io
+import json
 import shutil
+from pathlib import Path
 from typing import Literal
 from fastapi import APIRouter, UploadFile, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from . import store, google_fonts, scene_media, scene_chat, block_render, visuals, flow
+from . import store, google_fonts, scene_media, scene_chat, block_render, visuals, flow, materials
 from .models import ScenePreview
 from .scene_layout import new_id, empty_blocks, VisualObject
 from .media import data_path
@@ -65,6 +67,45 @@ def upload_video(project_id: str, file: UploadFile, revision: int = Query(ge=1))
         return present(store.update_project(project_id, {'videos': [*project.get('videos', []), record]}, revision))
     except BaseException:
         if record:
+            shutil.rmtree(data_path(record['path']).parent)
+        raise
+    finally:
+        file.file.close()
+
+
+@router.post('/projects/{project_id}/brolls/{key}/clip')
+def import_clip(project_id: str, key: str, file: UploadFile, revision: int = Query(ge=1)):
+    """The clip of a B-roll from the lista de materiais, a video or an image, replaces the background of every plano
+    that shows the B-roll."""
+    from .api import present
+    from .scene_images import import_image, files
+    project = store.get_project(project_id)
+    broll = next((item for item in project.get('brolls', []) if item['key'] == key), None)
+    if broll is None:
+        raise store.Missing('Esse B-roll não está na lista de materiais deste Short.')
+    if project['revision'] != revision:
+        raise store.Conflict('O projeto mudou em outra tela. Reabra-o antes de importar o clipe.')
+    if not materials.uses(project['scenes'], key):
+        raise ValueError(f'Nenhum plano usa mais o B-roll “{broll["title"]}”. Importe o vídeo pelo editor da cena.')
+    name = file.filename or 'clipe.mp4'
+    kind = 'image' if Path(name).suffix.lower() in materials.IMAGE_SUFFIXES else 'video'
+    library = 'images' if kind == 'image' else 'videos'
+    if kind == 'image' and len(project.get('images', [])) >= 24:
+        raise ValueError('Use até 24 imagens por produção.')
+    record = None
+    try:
+        record = (import_image(file.file.read(15 * 1024 * 1024 + 1), project_id, name) if kind == 'image'
+                  else scene_media.import_video(file.file, name, project_id))
+        scenes = materials.with_clip(json.loads(json.dumps(project['scenes'])), key, kind, record['id'])
+        brolls = [{**item, 'clip': {'kind': kind, 'id': record['id']}} if item['key'] == key else item
+                  for item in project['brolls']]
+        return present(store.update_project(project_id, {library: [*project.get(library, []), record], 'scenes': scenes,
+                                                         'brolls': brolls}, revision))
+    except BaseException:
+        if record and kind == 'image':
+            for path in files(record):
+                path.unlink(missing_ok=True)
+        elif record:
             shutil.rmtree(data_path(record['path']).parent)
         raise
     finally:
