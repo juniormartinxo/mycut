@@ -117,7 +117,8 @@ class FreeDirection(Output):
     scenes: list[FreeScene] = Field(min_length=1, max_length=12)
     # Visual bible and image requests for the Arte; empty when the Short has no generated images.
     bible: Bible | None = None
-    images: list[ArtRequest] = Field(default_factory=list, max_length=artwork.MAX_REQUESTED)
+    # Unbounded here: requests past the limit get a correction and are then dropped, never a failed direction.
+    images: list[ArtRequest] = Field(default_factory=list)
 
 
 WRITER = (
@@ -532,7 +533,7 @@ def produce(job, folder):
     if not review.approved:
         warnings = warnings + [f'Conferência: {issue}' for issue in issues] + interrupted
     values = {'title': script.titles[0], 'description': script.description, 'tags': script.tags, 'sources': '\n'.join(sources),
-              'scenes': scenes, 'images': artwork.library(project.get('images', []), scenes), 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
+              'scenes': scenes, 'images': artwork.library(project.get('images', []), scenes, requests), 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
               'agent_review': review.model_dump(), 'audio': None, 'warnings': warnings, 'visual_style': style,
               'publication': {'titles': script.titles, 'description': script.description, 'hashtags': script.hashtags,
                               'pinned_comment': script.pinned_comment},

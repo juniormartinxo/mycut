@@ -147,6 +147,23 @@ class ArtTests(unittest.TestCase):
         art_step = next(s for s in store.get_job(job['id'])['steps'] if s['name'] == 'art')
         self.assertEqual(art_step['state'], 'succeeded')
         self.assertNotIn('voice', {s['name'] for s in store.get_job(job['id'])['steps']})
+        self.assertEqual(store.get_job(job['id'])['message'], 'Imagens-base prontas: confira e oriente na aba Arte')
+
+    def stopped_message(self, direction, fail=()):
+        project, job = self.start('pipeline', 'bases')
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, direction, APPROVED], fail=fail)):
+            pipeline.produce(job)
+        return store.get_job(job['id'])['message']
+
+    def test_the_stopped_production_says_what_happened_to_the_bases(self):
+        self.assertEqual(self.stopped_message(art_direction(), fail={1, 2}),
+                         'As imagens-base não puderam ser geradas: veja os avisos e refaça na aba Arte')
+        without_bases = art_direction()
+        without_bases['images'] = [{**REQUESTS[2], 'references': []}]
+        for scene in (3, 4):
+            without_bases['scenes'][scene] = free_direction()['scenes'][scene]
+        self.assertEqual(self.stopped_message(without_bases),
+                         'Nenhuma imagem-base para conferir: gere as imagens das cenas na aba Arte')
 
     def produce_bases(self, kind='pipeline'):
         project, job = self.start(kind, 'bases')
@@ -349,6 +366,38 @@ class ArtTests(unittest.TestCase):
             pipeline.produce(store.claim())
         saved = store.get_project(project['id'])
         self.assertEqual(saved['images'], [], 'Images nothing uses anymore leave the library.')
+
+    def test_an_earlier_arte_image_cited_only_as_a_reference_stays_and_is_attached(self):
+        project, job = self.start('plan', 'all')
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, art_direction(), APPROVED])):
+            pipeline.produce(job)
+        store.finish(job['id'], 'succeeded', 'Pronto')
+        before = store.get_project(project['id'])
+        sheet = self.image_of(before, 'ira')
+        again = free_direction()
+        again['images'] = [{**REQUESTS[2], 'key': 'ira-de-novo', 'references': [sheet['id']]}]
+        again['scenes'][5]['shots'][0]['background'] = art_background('ira-de-novo')
+        self.client.post(f'/api/projects/{project["id"]}/run', json={'kind': 'plan', 'mode': 'final', 'revision': before['revision']})
+        cli = FakeCLI([FREE_SCRIPT, again, APPROVED])
+        with patch.object(bridge, 'invoke', side_effect=cli):
+            pipeline.produce(store.claim())
+        saved = store.get_project(project['id'])
+        self.assertEqual([image['id'] for image in saved['images'] if image.get('art') != 'ira-de-novo'], [sheet['id']])
+        self.assertEqual(cli.images[0]['attachments'], [str(DATA/sheet['path'])])
+
+    def test_a_redone_image_does_not_come_back_to_a_block_the_author_emptied(self):
+        project, job = self.start('plan', 'all')
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, art_direction(), APPROVED])):
+            pipeline.produce(job)
+        store.finish(job['id'], 'succeeded', 'Pronto')
+        current = store.get_project(project['id'])
+        scenes = copy.deepcopy(current['scenes'])
+        scenes[3]['blocks'][1]['object'] = None
+        current = store.update_project(project['id'], {'scenes': scenes}, current['revision'])
+        self.client.post(f'/api/projects/{project["id"]}/art/ira', data={'text': 'Mais luz', 'revision': str(current['revision'])})
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([])):
+            pipeline.produce(store.claim())
+        self.assertIsNone(store.get_project(project['id'])['scenes'][3]['blocks'][1]['object'])
 
 
 if __name__ == '__main__':

@@ -17,8 +17,6 @@ from .scene_layout import VisualObject, Background
 
 MAX_IMAGES = 12
 MAX_BASES = 4
-# What the director's contract accepts: requests past MAX_IMAGES are corrected, then dropped, not a failed direction.
-MAX_REQUESTED = 2 * MAX_IMAGES
 # Same library limit as the editor's uploads.
 MAX_LIBRARY = 24
 MAX_REFERENCES = 4
@@ -116,10 +114,12 @@ def add_placements(requests_by_key, scene_id, plano, background, blocks):
                 {'scene': scene_id, 'shot': plano['id'], 'block': block['id'], 'motion': marker['motion']})
 
 
-def library(images, scenes):
-    """The production's images after a new direction: the Arte's previous images nothing uses anymore leave it."""
+def library(images, scenes, requests):
+    """The production's images after a new direction: the Arte's previous images that no plano shows and no new
+    request cites as a reference leave it."""
     used = {item.get('asset_id') for scene in scenes for plano in planos(scene)
             for item in [plano.get('background') or {}, *(block.get('object') or {} for block in plano['blocks'])]}
+    used |= {reference for request in requests for reference in request['references']}
     return [image for image in images if not image.get('art') or image['id'] in used]
 
 
@@ -138,14 +138,17 @@ def where(scenes, placement):
 
 
 def place(scenes, request, image_id, previous=None):
-    """The image takes its places; a new version of an image replaces the previous one wherever it is used."""
-    for scene in scenes:
-        for plano in planos(scene):
-            if previous and (plano.get('background') or {}).get('asset_id') == previous:
-                plano['background']['asset_id'] = image_id
-            for block in plano['blocks']:
-                if previous and block.get('object') and block['object'].get('asset_id') == previous:
-                    block['object']['asset_id'] = image_id
+    """A new image takes its places; a new version replaces the previous one only where it is still used, so a
+    block the author emptied stays empty."""
+    if previous:
+        for scene in scenes:
+            for plano in planos(scene):
+                if (plano.get('background') or {}).get('asset_id') == previous:
+                    plano['background']['asset_id'] = image_id
+                for block in plano['blocks']:
+                    if block.get('object') and block['object'].get('asset_id') == previous:
+                        block['object']['asset_id'] = image_id
+        return scenes
     for placement in request['placements']:
         plano, block = where(scenes, placement)
         if plano is None:
@@ -331,8 +334,23 @@ def after_production(job, kind):
     if current == 'bases' and any(not item['base'] for item in job['snapshot']['art']['requests']):
         art = job['snapshot']['art']
         job = store.checkpoint(job['id'], {'art': {**art, 'then': kind}})
+        # The worker keeps this as the production's final message.
+        store.progress(job['id'], 100, stopped(art['requests']))
         return job, False
     return job, True
+
+
+def stopped(requests):
+    """What the author finds when the production waits in the Arte tab."""
+    bases = [item for item in requests if item['base']]
+    if not bases:
+        return 'Nenhuma imagem-base para conferir: gere as imagens das cenas na aba Arte'
+    done = sum(item['state'] == 'generated' for item in bases)
+    if done == len(bases):
+        return 'Imagens-base prontas: confira e oriente na aba Arte'
+    if not done:
+        return 'As imagens-base não puderam ser geradas: veja os avisos e refaça na aba Arte'
+    return f'{done} de {len(bases)} imagens-base prontas: veja os avisos e refaça as demais na aba Arte'
 
 
 def resumes(project):

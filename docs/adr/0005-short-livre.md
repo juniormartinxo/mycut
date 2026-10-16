@@ -98,7 +98,9 @@ preencheu nesse meio-tempo. Uma imagem que falha vira aviso dos agentes, e
 uma imagem que cita uma base ainda inexistente espera por ela, em vez de sair
 sem a referência. Pedidos além do limite recebem uma correção e depois são
 descartados, sem perder a direção. Uma nova produção tira da biblioteca as
-imagens antigas da Arte que as novas cenas não usam. A
+imagens antigas da Arte que as novas cenas não usam e que os novos pedidos não
+citam como referência. Quando a produção para na aba Arte, a mensagem diz se as
+bases estão prontas, se falharam ou se não havia base a conferir. A
 estimativa (imagens × preço por imagem, editável) é gravada antes da primeira
 chamada, e cada chamada registra as imagens recebidas em Custos. Como os CLIs
 não informam o custo de uma imagem, o preço serve só como referência (decisão do

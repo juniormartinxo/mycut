@@ -54,7 +54,8 @@ def run_once(covers=False):
             output = json.loads((folder / 'result.json').read_text())
             message = MESSAGES.get(job['kind'], 'Pronto para revisar')
             if job['kind'] == 'pipeline' and output is None:
-                message = 'Imagens-base prontas: confira e oriente na aba Arte'
+                # Stopped in the Arte tab: the production said why (art.stopped).
+                message = store.get_job(job['id'])['message']
             elif job['kind'] == 'art' and output:
                 message = 'Imagens da Arte, narração e vídeo prontos'
             store.finish(job['id'], 'succeeded', message, output)

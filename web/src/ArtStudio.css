@@ -68,7 +68,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #ecebe5;
+  background: #eeeee6;
   color: var(--muted);
   text-align: center;
 }
@@ -78,7 +78,7 @@
   object-fit: contain;
 }
 .art-card.failed .art-frame {
-  border-color: #e3b3a5;
+  border-color: #a23320;
 }
 .art-body {
   display: grid;
