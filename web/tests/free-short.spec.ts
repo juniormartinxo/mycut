@@ -274,12 +274,12 @@ test("A Arte gera primeiro as imagens-base e deixa orientar cada uma antes das d
   await expect(bases.getByRole("img", { name: "Ficha da Comandante Ira Vale" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Imagens das cenas" })).toContainText("Aguardando geração · 9:16 · com Ficha da Comandante Ira Vale");
   // A scene image waits for its bases: it cannot be guided before they exist.
-  project.art!.requests[0] = { ...project.art!.requests[0], state: "failed", image_id: null };
+  project.art!.requests![0] = { ...project.art!.requests![0], state: "failed", image_id: null };
   await page.reload();
   const scenes = page.getByRole("region", { name: "Imagens das cenas" });
   await expect(scenes).toContainText("Gere antes a imagem-base “Ficha da Comandante Ira Vale”");
   await expect(scenes.getByLabel("Orientação para a Arte")).toBeDisabled();
-  project.art!.requests[0] = { ...project.art!.requests[0], state: "generated", image_id: base };
+  project.art!.requests![0] = { ...project.art!.requests![0], state: "generated", image_id: base };
   await page.reload();
   await expect(page.getByText("1 imagem · estimativa US$ 0,05.")).toBeVisible();
   await bases.getByLabel("Orientação para a Arte").fill("Cicatriz bem visível");
@@ -298,4 +298,21 @@ test("A Arte gera primeiro as imagens-base e deixa orientar cada uma antes das d
   await expect.poll(() => posted.length).toBe(2);
   expect(posted[1].url).toMatch(/\/art$/);
   expect(JSON.parse(posted[1].body)).toEqual({ revision: 2 });
+});
+
+test("a aba Arte de um Short livre recém-criado espera o diretor sem quebrar a tela", async ({ page }) => {
+  await builtApp(page);
+  await agents(page);
+  // Until the director composes the scenes, the project keeps only the Arte's mode.
+  const project: Project = { ...freeProject(prompt), art: { mode: "bases" } as Project["art"] };
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/projects", (route) => route.fulfill({ json: [project] }));
+  await page.route(`**/api/projects/${id}`, (route) => route.fulfill({ json: project }));
+  await page.goto(`/#/producoes/${id}/art`);
+  await expect(page.getByText("A bíblia visual e os pedidos de imagem aparecem aqui depois que o diretor compõe as cenas.")).toBeVisible();
+  await page.getByRole("tab", { name: "Materiais" }).click();
+  await page.getByRole("tab", { name: "Arte" }).click();
+  await expect(page.getByText("A bíblia visual e os pedidos de imagem aparecem aqui")).toBeVisible();
+  expect(errors).toEqual([]);
 });

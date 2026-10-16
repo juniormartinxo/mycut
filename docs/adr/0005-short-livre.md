@@ -42,6 +42,20 @@ pontuação para a fala sair natural. A conferência verifica essa fidelidade al
 dos fatos. Quando o prompt é só uma ideia, o roteirista escreve com liberdade
 de estrutura.
 
+## Duração e a última palavra do autor
+
+A duração de um Short livre é o tempo da fala (decisão do usuário em 16/10/2026,
+no MYC-8). Os tempos por trecho do prompt ("16–28 s") orientam o roteirista, o
+ritmo de corte do diretor e a conferência, mas o MyCut não acrescenta silêncio
+para alcançá-los: só as pausas explícitas viram silêncio. Por isso o Short de
+referência, com 107 palavras de narração, dura uns 42 s com a voz num ritmo
+natural, e não os 55–60 s da tabela do prompt.
+
+A fala é sempre decisão do autor. Nos dois modos, **Roteiro e cenas primeiro**
+para antes da voz, e no Short livre a conferência das imagens-base também para
+antes dela. A narração editada na aba Roteiro é o texto que a ElevenLabs
+recebe.
+
 ## Pesquisa opcional
 
 O roteirista lista as afirmações factuais externas (ferramentas, preços,

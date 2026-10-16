@@ -1,9 +1,18 @@
-"""Local deterministic bridge for browser tests; never executes a provider CLI."""
+"""Local deterministic bridge for browser tests; never executes a provider CLI.
+
+Besides the scene proposals, it answers a Short livre's agents with the reference prompt's script and direction, and
+the Arte with a plain image, as the backend's end-to-end test does."""
+import io
 import json
 import os
 from pathlib import Path
 import signal
+import sys
 import time
+from PIL import Image
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'backend' / 'tests'))
+import reference_agents as reference
 
 root = Path(os.environ['MYCUT_BLOCK_TEST_DATA']).resolve()
 if not root.is_relative_to('/tmp'):
@@ -31,6 +40,32 @@ def reference_flow(narration):
                       {'source': 'agente', 'target': 'resposta', 'kind': 'result', 'anchor': anchor('resposta')}]}
 
 
+def proposal(request):
+    payload = json.loads(request['prompt'].split('\nDADOS:\n', 1)[1])
+    blocks = payload['scene']['blocks']
+    for block in blocks:
+        if (block.get('object') or {}).get('id') == payload['target_id']:
+            if block['object']['type'] == 'flow':
+                block['object']['flow'] = reference_flow(payload['scene']['narration'])
+            else:
+                block['object']['text'] = 'Uma ideia mais clara'
+    return {'reply': 'Proposta simulada para verificar a revisão no editor.', 'blocks': blocks}
+
+
+def picture(folder):
+    """The Arte's image, saved where the runner saves what the CLI generated."""
+    count = len(list((bridge / 'requests').glob('*/outputs/1.png')))
+    (folder / 'outputs').mkdir(exist_ok=True)
+    out = io.BytesIO()
+    Image.new('RGB', (96, 160), (40 + 30 * count % 200, 90, 120)).save(out, format='PNG')
+    (folder / 'outputs' / '1.png').write_bytes(out.getvalue())
+    return {'message': 'Imagem criada.'}
+
+
+ANSWERS = {'Proposal': proposal, 'FreeScript': lambda _: reference.script(), 'FreeDirection': lambda _: reference.direction(),
+           'Review': lambda _: reference.APPROVED}
+
+
 def stop(*_):
     global active
     active = False
@@ -49,17 +84,12 @@ try:
             if response.exists():
                 continue
             request = json.loads(path.read_text())
-            if request.get('schema', {}).get('title') != 'Proposal':
+            if request.get('kind') == 'image':
+                result = {'result': picture(path.parent), 'usage': []}
+            elif request.get('schema', {}).get('title') in ANSWERS:
+                result = {'result': ANSWERS[request['schema']['title']](request)}
+            else:
                 continue
-            payload = json.loads(request['prompt'].split('\nDADOS:\n', 1)[1])
-            blocks = payload['scene']['blocks']
-            for block in blocks:
-                if (block.get('object') or {}).get('id') == payload['target_id']:
-                    if block['object']['type'] == 'flow':
-                        block['object']['flow'] = reference_flow(payload['scene']['narration'])
-                    else:
-                        block['object']['text'] = 'Uma ideia mais clara'
-            result = {'result': {'reply': 'Proposta simulada para verificar a revisão no editor.', 'blocks': blocks}}
             tmp = response.with_suffix('.tmp')
             tmp.write_text(json.dumps(result, ensure_ascii=False))
             tmp.replace(response)

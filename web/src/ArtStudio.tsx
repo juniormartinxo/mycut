@@ -39,21 +39,22 @@ export function ArtStudio({
         os anexos, textos e animações.
       </p>
     );
-  if (!art.requests.length)
+  const requests = art.requests || [];
+  if (!requests.length)
     return (
       <p className="art-empty">
         A bíblia visual e os pedidos de imagem aparecem aqui depois que o
         diretor compõe as cenas.
       </p>
     );
-  const missing = art.requests.filter((item) => item.state !== "generated");
+  const missing = requests.filter((item) => item.state !== "generated");
   // Only the voice and the video are left of a production that stopped for the bases.
   const resumes = art.then === "pipeline";
-  const bases = art.requests.filter((item) => item.base);
-  const others = art.requests.filter((item) => !item.base);
+  const bases = requests.filter((item) => item.base);
+  const others = requests.filter((item) => !item.base);
   const titles = Object.fromEntries(
     [
-      ...art.requests.map((item) => [item.key, item.title]),
+      ...requests.map((item) => [item.key, item.title]),
       ...(project.images || []).map((item) => [item.id, item.name]),
     ] as [string, string][],
   );
