@@ -9,13 +9,14 @@ from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from pydantic import Field, StringConstraints
 from . import flow, store, visuals, google_fonts
-from . import art as artwork
+from . import art as artwork, materials
 from .art import ArtKey, ArtRequest, Bible
+from .materials import Broll
 from .block_render import inspect, text_layout
 from .flow import FlowSpec
 from .models import Scene, ProjectInput, CaptionStyle, Pause, VisualStyle
 from .pipeline import Output, Source, Review, AgentOutputError, agent, save_editorial
-from .scene_layout import VisualObject, SceneBlock, Background, Shot, Motion, geometry, new_id, MAX_SHOTS, MAX_PROJECT_SHOTS, AREA
+from .scene_layout import VisualObject, SceneBlock, Background, Shot, Key, Motion, geometry, new_id, MAX_SHOTS, MAX_PROJECT_SHOTS, AREA
 
 Color = Annotated[str, StringConstraints(pattern=r'^#[0-9a-fA-F]{6}$')]
 ImageId = Annotated[str, StringConstraints(pattern=r'^[a-f0-9]{32}$')]
@@ -86,6 +87,8 @@ class FreeBackground(Output):
     angle: float = Field(ge=0, le=360, allow_inf_nan=False)
     image_id: ImageId | None
     art: ArtKey | None = None
+    # The B-roll whose clip will fill this plano; the imagem provisória holds it until the clip is imported.
+    broll: Key | None = None
     motion: Motion
     dim: float = Field(ge=0, le=80, allow_inf_nan=False)
 
@@ -119,6 +122,8 @@ class FreeDirection(Output):
     bible: Bible | None = None
     # Unbounded here: requests past the limit get a correction and are then dropped, never a failed direction.
     images: list[ArtRequest] = Field(default_factory=list)
+    # Lista de materiais: the B-rolls in video or image made outside the MyCut; same correction as the images.
+    brolls: list[Broll] = Field(default_factory=list)
 
 
 WRITER = (
@@ -260,11 +265,12 @@ def direct(ask, project, script, issues):
     payload = {'prompt': project['brief'], 'script': script.model_dump(), 'flow_icons': flow.icon_names(),
                'available_images': [{k: v for k, v in item.items() if k != 'path'} for item in images],
                'area': {'width': AREA[2], 'height': AREA[3]},
-               'art': {'max_images': artwork.MAX_IMAGES, 'max_bases': artwork.MAX_BASES} if generating else None}
+               'art': {'max_images': artwork.MAX_IMAGES, 'max_bases': artwork.MAX_BASES} if generating else None,
+               'materials': {'max_brolls': materials.MAX_BROLLS}}
     corrections = list(issues)
     for final in (False, True):
         try:
-            direction = ask('director', DIRECTOR + artwork.GUIDE + flow.GUIDE, {**payload, 'issues_to_fix': corrections},
+            direction = ask('director', DIRECTOR + artwork.GUIDE + materials.GUIDE + flow.GUIDE, {**payload, 'issues_to_fix': corrections},
                             FreeDirection)
         except ValueError as exc:
             if final:
@@ -272,7 +278,7 @@ def direct(ask, project, script, issues):
                 store.step(ask.job['id'], 'director', 'failed', message)
                 notes, style = [message], generated_style(None, [], True, [])
                 styled = {**project, 'visual_style': style}
-                return None, [fallback(scene, index, styled, notes) for index, scene in enumerate(script.scenes)], notes, style, []
+                return None, [fallback(scene, index, styled, notes) for index, scene in enumerate(script.scenes)], notes, style, [], []
             corrections = [*issues, str(exc)]
             continue
         notes, problems = [], []
@@ -280,10 +286,14 @@ def direct(ask, project, script, issues):
         style = generated_style(direction, problems, final, notes)
         available = {item['id'] for item in images}
         requests = artwork.requests(direction, available, problems, final) if generating else []
-        problems, scenes = compose(direction, script, {**project, 'visual_style': style}, final, notes, problems, requests)
+        bases = {item['key'] for item in requests if item['base']}
+        brolls = materials.checked(direction, available | bases, problems, final)
+        problems, scenes = compose(direction, script, {**project, 'visual_style': style}, final, notes, problems, requests,
+                                   {item['key'] for item in brolls})
         requests = artwork.unused(requests, problems, final)
+        brolls = materials.unused(brolls, scenes, problems, final)
         if final or not problems:
-            return direction, scenes, notes, style, requests
+            return direction, scenes, notes, style, requests, brolls
         corrections = [*issues, *problems[:8]]
 
 
@@ -307,9 +317,10 @@ def generated_style(direction, problems, repair, notes):
                        captions=direction.captions, loop=direction.loop).model_dump()
 
 
-def compose(direction, script, project, repair, notes, problems, requests=()):
+def compose(direction, script, project, repair, notes, problems, requests=(), brolls=()):
     """Project scenes from the director's output, with the problems found; with repair, fixes them instead.
-    An image the Arte will generate leaves its place empty and the request records where it goes."""
+    An image the Arte will generate leaves its place empty and the request records where it goes; a B-roll's plano
+    keeps its background waiting for that image and then for the clip."""
     if len(direction.scenes) != len(script.scenes):
         problems.append(f'scenes: crie exatamente {len(script.scenes)} cenas, uma por cena do roteiro.')
     images = {item['id'] for item in project.get('images', [])}
@@ -327,7 +338,8 @@ def compose(direction, script, project, repair, notes, problems, requests=()):
         if len(planos) < len(visual.shots):
             problems.append(f'Use até {MAX_PROJECT_SHOTS} planos no Short inteiro.')
         budget -= len(planos)
-        built = [plano(shot, index, number, images, problems, art) for number, shot in enumerate(planos)]
+        built = [plano(shot, index, number, images, problems, art, brolls, artwork.mode(project) != 'none')
+                 for number, shot in enumerate(planos)]
         markers = [(shot.pop('_art', None), [block.pop('_art', None) for block in shot['blocks']]) for shot in built]
         scene = {**built[0], 'id': new_id(), 'title': visual.title or (source.screen_text or [''])[0][:100] or f'Cena {index+1}',
                  'narration': source.narration, 'layout': 'statement', 'items': items(source),
@@ -339,7 +351,7 @@ def compose(direction, script, project, repair, notes, problems, requests=()):
     return problems, scenes
 
 
-def plano(shot, scene, number, images, problems, art):
+def plano(shot, scene, number, images, problems, art, brolls=(), generating=False):
     where = f'scenes[{scene}].shots[{number}]'
     total = sum(block.height for block in shot.blocks)
     heights = [block.height * 100 / total for block in shot.blocks]
@@ -357,11 +369,26 @@ def plano(shot, scene, number, images, problems, art):
         blocks.append({**SceneBlock(height=height, object=visual_object(value, f'{where}.blocks[{i}]', images, problems)).model_dump(),
                        **({'_art': marker} if marker else {})})
     background, marker = None, None
-    if shot.background and shot.background.kind == 'image' and shot.background.art is not None \
-            and shot.background.image_id not in images:
-        value = shot.background
-        marker = requested(value.art, art, f'{where}.background', problems) and {'key': value.art, 'motion': value.motion,
+    value = shot.background
+    broll = value.broll if value else None
+    if broll is not None and broll not in brolls:
+        problems.append(f'{where}.background.broll: use a key de um B-roll de brolls.')
+        broll = None
+    if value and value.kind == 'image' and value.art is not None and value.image_id not in images:
+        motion = value.motion
+        if broll:
+            motion = stand_in(broll, value.motion, value.art in art, generating,
+                              f'{where}.background', problems)
+            background = Background(kind='image', motion=motion, dim=value.dim, broll=broll).model_dump()
+        marker = requested(value.art, art, f'{where}.background', problems) and {'key': value.art, 'motion': motion,
                                                                                   'dim': value.dim}
+    elif broll:
+        if value.image_id is not None and value.image_id not in images:
+            problems.append(f'{where}.background: use um image_id de available_images.')
+        # With no image, the plano waits for the clip on the project background.
+        image = value.image_id if value.image_id in images else None
+        motion = stand_in(broll, value.motion, image is not None, generating, f'{where}.background', problems)
+        background = Background(kind='image', asset_id=image, motion=motion, dim=value.dim, broll=broll).model_dump()
     elif shot.background:
         value = shot.background
         try:
@@ -374,6 +401,18 @@ def plano(shot, scene, number, images, problems, art):
             problems.append(f'{where}.background: {exc}')
     return {'anchor': shot.anchor or None if number else None, 'transition': shot.transition, 'brand': shot.brand,
             'background': background, 'blocks': blocks, **({'_art': marker} if marker else {})}
+
+
+def stand_in(broll, motion, image, generating, where, problems):
+    """The imagem provisória holds a B-roll's plano with camera motion until the clip arrives; returns the motion,
+    a slow zoom when the director gave none."""
+    if generating and not image:
+        problems.append(f'{where}: dê ao plano do B-roll “{broll}” uma imagem provisória em art (uma imagem de images) '
+                        'ou image_id.')
+    if image and motion == 'none':
+        problems.append(f'{where}: dê movimento de câmera (motion) à imagem provisória do B-roll “{broll}”.')
+        return 'zoom_in'
+    return motion
 
 
 def requested(key, art, where, problems):
@@ -509,7 +548,7 @@ def produce(job, folder):
         try:
             script = write(ask, project, issues)
             script, warnings = verify(ask, project, script, issues, known)
-            direction, scenes, notes, style, requests = direct(ask, project, script, issues)
+            direction, scenes, notes, style, requests, brolls = direct(ask, project, script, issues)
         except ValueError as exc:
             if kept is None:
                 raise
@@ -523,11 +562,11 @@ def produce(job, folder):
         except ValueError as exc:
             # Invalid output, CLI error or timeout: the paid script and scenes are kept, as after a rejection.
             review = Review(approved=False, issues=[str(exc)[:500]])
-        kept = script, warnings + notes, direction, scenes, style, checked, review, requests
+        kept = script, warnings + notes, direction, scenes, style, checked, review, requests, brolls
         if review.approved:
             break
         issues = review.issues or ['A conferência não aprovou a fidelidade ao prompt.']
-    script, warnings, direction, scenes, style, checked, review, requests = kept
+    script, warnings, direction, scenes, style, checked, review, requests, brolls = kept
     sources = list(dict.fromkeys(item['source']['url'] for item in checked if item['verified']))
     accent = project['accent'] if project.get('accent_locked') or direction is None else direction.accent
     if not review.approved:
@@ -538,7 +577,8 @@ def produce(job, folder):
               'publication': {'titles': script.titles, 'description': script.description, 'hashtags': script.hashtags,
                               'pinned_comment': script.pinned_comment},
               'art': {'mode': artwork.mode(project), 'bible': direction.bible.model_dump() if direction and direction.bible else None,
-                      'requests': requests, 'estimate': None, 'then': None}}
+                      'requests': requests, 'estimate': None, 'then': None},
+              'brolls': brolls}
     ProjectInput.model_validate({'title': script.titles[0], 'scenes': scenes, 'visual_style': style})
     job = store.checkpoint(job['id'], values)
     save_editorial(job, folder)

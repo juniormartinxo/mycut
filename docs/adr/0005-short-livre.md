@@ -112,6 +112,29 @@ de cada clipe, e diz com clareza o que está faltando. Enquanto o clipe não
 chega, o plano usa a imagem gerada com movimento de câmera e não bloqueia a
 exportação. Importar o clipe substitui o fundo do plano.
 
+Implementado no MYC-7. O diretor entrega os B-rolls junto com a direção, até 12,
+cada um com prompt, ferramenta, referências (imagens-base ou anexos) e duração,
+com a mesma correção limitada das imagens: referência desconhecida, B-roll fora
+dos planos ou plano que cita um B-roll fora da lista recebem uma correção e
+depois são descartados. O B-roll fica marcado no fundo do plano, e não no
+plano: assim ele acompanha a composição quando o autor reordena os planos, e
+some quando o autor troca o fundo por outro tipo. Um plano aguarda o clipe
+enquanto o fundo não tem arquivo ou não é vídeo; sem imagem provisória, ele usa o fundo do projeto
+e mesmo assim não bloqueia a exportação. O selo "aguardando clipe" fica só na
+interface (editor, faixa de planos, aba Materiais e avisos), nunca na prévia
+nem no MP4, para um vídeo exportado antes do clipe sair publicável (decisão do
+usuário em 16/10/2026). A lista fica numa aba própria, Materiais, porque um
+Short sem imagens da Arte também pode ter B-rolls. O que falta aparece na
+Pauta, nas Cenas e na mensagem final da produção, e a lista sai no
+`materiais.txt`. Importar o clipe põe o vídeo no fundo de todos os planos
+daquele B-roll, mantendo o escurecimento; um clipe novo substitui o anterior.
+Como os B-rolls 1 e 2 do prompt de referência são imagens (Midjourney, Flux), a
+lista também traz B-rolls de imagem, e o clipe importado pode ser uma imagem: o
+B-roll guarda o clipe, e a imagem importada mantém o movimento de câmera. Com a
+Arte ativa, o diretor precisa dar a cada plano de B-roll uma imagem provisória
+com movimento; sem isso, recebe uma correção, e o movimento faltante vira uma
+aproximação lenta.
+
 ## Pausas
 
 Pausas explícitas no roteiro livre viram silêncio no áudio, inserido entre

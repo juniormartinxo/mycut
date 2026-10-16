@@ -18,6 +18,7 @@ import {
   Headphones,
   ImagePlus,
   Layers,
+  ListVideo,
   LoaderCircle,
   Monitor,
   Plus,
@@ -31,6 +32,7 @@ import {
 import type { ProductionDraft } from "./Automation";
 import { GeneratedStyle, PublicationPackage, ScenePauses } from "./FreeShort";
 import { ArtStudio } from "./ArtStudio";
+import { MaterialsList, MissingClips } from "./Materials";
 import { Connections } from "./Connections";
 import { CoverStudio } from "./CoverStudio";
 import { SceneEditor } from "./SceneEditor";
@@ -86,6 +88,8 @@ const tabs: { id: Tab; name: string; icon: typeof FileText }[] = [
   { id: "publication", name: "Publicação", icon: Upload },
   // Short livre only: the visual bible and the Arte's images (ADR 0005).
   { id: "art", name: "Arte", icon: Palette },
+  // Short livre only: the lista de materiais, B-rolls in video or image brought from outside (ADR 0005).
+  { id: "materials", name: "Materiais", icon: ListVideo },
   { id: "versions", name: "Versões", icon: Film },
   { id: "costs", name: "Custos", icon: Coins },
 ];
@@ -659,6 +663,19 @@ function Editor({
       onUpdate(await request<Project>(`/projects/${project.id}`));
       setNotice("Arte adicionada à fila. Acompanhe a geração abaixo.");
     });
+  const importClip = (key: string, file: File) =>
+    void action(async () => {
+      const current = dirty ? await save() : draft;
+      const data = new FormData();
+      data.append("file", file);
+      accept(
+        await request<Project>(
+          `/projects/${project.id}/brolls/${key}/clip?revision=${current.revision}`,
+          { method: "POST", body: data },
+        ),
+      );
+      setNotice("Clipe importado: ele já ocupa o fundo dos planos desse B-roll.");
+    });
   const upload = (kind: string, file: File | undefined) => {
     if (!file) return;
     void action(async () => {
@@ -831,7 +848,7 @@ function Editor({
             role="tablist"
             aria-label="Etapas da produção"
           >
-            {tabs.filter((t) => t.id !== "art" || project.free).map((t) => (
+            {tabs.filter((t) => !["art", "materials"].includes(t.id) || project.free).map((t) => (
               <button
                 key={t.id}
                 role="tab"
@@ -904,6 +921,7 @@ function Editor({
                     </ul>
                   </div>
                 )}
+                <MissingClips project={project} onOpen={() => onTabChange("materials")} />
                 <ConnectionHint settings={settings} onConnect={onConnect} />
                 {connectionError && <Notice error>{connectionError}</Notice>}
                 <div className="automation-actions">
@@ -1022,6 +1040,7 @@ function Editor({
                     Cor do vídeo
                   </label>
                 </div>
+                <MissingClips project={project} onOpen={() => onTabChange("materials")} />
                 {draft.scenes.every(s => !s.blocks) && <div className="scene-agent-actions">
                   {incompleteScenes > 0 && (
                     <Notice>
@@ -1529,6 +1548,22 @@ function Editor({
                     })
                   }
                 />
+              </>
+            )}
+            {tab === "materials" && project.free && (
+              <>
+                <div className="section-heading">
+                  <div>
+                    <h2>Os clipes que você traz</h2>
+                    <p>
+                      B-rolls feitos fora do MyCut, em vídeo (Kling, Runway,
+                      Luma) ou imagem (Midjourney, Flux): o prompt, a ferramenta
+                      sugerida, as referências e a duração de cada um.
+                    </p>
+                  </div>
+                </div>
+                <MissingClips project={project} />
+                <MaterialsList project={project} locked={locked} onImport={importClip} />
               </>
             )}
             {tab === "costs" && <ProjectCosts project={project} />}

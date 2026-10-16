@@ -146,7 +146,7 @@ def job_row(row, private=False):
     job['kind'] = snapshot.get('_kind', 'render')
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     job['materials'] = [] if job['kind'] in ('cover', 'scene_edit') else (['input.json'] if job['kind'] != 'render' else []) + [
-        name for name in ('roteiro.txt', 'publicacao.txt', 'capa.png', 'narracao.wav')
+        name for name in ('roteiro.txt', 'publicacao.txt', 'materiais.txt', 'capa.png', 'narracao.wav')
         if job['state'] in ('succeeded', 'failed', 'cancelled') and (folder / name).is_file()]
     with connect() as db:
         job['steps'] = [dict(s) for s in db.execute('SELECT name,state,message,updated_at FROM job_steps WHERE job_id=? ORDER BY rowid', (job['id'],))]

@@ -76,6 +76,15 @@ _Evitar_: Imagem de referência, para não confundir com os anexos do prompt.
 Relação dos B-rolls externos de um Short livre, cada um com prompt, ferramenta
 sugerida, referências e duração.
 
+**B-roll**:
+Clipe de um Short livre feito fora do MyCut, em vídeo (Kling, Runway, Luma) ou
+imagem (Midjourney, Flux), que ocupa o fundo de um ou mais planos; enquanto o
+clipe não é importado, o plano aguarda o clipe sobre a imagem provisória.
+
+**Imagem provisória**:
+Imagem, em geral gerada pela Arte, que segura com movimento de câmera o plano
+de um B-roll até o clipe ser importado.
+
 **Área útil da cena**:
 Espaço disponível para os blocos depois de reservar as áreas da marca do canal
 e das legendas.

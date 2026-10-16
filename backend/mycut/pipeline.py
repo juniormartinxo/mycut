@@ -393,6 +393,9 @@ def save_editorial(job, folder):
                                            + package_text(project))
     if project.get('cover'):
         shutil.copy2(data_path(project['cover']['path']), folder / 'capa.png')
+    if project.get('brolls'):
+        from .materials import listing
+        (folder / 'materiais.txt').write_text(listing(project))
 
 
 def package_text(project):

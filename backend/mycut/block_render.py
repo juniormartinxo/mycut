@@ -100,7 +100,8 @@ def inspect(scene, project, clock=None):
     anchors = flow.resolve_anchors({'steps': [{'anchor': s.get('anchor')} for s in planos[1:]]}, narration)
     for index, shot in enumerate(planos):
         background = shot.get('background') or {}
-        if background.get('kind') in ('image', 'video') and not background.get('asset_id'):
+        # A B-roll's plano waiting for its image or clip is drawn on the project background and still exports.
+        if background.get('kind') in ('image', 'video') and not background.get('asset_id') and not background.get('broll'):
             issues.append({'shot_id': shot['id'], 'object_id': None, 'kind': 'missing_media',
                            'message': f'Plano {index+1}: selecione o arquivo do fundo ou troque o tipo de fundo.'})
         if index and shot.get('anchor') and anchors[index-1] is None:

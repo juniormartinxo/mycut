@@ -9,6 +9,8 @@ from .flow import FlowSpec
 Id = Annotated[str, StringConstraints(pattern=r'^[a-f0-9]{32}$')]
 Percent = Annotated[float, Field(gt=0, le=100, allow_inf_nan=False)]
 Color = Annotated[str, StringConstraints(pattern=r'^#[a-fA-F0-9]{6}$')]
+# Key of an Arte image or a B-roll, chosen by the director of a Short livre (ADR 0005).
+Key = Annotated[str, StringConstraints(pattern=r'^[a-z0-9][a-z0-9-]{0,39}$')]
 # Camera motion over a plano's duration (ADR 0004); 'none' keeps the authored framing still.
 Motion = Literal['none', 'zoom_in', 'zoom_out', 'pan_left', 'pan_right', 'pan_up', 'pan_down']
 Playback = Literal['once', 'loop']
@@ -85,9 +87,14 @@ class Background(BaseModel):
     playback: Playback = Field(default='once', exclude_if=lambda value: value == 'once')
     # Darkens media so text and captions stay readable on top of it.
     dim: float = Field(default=0, ge=0, le=80, allow_inf_nan=False)
+    # The B-roll of the lista de materiais this plano shows: until its clip is imported the background is an
+    # image, or nothing yet, and the plano waits for the clip without blocking the export.
+    broll: Key | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode='after')
     def complete(self):
+        if self.broll and self.kind not in ('image', 'video'):
+            raise ValueError('O B-roll entra num fundo de imagem ou de vídeo.')
         if self.kind == 'color' and not self.color:
             raise ValueError('Escolha a cor do fundo.')
         if self.kind == 'gradient' and not (self.color and self.color_to):
