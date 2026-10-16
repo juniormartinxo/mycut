@@ -34,6 +34,11 @@ Aproximação, afastamento ou panorâmica aplicada a uma imagem ao longo do plan
 Título ou parágrafo de um plano que repete a ideia-chave, independente da
 narração.
 
+**Aviso dos agentes**:
+Ponto que os agentes de um Short livre deixam para revisão, sem recusar a produção: afirmação não
+verificada, texto na tela encurtado para caber, pesquisa ou direção indisponível e problemas apontados
+pela conferência.
+
 **Bíblia visual**:
 Tom, fichas de personagem e de cenário extraídos do prompt de um Short livre,
 que servem de referência para todas as imagens geradas.

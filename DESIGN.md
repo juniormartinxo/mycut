@@ -186,7 +186,7 @@ A paleta combina terracota, papel quente e neutros com matiz verde. O frontmatte
 - **Verde de bastidor — `sidebar`:** navegação persistente. Os tokens `nav-*` definem texto e seleção nesse contexto escuro.
 - **Papel de ação secundária — `secondary`:** salvar, assistir e baixar, com seus estados de texto e hover.
 
-Estados usam pares próprios: `draft` para edição ou conexão ausente, `working` para execução, `ready` para resultado disponível ou conexão reportada e `error` para falha. A legenda textual distingue cada contexto; “Pronto para revisar” não afirma aprovação final. As etapas dos agentes usam pontos com cores locais de sucesso e falha, terracota durante execução e contorno enquanto pendentes. Mensagens reais acompanham os pontos. Avisos têm cores locais próprias, extraídas no sidecar.
+Estados usam pares próprios: `draft` para edição ou conexão ausente, `working` para execução, `ready` para resultado disponível ou conexão reportada e `error` para falha. A legenda textual distingue cada contexto; “Pronto para revisar” não afirma aprovação final. As etapas dos agentes usam pontos com cores locais de sucesso e falha, terracota durante execução, contorno enquanto pendentes e contorno tracejado quando dispensadas (a Pesquisa de um Short livre sem afirmações factuais). Mensagens reais acompanham os pontos. Avisos têm cores locais próprias, extraídas no sidecar.
 
 **The Cor da Produção Rule.** A cor editável do vídeo fica restrita à capa provisória e à composição da cena; não substitui a cor de ação do aplicativo.
 
@@ -281,7 +281,9 @@ A navegação principal contém Produções, Fila de produção e Conexões. Sel
 
 Novo Short começa em “Da pauta ao Short.” e oferece Short completo, Roteiro e cenas primeiro ou Abrir editor vazio. A produção completa exige pauta, executor online, CLIs selecionados encontrados e voz configurada. A opção de planejamento não exige voz. A interface diferencia disponibilidade reportada de uma execução: detectar um CLI não comprova que seu login funciona. Gerar voz informa uso de créditos; conectar e listar vozes não gera narração.
 
-O rascunho da nova produção — pauta, título e opção escolhida — fica no estado de App e sobrevive à ida a Conexões e ao retorno pela navegação interna. É limpo depois da criação bem-sucedida; não há persistência desse rascunho após recarregar ou fechar a aba. No editor de projeto existente, sair com alterações não salvas continua sujeito à confirmação de descarte.
+A galeria de formatos tem um quinto cartão, **Livre**, sem prévia renderizada: ícone e texto sobre papel com borda tracejada. Escolhê-lo troca “Pauta ou link” por “Prompt do Short livre”, um campo alto na mesma tipografia Manrope, oculta a personalização de aparência, o conteúdo visual e “Abrir editor vazio”, e mostra “Anexar referências”: um botão secundário sobre input de arquivo, com as imagens listadas em fichas removíveis (raio de controle). Escolher outro formato sai do Livre. No editor de um Short livre, a aba Pauta e agentes mostra o prompt sem a galeria e os avisos dos agentes numa caixa de aviso com lista.
+
+O rascunho da nova produção — pauta, título, opção escolhida e anexos — fica no estado de App e sobrevive à ida a Conexões e ao retorno pela navegação interna. É limpo depois da criação bem-sucedida; não há persistência desse rascunho após recarregar ou fechar a aba. No editor de projeto existente, sair com alterações não salvas continua sujeito à confirmação de descarte.
 
 Etapas apresentam Pesquisa, Roteiro, Animações, Conferência, Narração e Vídeo conforme o tipo de execução. Nome, ponto de estado e mensagem formam uma linha. Etapas sem registro mostram “Aguardando”, ou “Não executada” depois de falha/cancelamento. Trabalho apenas de narração mostra a etapa de voz; render isolado não mostra essa lista. O fluxo implementado conecta agentes CLI, ElevenLabs e render; agendamento diário e envio ao YouTube continuam pendentes, como partes do objetivo original.
 

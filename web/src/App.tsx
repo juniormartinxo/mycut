@@ -40,6 +40,8 @@ import { SettingsMenu } from "./SettingsMenu";
 import {
   AgentSteps,
   ConnectionHint,
+  emptyDraft,
+  FREE_BRIEF_LIMIT,
   NewProduction,
   readiness,
   useIntegrations,
@@ -149,13 +151,9 @@ function Empty({
 }
 
 export default function App() {
-  const [newDraft, setNewDraft] = useState<ProductionDraft>({
-    title: "",
-    brief: "",
-    automation: "pipeline",
-    accent: null,
-    visual_style: initialStyle,
-  });
+  const [newDraft, setNewDraft] = useState<ProductionDraft>(() =>
+    emptyDraft(initialStyle),
+  );
   const [projects, setProjects] = useState<Project[]>([]);
   const [health, setHealth] = useState<Health | null>(null);
   const [error, setError] = useState("");
@@ -332,13 +330,7 @@ export default function App() {
             onConnect={() => select(null, "environment")}
             onCancel={() => select(null)}
             onCreated={(p) => {
-              setNewDraft({
-                title: "",
-                brief: "",
-                automation: "pipeline",
-                accent: null,
-                visual_style: initialStyle,
-              });
+              setNewDraft(emptyDraft(initialStyle));
               update(p);
               select(p.id);
             }}
@@ -852,34 +844,48 @@ function Editor({
                   <div>
                     <h2>O ponto de partida dos agentes</h2>
                     <p>
-                      Cole a fonte ou descreva a ideia. O roteiro será criado a
-                      partir dela.
+                      {project.free
+                        ? "Short livre: o prompt é a especificação do roteiro, das cenas e dos planos."
+                        : "Cole a fonte ou descreva a ideia. O roteiro será criado a partir dela."}
                     </p>
                   </div>
                 </div>
                 <label>
-                  Pauta ou link
+                  {project.free ? "Prompt do Short livre" : "Pauta ou link"}
                   <textarea
-                    rows={7}
-                    maxLength={12000}
+                    className={project.free ? "free-prompt" : undefined}
+                    rows={project.free ? 16 : 7}
+                    maxLength={project.free ? FREE_BRIEF_LIMIT : 12000}
                     disabled={locked}
                     value={draft.brief}
                     onChange={(e) => change({ brief: e.target.value })}
                     placeholder="Link da notícia, vídeo ou assunto do Short…"
                   />
                 </label>
-                <FormatPicker
-                  value={draft.visual_style || null}
-                  accent={draft.accent}
-                  onChange={(visual_style, accent) =>
-                    change({
-                      visual_style,
-                      accent,
-                      accent_locked: true,
-                    })
-                  }
-                  disabled={locked}
-                />
+                {!project.free && (
+                  <FormatPicker
+                    value={draft.visual_style || null}
+                    accent={draft.accent}
+                    onChange={(visual_style, accent) =>
+                      change({
+                        visual_style,
+                        accent,
+                        accent_locked: true,
+                      })
+                    }
+                    disabled={locked}
+                  />
+                )}
+                {(project.warnings || []).length > 0 && (
+                  <div className="notice agent-warnings" role="status">
+                    <strong>Avisos dos agentes</strong>
+                    <ul>
+                      {project.warnings!.map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <ConnectionHint settings={settings} onConnect={onConnect} />
                 {connectionError && <Notice error>{connectionError}</Notice>}
                 <div className="automation-actions">

@@ -2,6 +2,10 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator, model_validator
 from .scene_layout import Id, SceneBlock, Background, Shot, validate_blocks, MAX_SHOTS, MAX_PROJECT_SHOTS
 
+# A free Short's prompt can be a whole production document, with tables and code blocks.
+BRIEF_LIMIT = 40000
+FORMAT_BRIEF_LIMIT = 12000
+
 
 class VisualStyle(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -63,7 +67,7 @@ class ProjectInput(BaseModel):
     description: str = Field(default='', max_length=5000)
     tags: str = Field(default='', max_length=500)
     sources: str = Field(default='', max_length=8000)
-    brief: str = Field(default='', max_length=12000)
+    brief: str = Field(default='', max_length=BRIEF_LIMIT)
     accent: str = Field(default='#c85e37', pattern=r'^#[0-9a-fA-F]{6}$')
     accent_locked: bool = True
     visual_style: VisualStyle | None = None
@@ -97,7 +101,7 @@ class ProjectInput(BaseModel):
 class CreateProject(BaseModel):
     title: str = Field(default='Novo Short', min_length=1, max_length=100)
     template: Literal['blank'] = 'blank'
-    brief: str = Field(default='', max_length=12000)
+    brief: str = Field(default='', max_length=BRIEF_LIMIT)
     automation: Literal['none', 'plan', 'pipeline'] = 'none'
     accent: str | None = Field(default=None, pattern=r'^#[0-9a-fA-F]{6}$')
     visual_style: VisualStyle | None = None

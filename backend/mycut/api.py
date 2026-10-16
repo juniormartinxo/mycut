@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from PIL import UnidentifiedImageError, Image
 from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
-from .models import CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
+from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
 from . import voice_tests, covers, endings, flow
 from . import visuals, scene_layout, scene_media, google_fonts
@@ -75,6 +75,8 @@ def present(project):
     project.setdefault('brief', '')
     project.setdefault('visual_style', None)
     project.setdefault('ending_id', None)
+    project.setdefault('free', False)
+    project.setdefault('warnings', [])
     project['jobs'] = store.jobs(project['id'])
     for key in ['audio', 'cover']:
         if project.get(key):
@@ -160,6 +162,8 @@ def projects():
 
 @app.post('/api/projects', status_code=201)
 def create(body: CreateProject):
+    if len(body.brief) > FORMAT_BRIEF_LIMIT:
+        raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta. Para um prompt maior, escolha Livre.')
     if body.automation != 'none':
         if not body.brief.strip():
             raise ValueError('Informe a pauta ou link para iniciar os agentes.')
@@ -178,6 +182,46 @@ def create(body: CreateProject):
     if body.automation != 'none':
         store.enqueue(result['id'], 'final', result['revision'], body.automation, settings)
     return present(result)
+
+
+# Reference images sent with a free Short's prompt; text files are pasted into the prompt by the browser.
+MAX_FREE_ATTACHMENTS = 8
+
+
+@app.post('/api/projects/free', status_code=201)
+def create_free(project: str = Form(max_length=200_000), files: list[UploadFile] = File(default=[])):
+    """Short livre (ADR 0005): the prompt is the specification, the attachments join the production's images."""
+    from pydantic import ValidationError
+    from .scene_images import import_image
+    try:
+        body = CreateProject.model_validate_json(project)
+    except ValidationError as exc:
+        raise ValueError('Confira o prompt: ' + exc.errors()[0]['msg']) from None
+    if body.automation == 'none' or not body.brief.strip():
+        raise ValueError('Escreva o prompt do Short livre para os agentes.')
+    if len(files) > MAX_FREE_ATTACHMENTS:
+        raise ValueError(f'Anexe até {MAX_FREE_ATTACHMENTS} imagens de referência.')
+    settings = ready_for(body.automation)
+    project_id = store.uid()
+    images = []
+    try:
+        for file in files:
+            try:
+                content = file.file.read(15 * 1024 * 1024 + 1)
+                images.append(import_image(content, project_id, file.filename or 'Referência'))
+            except ValueError as exc:
+                raise ValueError(f'Anexo {file.filename or ""}: {exc}') from None
+            finally:
+                file.file.close()
+        document = blank(body.title)
+        document.update(title=body.title.strip() or 'Short livre', brief=body.brief, free=True,
+                        accent_locked=False, images=images)
+        result = store.create_project(document, project_id)
+    except BaseException:
+        shutil.rmtree(DATA / 'projects' / project_id, ignore_errors=True)
+        raise
+    store.enqueue(result['id'], 'final', result['revision'], body.automation, settings)
+    return present(store.get_project(result['id']))
 
 
 def ready_for(kind):
@@ -346,6 +390,9 @@ def update(project_id: str, body: ProjectInput):
     if body.ending_id:
         endings.get(body.ending_id)
     current = store.get_project(project_id)
+    # The saved project decides the mode; a Short livre is created as such and stays one (ADR 0005).
+    if not current.get('free') and len(body.brief) > FORMAT_BRIEF_LIMIT:
+        raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta.')
     images = {item['id'] for item in current.get('images', [])}
     if body.visual_style and body.visual_style.google_font:
         google_fonts.entry(body.visual_style.google_font)
