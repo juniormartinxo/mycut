@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from . import store, bridge, integrations, agent_models
 from .config import DATA
-from .scene_layout import Id, SceneBlock, scoped_blocks, target, validate_assets
+from .scene_layout import Id, SceneBlock, scoped_blocks, target, validate_assets, shot_of, shot_view, with_shot_blocks, shots
 from .models import Scene, ProjectInput
 
 
@@ -40,10 +40,11 @@ def scene_in(project, scene_id):
 
 
 def scope_snapshot(project, scene, scope, target_id):
+    blocks = shot_of(scene, scope, target_id)['blocks']
     return {'target': copy.deepcopy(target(scene, scope, target_id)),
             'style': project.get('visual_style'), 'accent': project.get('accent'),
             'narration': scene['narration'],
-            'structure': [[b['id'], b['width'], b['height'], b['align']] for b in scene['blocks']]}
+            'structure': [[b['id'], b['width'], b['height'], b['align']] for b in blocks]}
 
 
 def thread(project_id, body):
@@ -126,7 +127,8 @@ def proposed_scene(current, job):
     if job['state'] != 'succeeded' or not output or output.get('blocks') is None:
         raise ValueError('Esta mensagem não tem uma proposta pronta para aceitar.')
     blocks = scoped_blocks(scene, output['blocks'], request['scope'], request['target_id'])
-    proposed = Scene.model_validate({**scene, 'blocks': blocks}).model_dump()
+    plano = shot_of(scene, request['scope'], request['target_id'])['id']
+    proposed = Scene.model_validate(with_shot_blocks(scene, plano, blocks)).model_dump()
     validate_assets(proposed, current)
     return proposed
 
@@ -162,11 +164,15 @@ def run(job):
     project = job['snapshot']
     request = project['_scene_edit']
     scene = scene_in(project, request['scene_id'])
+    planos = shots(scene)
+    plano = shot_of(scene, request['scope'], request['target_id'])['id']
+    position = next(i for i, shot in enumerate(planos) if shot['id'] == plano)
     corrections = []
     for attempt in (1, 2):
         proposal = agent(job, 'director',
             'Converse sobre a composição da cena. Se não houver pedido de mudança, responda com blocks=null. '
-            'Para mudar, entregue TODOS os blocos da cena em blocks, mas altere somente o alvo e alcance escolhidos. '
+            'Para mudar, entregue TODOS os blocos do plano em blocks, mas altere somente o alvo e alcance escolhidos. '
+            'A cena pode ter vários planos; você vê e altera somente o plano informado em shot. '
             'Um bloco tem zero ou um objeto: title, paragraph, image, video ou flow. Alturas somam 100. '
             'Ao mudar altura do alvo, mova apenas uma borda: compense a diferença em um único bloco vizinho imediato; não altere seus outros campos. '
             'Mantenha IDs existentes, inclusive ao trocar tipo; novos blocos/objetos recebem IDs hexadecimais de 32 caracteres únicos. '
@@ -177,7 +183,8 @@ def run(job):
             'mesmo que a mensagem não detalhe nada: você decide nós, posições, conexões, etapas, âncoras e animação. '
             'Quando o alcance for a cena inteira e o pedido permitir, prefira transformar o conteúdo central em um Fluxo animado. '
             'Objetos que não são flow usam flow=null. ' + flow.GUIDE + ' Corrija os problemas em issues_to_fix.',
-            {'scene': scene, 'scope': request['scope'], 'target_id': request['target_id'],
+            {'scene': shot_view(scene, plano), 'scope': request['scope'], 'target_id': request['target_id'],
+             'shot': {'number': position+1, 'count': len(planos), 'anchor': planos[position].get('anchor')},
              'message': request['text'], 'history': request['history'], 'style': project.get('visual_style'),
              'flow_icons': flow.icon_names(), 'issues_to_fix': corrections,
              'images': [{k: v for k, v in r.items() if k != 'path'} for r in project.get('images', [])],
@@ -187,7 +194,7 @@ def run(job):
         if output['blocks'] is None:
             break
         blocks = scoped_blocks(scene, output['blocks'], request['scope'], request['target_id'])
-        changed = Scene.model_validate({**scene, 'blocks': blocks}).model_dump()
+        changed = Scene.model_validate(with_shot_blocks(scene, plano, blocks)).model_dump()
         validate_assets(changed, project)
         report = inspect(changed, project)
         corrections = [item['message'] for item in report['issues'] + report['warnings']]

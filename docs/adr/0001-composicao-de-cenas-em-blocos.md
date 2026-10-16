@@ -22,7 +22,10 @@ vídeo reproduz dentro de sua área, sem tempos individuais de entrada e saída
 dos objetos nesta versão. Isso mantém o escopo na composição espacial, sem
 introduzir uma linha do tempo por objeto. O Fluxo animado é a exceção registrada na
 [ADR 0003](0003-fluxo-animado-com-estados-no-tempo.md): continua presente na
-cena inteira, mas seus estados internos mudam com a narração.
+cena inteira, mas seus estados internos mudam com a narração. A
+[ADR 0004](0004-planos-fundo-e-comportamentos-no-tempo.md) amplia esta decisão:
+a cena passa a ter planos, cada um com sua composição em blocos e um fundo em
+tela cheia, e título, parágrafo e imagem ganham revelação e movimento de câmera.
 
 ## Dimensionamento e conteúdo
 

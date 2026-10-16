@@ -7,7 +7,33 @@ export type Scene = {
   items: string[];
   image_id?: string | null;
   image_fit?: "contain" | "cover";
+  // The first plano is the scene's own composition; later planos change it in time (ADR 0004).
+  background?: Background | null;
+  brand?: boolean;
+  shots?: Shot[];
 };
+export type Motion = "none" | "zoom_in" | "zoom_out" | "pan_left" | "pan_right" | "pan_up" | "pan_down";
+export type Background = {
+  kind: "color" | "gradient" | "image" | "video";
+  color?: string | null;
+  color_to?: string | null;
+  angle?: number;
+  asset_id?: string | null;
+  zoom?: number;
+  crop_x?: number;
+  crop_y?: number;
+  motion?: Motion;
+  dim?: number;
+};
+export type Shot = {
+  id: string;
+  anchor: string | null;
+  transition: "cut" | "fade";
+  background: Background | null;
+  brand: boolean;
+  blocks: SceneBlock[];
+};
+export type ShotWindow = { id: string; start: number; end: number };
 export type VisualStyle = {
   format_id: "editorial" | "radar" | "tutorial" | "impact";
   channel_name?: string;
@@ -146,6 +172,8 @@ export type VisualObject = {
   crop_x: number;
   crop_y: number;
   flow?: FlowSpec | null;
+  reveal?: "none" | "lines" | "typing";
+  motion?: Motion;
 };
 export type SceneBlock = {
   id: string;
@@ -164,8 +192,9 @@ export type ProjectVideo = {
   duration: number;
 };
 export type SceneIssue = {
-  object_id: string;
-  kind: "missing_media" | "overflow" | "missing_flow" | "anchor";
+  object_id: string | null;
+  shot_id?: string;
+  kind: "missing_media" | "overflow" | "missing_flow" | "anchor" | "shot_anchor" | "shot_short";
   message: string;
   font_size?: number | null;
   step?: number;

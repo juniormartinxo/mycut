@@ -3,10 +3,12 @@ import { MessageSquare, Flag, Check, X } from "lucide-react";
 import { request } from "./api";
 import { RenderedScene } from "./FormatPicker";
 import type { Project, Scene, SceneMessage, SceneThread } from "./types";
+import { shotsOf, shotView } from "./sceneLayout";
 
 type Conversations = { threads: SceneThread[]; messages: SceneMessage[] };
-export function SceneConversation({ project, scene, blockId, objectId, disabled, save, onAccepted, onBusy, onThreads, autoRequest }: {
-  project: Project; scene: Scene; blockId: string; objectId?: string; disabled: boolean;
+export function SceneConversation({ project, scene, whole, shotId, shots = 1, blockId, objectId, disabled, save, onAccepted, onBusy, onThreads, autoRequest }: {
+  /** The scene as seen in the plano being edited (whole has every plano); a whole-plano request targets shotId. */
+  project: Project; scene: Scene; whole?: Scene; shotId?: string; shots?: number; blockId: string; objectId?: string; disabled: boolean;
   save: () => Promise<Project>; onAccepted: (project: Project) => void; onBusy: (busy: boolean) => void; onThreads: (threads: SceneThread[]) => void;
   /** Sent once per key to the selected object, e.g. when a Fluxo animado is chosen and the agent must build it. */
   autoRequest?: { key: number; text: string } | null;
@@ -19,7 +21,7 @@ export function SceneConversation({ project, scene, blockId, objectId, disabled,
   const [pollError, setPollError] = useState("");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
-  useEffect(() => { setScope(objectId ? "object" : "block"); setHistoryId(""); setPreview(null); }, [objectId, blockId, scene.id]);
+  useEffect(() => { setScope(objectId ? "object" : "block"); setHistoryId(""); setPreview(null); }, [objectId, blockId, scene.id, shotId]);
   const refresh = useCallback(async () => {
     const result = await request<Conversations>(`/projects/${project.id}/scene-conversations`);
     setData(result); onThreads(result.threads); setPollError("");
@@ -34,12 +36,19 @@ export function SceneConversation({ project, scene, blockId, objectId, disabled,
     const timer = setInterval(() => void poll(), 2000);
     return () => { alive = false; clearInterval(timer); };
   }, [project.id, project.revision, onThreads]);
-  const targetId = scope === "scene" ? scene.id! : scope === "object" ? objectId! : blockId;
+  const targetId = scope === "scene" ? shotId || scene.id! : scope === "object" ? objectId! : blockId;
   const selectedThread = data.threads.find(t => t.scene_id === scene.id && t.scope === scope && t.target_id === targetId);
   const activeThread = historyId ? data.threads.find(t => t.id === historyId) : selectedThread;
   const messages = data.messages.filter(m => m.thread_id === activeThread?.id);
   const running = data.messages.find(m => m.state === "queued" || m.state === "running");
   const target = { scene_id: scene.id, scope, target_id: targetId };
+  // A proposal from the history may belong to another plano: review it over that plano's own background.
+  const proposalScene = (message: SceneMessage) => {
+    if (!whole?.blocks || !message.blocks) return scene;
+    const ids = new Set(message.blocks.map(b => b.id));
+    const index = shotsOf(whole).findIndex(s => s.blocks.some(b => ids.has(b.id)));
+    return index < 0 ? scene : shotView(whole, index);
+  };
   const action = async (run: () => Promise<void>) => {
     setBusy(true); onBusy(true); setError("");
     try { await run(); await refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); onBusy(false); }
@@ -65,7 +74,7 @@ export function SceneConversation({ project, scene, blockId, objectId, disabled,
       <label>Alcance do pedido<select value={scope} disabled={busy || disabled} onChange={e => { setScope(e.target.value as SceneThread["scope"]); setHistoryId(""); setPreview(null); }}>
         {objectId && <option value="object">Objeto selecionado</option>}
         {!objectId && <option value="block">Bloco vazio</option>}
-        <option value="scene">Cena inteira</option>
+        <option value="scene">{shots > 1 ? "Plano inteiro" : "Cena inteira"}</option>
       </select></label>
       <label>Histórico<select value={historyId} onChange={e => { setHistoryId(e.target.value); setPreview(null); }}>
         <option value="">Conversa do alvo atual</option>
@@ -94,8 +103,8 @@ export function SceneConversation({ project, scene, blockId, objectId, disabled,
           <button type="button" className="text-button" onClick={() => setPreview(preview === message.id ? null : message.id)}>{preview === message.id ? "Fechar prévia" : "Revisar proposta"}</button>
           {preview === message.id && <div className="proposal-review">
             <div className="proposal-pair">
-              <figure><figcaption>Cena atual</figcaption><RenderedScene scene={scene} style={project.visual_style || null} accent={project.accent} projectId={project.id} /></figure>
-              <figure><figcaption>Proposta do agente</figcaption><RenderedScene scene={{ ...scene, blocks: message.blocks }} style={project.visual_style || null} accent={project.accent} projectId={project.id} /></figure>
+              <figure><figcaption>{shots > 1 ? "Plano atual" : "Cena atual"}</figcaption><RenderedScene scene={proposalScene(message)} style={project.visual_style || null} accent={project.accent} projectId={project.id} /></figure>
+              <figure><figcaption>Proposta do agente</figcaption><RenderedScene scene={{ ...proposalScene(message), blocks: message.blocks }} style={project.visual_style || null} accent={project.accent} projectId={project.id} /></figure>
             </div>
             <p>{message.blocks.length} blocos · alturas {message.blocks.map(b => `${b.height.toFixed(1)}%`).join(" / ")}. Aceitar aplica o conjunto.</p>
             <div className="block-actions">

@@ -208,6 +208,9 @@ def make_video(job):
             for number in range(count):
                 now = number/fps
                 while scene_index+1 < len(timing['scenes']) and now >= timing['scenes'][scene_index+1]['start']:
+                    # A finished scene releases its video decoders before the next one opens its own.
+                    if compositions and isinstance(compositions[scene_index], block_render.BlockComposition):
+                        compositions[scene_index].close()
                     scene_index += 1
                 while caption_index+1 < len(timing['captions']) and now >= timing['captions'][caption_index]['end']:
                     caption_index += 1

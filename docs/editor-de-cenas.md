@@ -15,9 +15,10 @@ Cada cena nova começa com três blocos vazios de alturas
 título, parágrafo, imagem ou vídeo. O limite desta versão é de 100 blocos por cena.
 
 Selecione o bloco na composição ou na lista e escolha **Objeto do bloco**.
-O painel separa as propriedades nas abas **Bloco**, **Objeto** e **Agente**.
-Bloco reúne dimensões e posição; Objeto reúne conteúdo, estilo e recorte;
-Agente reúne conversa, marcação e propostas. Trocar de aba mantém os rascunhos.
+O painel separa as propriedades nas abas **Plano**, **Bloco**, **Objeto** e
+**Agente**. Plano reúne início, transição, fundo e marca do canal; Bloco reúne
+dimensões e posição; Objeto reúne conteúdo, estilo, recorte, revelação e
+movimento; Agente reúne conversa, marcação e propostas. Trocar de aba mantém os rascunhos.
 À esquerda da composição, abaixo do título do bloco selecionado, ficam
 **Duplicar**, **Mover para cima**, **Mover para baixo** e **Excluir bloco**,
 nessa ordem, em uma coluna. Títulos e parágrafos têm texto, família Google Fonts,
@@ -140,10 +141,49 @@ subconjunto a partir do pacote da interface, use
 Fonts do projeto. A decisão está na
 [ADR do Fluxo animado](adr/0003-fluxo-animado-com-estados-no-tempo.md).
 
+## Planos, fundo e movimento
+
+Uma cena pode ter até 12 planos (60 por Short). Cada plano tem a própria
+composição em blocos e troca a imagem da cena num trecho da narração, como os
+cortes de um vídeo. A narração e a legenda continuam sendo da cena. Os botões
+**Plano 1, Plano 2…** acima da composição trocam o plano em edição e mostram
+quando cada um começa; **+ Plano** cria um plano vazio depois do atual. Um
+plano com pendência mostra um sinal de alerta.
+
+Na aba **Plano**:
+
+- **Começa na fala** recebe um trecho copiado da narração. Vazio, ou com um
+  trecho que não está na fala, o plano é distribuído por igual entre os
+  vizinhos, com um aviso. Cada plano dura pelo menos 1 s. O primeiro plano
+  sempre começa com a cena.
+- **Transição de entrada**: **Corte seco** ou **Fusão** (0,4 s) com o plano
+  anterior. A troca entre cenas é sempre um corte seco.
+- **Fundo**: **Fundo do projeto**, **Cor**, **Degradê** (duas cores e ângulo;
+  180° vai de cima para baixo), **Imagem em tela cheia** ou **Vídeo em tela
+  cheia**. Imagem e vídeo ocupam o quadro inteiro, atrás dos blocos;
+  **Escurecer o fundo** ajuda a ler textos e legendas. A imagem aceita
+  **Movimento de câmera**. Um fundo de mídia sem arquivo bloqueia a exportação.
+- **Mostrar a marca do canal** pode ser desligado, por exemplo para B-rolls em
+  tela cheia.
+- **Duplicar plano**, **Mover plano para antes/depois** e **Excluir plano**.
+  Mover troca a composição (blocos, fundo e marca) de lugar. O início na fala
+  e a transição ficam com a posição, para os trechos seguirem a ordem da
+  narração; mover e voltar restaura a cena como estava.
+
+Na aba **Objeto**, título e parágrafo têm **Entrada do texto**: **Fixo durante
+o plano**, **Linha a linha** (cada linha do texto entra ao longo do plano) ou
+**Digitação** (com cursor, terminando antes do fim do plano). Imagens têm
+**Movimento de câmera**: aproximar, afastar ou panorâmica para os quatro lados,
+ao longo do plano. A composição estática mostra o texto completo e o
+enquadramento inicial; **Reproduzir animação** mostra planos, fusões,
+revelações e movimentos com os mesmos quadros da exportação. A decisão está na
+[ADR de planos](adr/0004-planos-fundo-e-comportamentos-no-tempo.md).
+
 ## Conversas e propostas
 
 A aba **Agente** abre uma conversa com alcance explícito:
-objeto selecionado, bloco vazio ou cena inteira. O agente configurado no papel
+objeto selecionado, bloco vazio ou cena inteira (**plano inteiro** quando a
+cena tem mais de um plano). A proposta altera só o plano em edição. O agente configurado no papel
 de diretor recebe a cena e a narração como contexto. Precisa do runner e da
 conexão do provedor já configurados no estúdio.
 
@@ -293,3 +333,17 @@ são de `costs.spec.ts` (edição de preços), e falham igualmente na `main`, se
 relação com esta entrega. Para rodar o cenário com o agente simulado, exporte
 `MYCUT_BLOCK_TEST_DATA` com uma pasta em `/tmp`: o servidor de testes passa a
 usar esse mesmo diretório.
+
+Nos planos (MYC-3), 128 testes de backend passaram, 10 deles novos em
+`backend/tests/test_scene_shots.py`. Eles cobrem persistência e limites (12
+planos por cena, 60 por Short), compatibilidade das cenas antigas, âncoras,
+distribuição automática e duração mínima, troca de composição, degradê, marca
+desligada, fusão, revelação linha a linha e por digitação, movimento de câmera
+no objeto e no fundo, fundo em vídeo recomeçando no plano e propostas do agente
+restritas ao plano do alvo. A paridade compara, por pixels, a prévia do servidor
+com o MP4 em cinco instantes: dois planos diferentes, durante a revelação, no
+meio da fusão e no plano seguinte. Em `web/tests/scene-shots.spec.ts`, quatro
+cenários passaram em desktop e celular: criar, configurar, salvar, reordenar,
+excluir e desfazer planos, e importar imagem como fundo com movimento. A
+regressão de `scene-blocks`, `animated-flow` e `scene-agents` passou, inclusive
+as propostas pela fila real com `MYCUT_BLOCK_TEST_DATA`.

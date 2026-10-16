@@ -130,3 +130,11 @@
 .flow-summary ol { padding-left: 20px; font-size: 13px; line-height: 1.6; }
 .flow-summary small { color: #686d63; }
 @media (max-width: 760px) { .flow-controls { grid-template-columns: auto minmax(0, 1fr) auto; } .flow-controls output { grid-column: 1 / -1; grid-row: 2; } }
+.shot-strip { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 3px 3px 12px; margin-bottom: 8px; }
+.shot-strip .button { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 7px 11px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.shot-strip .button small { font-size: 11px; color: inherit; opacity: .75; }
+.shot-strip .button.secondary[aria-current="step"],
+.shot-strip .button.secondary[aria-current="step"]:hover { background: #202820; border-color: #202820; color: #fffefa; font-weight: 700; }
+.shot-alert { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #b3261e; color: #fffefa; font-size: 10px; font-weight: 700; }
+.block-controls label.block-check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.block-controls label.block-check input { width: auto; }
