@@ -153,7 +153,7 @@ def public(record):
 
 
 class AnimatedImage:
-    """An imported GIF looping on its own frame timing, decoded sequentially like a video."""
+    """An imported GIF on its own frame timing, decoded sequentially like a video."""
     def __init__(self, record):
         animation = record['animation']
         source = data_path(animation['path'])
@@ -164,9 +164,10 @@ class AnimatedImage:
         self.duration = self.starts.pop()
         self.index, self.current = -1, None
 
-    def frame(self, elapsed):
-        """(frame index, RGBA frame) shown at this time; no time is the first frame."""
-        moment = 0.0 if elapsed is None else elapsed % self.duration
+    def frame(self, elapsed, loop=False):
+        """(frame index, RGBA frame) shown at this time; no time is the first frame.
+        Played once, the last frame stays after the animation ends."""
+        moment = 0.0 if elapsed is None else elapsed % self.duration if loop else elapsed
         index = max(0, bisect.bisect_right(self.starts, moment)-1)
         if index != self.index:
             self.image.seek(index)

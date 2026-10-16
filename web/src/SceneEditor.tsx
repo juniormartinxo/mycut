@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Plus, Redo2, Sparkles, Trash2, Undo2, Upload } from "lucide-react";
-import type { Background, Motion, Project, Scene, SceneBlock, SceneClock, SceneIssue, SceneThread, ShortFormat, ShotWindow, VisualObject } from "./types";
+import type { Background, Motion, Playback, Project, Scene, SceneBlock, SceneClock, SceneIssue, SceneThread, ShortFormat, ShotWindow, VisualObject } from "./types";
 import { request } from "./api";
 import { RenderedScene } from "./FormatPicker";
 import { GoogleFontPicker } from "./GoogleFontPicker";
@@ -97,8 +97,12 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
     return () => { clearTimeout(timer); controller.abort(); };
   }, [inspectBody, scene.blocks]);
   // Anything that changes over the scene's time is played with frames from the server (ADR 0003, ADR 0004).
+  const gifs = new Set(project.images?.filter(image => image.animated).map(image => image.id));
+  const isGif = (id?: string | null) => !!id && gifs.has(id);
   const animated = planos.length > 1 || planos.some(s => (s.background?.motion ?? "none") !== "none" || s.background?.kind === "video"
-    || s.blocks.some(b => b.object && (b.object.type === "flow" && b.object.flow || (b.object.reveal ?? "none") !== "none" || (b.object.motion ?? "none") !== "none")));
+    || s.background?.kind === "image" && isGif(s.background.asset_id)
+    || s.blocks.some(b => b.object && (b.object.type === "flow" && b.object.flow || (b.object.reveal ?? "none") !== "none" || (b.object.motion ?? "none") !== "none"
+      || b.object.type === "image" && isGif(b.object.asset_id))));
   const player = useFlowPlayer(inspectBody, animated ? clock : null);
   const askAgent = (text = FLOW_REQUEST) => { setActiveTab("agent"); setAgentRequest({ key: Date.now(), text }); };
   const nodeName = (id: string | null) => obj?.flow?.nodes.find(n => n.id === id)?.label ?? id;
@@ -327,11 +331,12 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             <label>Arquivo da biblioteca<select value={background.asset_id || ""} onChange={e => patchBackground({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{(background.kind === "image" ? project.images : project.videos)?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
             <div className="block-media-import">
               <button type="button" className="button secondary" disabled={locked} onClick={() => backgroundInput.current?.click()}><Upload size={16} /> Importar {background.kind === "image" ? "imagem" : "vídeo"}</button>
-              <small>Ocupa o quadro inteiro, atrás dos blocos. {background.kind === "video" ? "Sem áudio; repete até o fim do plano." : "Preenche com corte. GIF animado repete até o fim do plano."}</small>
+              <small>Ocupa o quadro inteiro, atrás dos blocos. {background.kind === "video" ? "Sem áudio; repete até o fim do plano." : "Preenche com corte."}</small>
               <input ref={backgroundInput} type="file" hidden aria-label={`Importar ${background.kind === "image" ? "imagem" : "vídeo"} do fundo`} disabled={locked}
                 accept={background.kind === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
                 onChange={e => { uploadBackground(e.target.files?.[0]); e.target.value = ""; }} />
             </div>
+            {background.kind === "image" && isGif(background.asset_id) && <PlaybackField value={background.playback} onChange={playback => patchBackground({ playback })} />}
             {background.kind === "image" && <label>Movimento de câmera<select value={background.motion ?? "none"} onChange={e => patchBackground({ motion: e.target.value as Motion })}>
               {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
             <label>Escurecer o fundo · {Math.round(background.dim ?? 0)}%
@@ -416,7 +421,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             </>}
             {obj.type === "image" && <label>Movimento de câmera<select value={obj.motion ?? "none"} onChange={e => patchObject({ motion: e.target.value as Motion })}>
               {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
-            {obj.type === "image" && media && "animated" in media && media.animated && <p className="block-hint">GIF animado: repete no próprio ritmo durante o plano. A prévia parada mostra o primeiro quadro.</p>}
+            {obj.type === "image" && isGif(obj.asset_id) && <PlaybackField value={obj.playback} onChange={playback => patchObject({ playback })} />}
             {obj.type === "video" && <><p className="block-hint">Sem áudio original. Repete ou termina junto com a cena. MP4, MOV ou WebM · até 100 MB e 180 s.</p>{obj.asset_id && <video className="object-video" controls muted loop playsInline src={project.videos?.find(v => v.id === obj.asset_id)?.url} aria-label="Reproduzir vídeo do objeto" />}</>}
           </>}
           {issues.filter(issue => issue.object_id === obj.id).map(issue => <div key={issue.kind} className="notice danger" role="alert">{issue.message}
@@ -435,4 +440,12 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
       </div>
     </div>
   </section>;
+}
+
+/** An animated GIF plays once and holds its last frame, or loops until the plano ends. */
+function PlaybackField({ value, onChange }: { value?: Playback; onChange: (value: Playback) => void }) {
+  return <label>Animação do GIF<select value={value ?? "once"} onChange={e => onChange(e.target.value as Playback)}>
+    <option value="once">Tocar uma vez e parar no último quadro</option>
+    <option value="loop">Repetir em loop até o fim do plano</option>
+  </select></label>;
 }

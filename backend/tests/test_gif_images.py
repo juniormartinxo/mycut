@@ -97,7 +97,10 @@ class GifImageTests(unittest.TestCase):
     def test_frames_follow_the_gif_timing_and_loop(self):
         record = scene_images.import_image(gif(delays=(200, 300)), self.project['id'], 'animado.gif')
         reader = scene_images.AnimatedImage(record)
-        self.assertEqual([reader.frame(t)[0] for t in (None, 0, .19, .21, .49, .51, 1.25)], [0, 0, 0, 1, 1, 0, 1])
+        moments = (None, 0, .19, .21, .49, .51, 1.25)
+        # Played once, the last frame holds; in loop, the GIF starts over.
+        self.assertEqual([reader.frame(t)[0] for t in moments], [0, 0, 0, 1, 1, 1, 1])
+        self.assertEqual([reader.frame(t, loop=True)[0] for t in moments], [0, 0, 0, 1, 1, 0, 1])
         reader.close()
         # Delays under 20 ms play at 100 ms, as in browsers.
         record = scene_images.import_image(gif(delays=(0, 0)), self.project['id'], 'rapido.gif')
@@ -117,6 +120,7 @@ class GifImageTests(unittest.TestCase):
         self.assertTrue(near(center(composition.frame(None), box), RED))
         self.assertTrue(near(center(composition.frame(.1), box), RED))
         self.assertTrue(near(center(composition.frame(.3), box), BLUE))
+        self.assertTrue(near(center(composition.frame(.6), box), BLUE))
         # The transparent half shows the scene behind it, not a filled color.
         x, y, w, h = map(round, box)
         frame = composition.frame(.3).convert('RGB')
@@ -132,6 +136,30 @@ class GifImageTests(unittest.TestCase):
         self.assertTrue(near(first.getpixel((100, 960)), RED))
         self.assertTrue(near(later.getpixel((100, 960)), BLUE))
         composition.close()
+
+    def test_loop_is_chosen_per_object_and_background(self):
+        response = self.upload(gif())
+        self.project = response.json()
+        image_id = self.project['images'][-1]['id']
+        scene = copy.deepcopy(self.project['scenes'][0])
+        scene['blocks'][1]['object'] = scene_layout.VisualObject(type='image', asset_id=image_id, playback='loop').model_dump()
+        scene['background'] = {'kind': 'image', 'asset_id': image_id, 'playback': 'loop'}
+        self.edit(scenes=[scene])
+        saved = self.project['scenes'][0]
+        self.assertEqual(saved['blocks'][1]['object']['playback'], 'loop')
+        self.assertEqual(saved['background']['playback'], 'loop')
+        project = store.get_project(self.project['id'])
+        box = scene_layout.geometry(project['scenes'][0]['blocks'])[1]['object']
+        composition = block_render.BlockComposition(project['scenes'][0], project)
+        self.assertTrue(near(center(composition.frame(.6), box), RED))
+        self.assertTrue(near(composition.frame(.6).convert('RGB').getpixel((100, 960)), RED))
+        composition.close()
+        # Played once is the default and is not stored, so older objects keep their shape.
+        self.assertNotIn('playback', scene_layout.VisualObject(type='image').model_dump())
+        with self.assertRaises(ValueError):
+            scene_layout.VisualObject(type='title', playback='loop')
+        with self.assertRaises(ValueError):
+            scene_layout.Background(kind='color', color='#000000', playback='loop')
 
 
 if __name__ == '__main__':

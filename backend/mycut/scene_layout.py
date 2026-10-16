@@ -11,6 +11,7 @@ Percent = Annotated[float, Field(gt=0, le=100, allow_inf_nan=False)]
 Color = Annotated[str, StringConstraints(pattern=r'^#[a-fA-F0-9]{6}$')]
 # Camera motion over a plano's duration (ADR 0004); 'none' keeps the authored framing still.
 Motion = Literal['none', 'zoom_in', 'zoom_out', 'pan_left', 'pan_right', 'pan_up', 'pan_down']
+Playback = Literal['once', 'loop']
 MAX_SHOTS = 12
 MAX_PROJECT_SHOTS = 60
 
@@ -43,6 +44,8 @@ class VisualObject(BaseModel):
     # Behaviour in time (ADR 0004), omitted while unused so older objects keep their stored shape.
     reveal: Literal['none', 'lines', 'typing'] = Field(default='none', exclude_if=lambda value: value == 'none')
     motion: Motion = Field(default='none', exclude_if=lambda value: value == 'none')
+    # An animated GIF plays once and holds its last frame, or loops until the plano ends.
+    playback: Playback = Field(default='once', exclude_if=lambda value: value == 'once')
 
     @model_validator(mode='after')
     def flow_only_in_flow_objects(self):
@@ -52,6 +55,8 @@ class VisualObject(BaseModel):
             raise ValueError('Somente título e parágrafo têm revelação progressiva.')
         if self.motion != 'none' and self.type != 'image':
             raise ValueError('O movimento de câmera vale para imagens; vídeos já têm o próprio movimento.')
+        if self.playback != 'once' and self.type != 'image':
+            raise ValueError('A repetição em loop vale para GIFs animados.')
         return self
 
 
@@ -77,6 +82,7 @@ class Background(BaseModel):
     crop_x: float = Field(default=50, ge=0, le=100, allow_inf_nan=False)
     crop_y: float = Field(default=50, ge=0, le=100, allow_inf_nan=False)
     motion: Motion = 'none'
+    playback: Playback = Field(default='once', exclude_if=lambda value: value == 'once')
     # Darkens media so text and captions stay readable on top of it.
     dim: float = Field(default=0, ge=0, le=80, allow_inf_nan=False)
 
@@ -88,6 +94,8 @@ class Background(BaseModel):
             raise ValueError('Um degradê precisa das duas cores.')
         if self.motion != 'none' and self.kind != 'image':
             raise ValueError('O movimento de câmera vale para fundos de imagem.')
+        if self.playback != 'once' and self.kind != 'image':
+            raise ValueError('A repetição em loop vale para fundos com GIF animado.')
         return self
 
 

@@ -16,6 +16,7 @@ export type Scene = {
 };
 export type Pause = { after: string; seconds: number };
 export type Motion = "none" | "zoom_in" | "zoom_out" | "pan_left" | "pan_right" | "pan_up" | "pan_down";
+export type Playback = "once" | "loop";
 export type Background = {
   kind: "color" | "gradient" | "image" | "video";
   color?: string | null;
@@ -26,6 +27,7 @@ export type Background = {
   crop_x?: number;
   crop_y?: number;
   motion?: Motion;
+  playback?: Playback;
   dim?: number;
 };
 export type Shot = {
@@ -201,6 +203,7 @@ export type VisualObject = {
   flow?: FlowSpec | null;
   reveal?: "none" | "lines" | "typing";
   motion?: Motion;
+  playback?: Playback;
 };
 export type SceneBlock = {
   id: string;

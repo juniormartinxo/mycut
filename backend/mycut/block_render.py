@@ -350,7 +350,8 @@ class ShotComposition:
             elif self.backdrop_animation:
                 background = self.background
                 layer = self.animated('background', self.backdrop_animation, (1080, 1920), 'cover', background.get('zoom', 1),
-                                      background.get('crop_x', 50), background.get('crop_y', 50), elapsed)
+                                      background.get('crop_x', 50), background.get('crop_y', 50), elapsed,
+                                      background.get('playback') == 'loop')
                 image = Image.new('RGB', (1080, 1920), self.style['background'])
                 image.paste(layer, (0, 0), layer)
                 if background.get('motion', 'none') != 'none':
@@ -365,7 +366,8 @@ class ShotComposition:
             current = moved(layer, motion, progress)
             image.paste(current, position, current)
         for obj, record, position, size in self.animations:
-            layer = self.animated(obj['id'], record, size, obj['fit'], obj.get('zoom', 1), obj.get('crop_x', 50), obj.get('crop_y', 50), elapsed)
+            layer = self.animated(obj['id'], record, size, obj['fit'], obj.get('zoom', 1), obj.get('crop_x', 50), obj.get('crop_y', 50),
+                                  elapsed, obj.get('playback') == 'loop')
             if obj.get('motion', 'none') != 'none':
                 layer = moved(layer, obj['motion'], progress)
             image.paste(layer, position, layer)
@@ -386,11 +388,11 @@ class ShotComposition:
             image.paste(layer, position, layer)
         return image
 
-    def animated(self, key, record, size, mode, zoom, crop_x, crop_y, elapsed):
+    def animated(self, key, record, size, mode, zoom, crop_x, crop_y, elapsed, loop):
         """The GIF frame shown at this time, fitted to its box; refitted only when the GIF advances."""
         if key not in self.readers:
             self.readers[key] = AnimatedImage(record)
-        index, source = self.readers[key].frame(elapsed)
+        index, source = self.readers[key].frame(elapsed, loop)
         if self.fitted.get(key, (None,))[0] != index:
             layer = Image.new('RGBA', size)
             fit(layer, source, mode, zoom, crop_x, crop_y)
