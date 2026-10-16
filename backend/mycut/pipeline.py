@@ -296,11 +296,12 @@ def produce(job):
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
     kind = job['kind']
+    resuming = False
     if kind == 'art':
         from . import art
-        job, proceed = art.produce(job)
+        job, resuming = art.produce(job)
         # The images a production stopped for are ready: it goes on to the voice and the video.
-        kind = 'pipeline' if proceed else 'art'
+        kind = 'pipeline' if resuming else 'art'
     elif kind in ('pipeline', 'plan') and job['snapshot'].get('free'):
         from . import free, art
         job = free.produce(job, folder)
@@ -368,6 +369,8 @@ def produce(job):
             # Only a call that never reached the provider is still open here.
             store.usage_finish(usage_id, 'failed')
         job = store.checkpoint(job['id'], {'audio': record})
+        if resuming:
+            job = art.resumed(job)
         store.step(job['id'], 'voice', 'succeeded', 'Narração e tempos de fala recebidos')
         if kind == 'voice':
             save_editorial(job, folder)

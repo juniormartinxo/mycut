@@ -47,6 +47,8 @@ export function ArtStudio({
       </p>
     );
   const missing = art.requests.filter((item) => item.state !== "generated");
+  // Only the voice and the video are left of a production that stopped for the bases.
+  const resumes = art.then === "pipeline";
   const bases = art.requests.filter((item) => item.base);
   const others = art.requests.filter((item) => !item.base);
   const titles = Object.fromEntries(
@@ -80,13 +82,15 @@ export function ArtStudio({
         <button
           type="button"
           className="button primary"
-          disabled={locked || !missing.length}
+          disabled={locked || (!missing.length && !resumes)}
           onClick={onGenerate}
         >
           <ImagePlus size={17} />
           {missing.length
-            ? `Gerar ${missing.length === 1 ? "a imagem que falta" : `as ${missing.length} imagens que faltam`}${art.then === "pipeline" ? " e continuar a produção" : ""}`
-            : "Todas as imagens foram geradas"}
+            ? `Gerar ${missing.length === 1 ? "a imagem que falta" : `as ${missing.length} imagens que faltam`}${resumes ? " e continuar a produção" : ""}`
+            : resumes
+              ? "Continuar a produção"
+              : "Todas as imagens foram geradas"}
         </button>
         <p className="connection-help">
           {missing.length > 0 &&
@@ -163,6 +167,11 @@ function ArtCard({
   const [text, setText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const image = project.images?.find((entry) => entry.id === item.image_id);
+  // Without its bases an image would lose the face or the place it has to keep.
+  const waiting = (project.art?.requests || []).filter(
+    (base) => base.base && item.references.includes(base.key) && base.state !== "generated",
+  );
+  const blocked = locked || waiting.length > 0;
   return (
     <li className={`art-card ${item.state}`}>
       <div className="art-frame">
@@ -181,6 +190,12 @@ function ArtCard({
         </small>
         {item.state === "failed" && item.error && (
           <p className="art-warning">{item.error}</p>
+        )}
+        {waiting.length > 0 && (
+          <p className="art-warning">
+            Gere antes a imagem-base “{waiting[0].title}”: esta imagem a usa
+            como referência.
+          </p>
         )}
         {item.outdated && (
           <p className="art-warning">
@@ -218,7 +233,7 @@ function ArtCard({
               rows={2}
               maxLength={2000}
               value={text}
-              disabled={locked}
+              disabled={blocked}
               placeholder="Ex.: cabelo mais curto, cicatriz bem visível, luz de emergência mais forte."
               onChange={(e) => setText(e.target.value)}
             />
@@ -231,7 +246,7 @@ function ArtCard({
                 type="file"
                 multiple
                 accept="image/png,image/jpeg,image/webp"
-                disabled={locked}
+                disabled={blocked}
                 onChange={(e) => {
                   const chosen = [...(e.target.files || [])];
                   e.target.value = "";
@@ -241,7 +256,7 @@ function ArtCard({
             </label>
             <button
               className="button secondary"
-              disabled={locked || !text.trim()}
+              disabled={blocked || !text.trim()}
             >
               <RefreshCw size={15} />
               {item.state === "generated" ? "Refazer" : "Gerar"} com esta

@@ -405,8 +405,8 @@ def run_agents(project_id: str, body: AgentRunRequest):
 def run_art(project_id: str, body: ArtRun):
     """The Arte's remaining images; a production that stopped for the bases then goes on to the voice and video."""
     current = store.get_project(project_id)
-    art.pending(current)
-    settings = ready_for('voice' if current['art'].get('then') == 'pipeline' else 'art', art=True)
+    art.check_run(current)
+    settings = ready_for('voice' if art.resumes(current) else 'art', art=True)
     return store.enqueue(project_id, 'final', body.revision, 'art', settings, {'action': 'pending'})
 
 
@@ -415,9 +415,7 @@ def redo_art(project_id: str, key: str, text: str = Form(max_length=2000), revis
              files: list[UploadFile] | None = File(None)):
     """One image again, following the author's message and examples, before the remaining ones are paid for."""
     files = files or []
-    current = store.get_project(project_id)
-    if not current.get('free') or not any(item['key'] == key for item in (current.get('art') or {}).get('requests', [])):
-        raise ValueError('Essa imagem não está na bíblia visual deste Short.')
+    art.check_redo(store.get_project(project_id), key)
     if not text.strip():
         raise ValueError('Escreva o que a Arte deve mudar nesta imagem.')
     if len(files) > covers.MAX_ATTACHMENTS:

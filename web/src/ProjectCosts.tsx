@@ -13,7 +13,7 @@ const steps: Record<UsageCall["step"], string> = {
   cover: "Capa",
   art: "Arte",
 };
-const providers: Record<UsageCall["provider"], string> = {
+export const providers: Record<UsageCall["provider"], string> = {
   codex: "Codex",
   claude: "Claude Code",
   grok: "Grok",

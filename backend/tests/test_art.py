@@ -1,5 +1,7 @@
 """Arte (ADR 0005): the director's visual bible becomes images, the bases first and attached to the others.
-Only the external CLIs are fixtures; the fake one saves its image where the runner would."""
+The external CLIs are fixtures, and the fake one saves its image where the runner would. Where a test only checks
+that the production goes on to the voice and the video, ElevenLabs and the renderer are skipped too: the Short livre
+tests render for real."""
 import copy
 import io
 import json
@@ -63,7 +65,9 @@ class FakeCLI:
             if isinstance(reply, Exception):
                 raise reply
             return reply
-        self.images.append({'config': config, 'prompt': prompt, 'attachments': [str(path) for path in attachments]})
+        # The first pixel of each attachment, read while the call runs: examples are deleted after the job.
+        self.images.append({'config': config, 'prompt': prompt, 'attachments': [str(path) for path in attachments],
+                            'pixels': [Image.open(path).convert('RGB').getpixel((0, 0)) for path in attachments]})
         if len(self.images) in self.fail:
             raise ValueError('O CLI recusou a imagem.')
         folder = bridge.BRIDGE/'requests'/request_id/'outputs'
@@ -199,7 +203,9 @@ class ArtTests(unittest.TestCase):
         self.assertIn('Cabelo mais curto e a cicatriz bem visível', cli.images[0]['prompt'])
         previous, example = cli.images[0]['attachments']
         self.assertEqual(previous, str(DATA/old['path']))
-        self.assertEqual(Image.open(example).getpixel((0, 0)), (255, 204, 0))
+        self.assertEqual(cli.images[0]['pixels'][1], (255, 204, 0))
+        self.assertFalse((DATA/'projects'/project['id']/'art-inputs').exists() and
+                         any((DATA/'projects'/project['id']/'art-inputs').iterdir()), 'Examples do not outlive the job.')
         self.assertEqual(saved['scenes'][3]['blocks'][1]['object']['asset_id'], new['id'])
         requests = {item['key']: item for item in saved['art']['requests']}
         self.assertEqual(requests['ira']['messages'], [{'text': 'Cabelo mais curto e a cicatriz bem visível', 'attachments': 1}])
@@ -207,9 +213,12 @@ class ArtTests(unittest.TestCase):
         self.assertEqual((requests['ira-corredor']['outdated'], requests['corredor']['outdated']), (True, False))
         self.assertEqual(len(saved['images']), 3)
 
-    def test_guidance_needs_a_known_image_and_some_text(self):
+    def test_guidance_needs_a_known_image_some_text_and_the_bases_it_references(self):
         project = self.produce_bases('plan')
-        for key, text in (('nao-existe', 'Mais luz'), ('ira', ' ')):
+        failed = {**project['art'], 'requests': [{**item, 'state': 'failed', 'image_id': None} if item['key'] == 'corredor'
+                                                 else item for item in project['art']['requests']]}
+        project = store.update_project(project['id'], {'art': failed}, project['revision'])
+        for key, text in (('nao-existe', 'Mais luz'), ('ira', ' '), ('ira-corredor', 'Mais luz')):
             response = self.client.post(f'/api/projects/{project["id"]}/art/{key}',
                                         data={'text': text, 'revision': str(project['revision'])})
             self.assertEqual(response.status_code, 422, response.text)
@@ -242,13 +251,16 @@ class ArtTests(unittest.TestCase):
         voice.assert_called_once()
         saved = store.get_project(project['id'])
         states = {item['key']: item['state'] for item in saved['art']['requests']}
-        self.assertEqual(states, {'ira': 'generated', 'corredor': 'failed', 'ira-corredor': 'generated'})
-        self.assertEqual(cli.images[2]['attachments'], [str(DATA/self.image_of(saved, 'ira')['path'])])
+        # Without the corridor, Ira's scene would lose its setting: it waits for the base instead of being paid for.
+        self.assertEqual(states, {'ira': 'generated', 'corredor': 'failed', 'ira-corredor': 'failed'})
+        self.assertEqual(len(cli.images), 2)
         self.assertIn('Arte: a imagem “Corredor vazio da Halcyon” não pôde ser gerada (O CLI recusou a imagem.).',
                       saved['warnings'])
+        self.assertIn('Arte: a imagem “Ira avança pelo corredor” não pôde ser gerada (gere antes a imagem-base '
+                      '“Corredor vazio da Halcyon”.).', saved['warnings'])
         self.assertIsNone(saved['scenes'][4].get('background'))
         step = next(s for s in store.get_job(job['id'])['steps'] if s['name'] == 'art')
-        self.assertEqual((step['state'], step['message']), ('succeeded', 'Arte · 2 de 3 imagens geradas · 1 com falha'))
+        self.assertEqual((step['state'], step['message']), ('succeeded', 'Arte · 1 de 3 imagens geradas · 2 com falha'))
 
     def test_the_arte_role_takes_only_clis_that_generate_images(self):
         agents = self.client.get('/api/integrations').json()['agents']
@@ -285,6 +297,58 @@ class ArtTests(unittest.TestCase):
         saved = store.get_project(project['id'])
         self.assertEqual((saved['art']['mode'], saved['art']['requests']), ('none', []))
         self.assertNotIn('art', {s['name'] for s in store.get_job(job['id'])['steps']})
+
+    def test_the_production_resumes_from_the_voice_when_it_failed_after_the_images(self):
+        project = self.produce_bases()
+        self.client.post(f'/api/projects/{project["id"]}/art', json={'revision': project['revision']})
+        job = store.claim()
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([])), \
+                patch.object(elevenlabs, 'synthesize', side_effect=ValueError('ElevenLabs fora do ar')):
+            with self.assertRaisesRegex(ValueError, 'fora do ar'):
+                pipeline.produce(job)
+        store.finish(job['id'], 'failed', 'ElevenLabs fora do ar')
+        saved = store.get_project(project['id'])
+        self.assertEqual(saved['art']['then'], 'pipeline', 'The production still has to go on.')
+        response = self.client.post(f'/api/projects/{project["id"]}/art', json={'revision': saved['revision']})
+        self.assertEqual(response.status_code, 202, response.text)
+        cli = FakeCLI([])
+        record = {'path': 'x.wav', 'script_hash': ''}
+        with patch.object(bridge, 'invoke', side_effect=cli), patch.object(elevenlabs, 'synthesize', return_value=record), \
+                patch.object(production, 'make_video', return_value={'duration': 58}) as video:
+            pipeline.produce(store.claim())
+        self.assertEqual(cli.images, [])
+        video.assert_called_once()
+        self.assertIsNone(store.get_project(project['id'])['art']['then'])
+
+    def test_requests_beyond_the_limit_are_corrected_and_then_dropped(self):
+        project, job = self.start('plan', 'bases')
+        crowded = art_direction()
+        crowded['images'] += [{**REQUESTS[0], 'key': f'extra-{i}', 'base': False, 'references': ['ira']} for i in range(11)]
+        for i in range(11):
+            crowded['scenes'][i % 7]['shots'].append(free.plano([{'height': 100, 'object': {
+                **art_direction()['scenes'][3]['shots'][0]['blocks'][1]['object'], 'art': f'extra-{i}'}}]))
+        cli = FakeCLI([FREE_SCRIPT, crowded, crowded, APPROVED])
+        with patch.object(bridge, 'invoke', side_effect=cli):
+            pipeline.produce(job)
+        self.assertIn('images: peça até 12 imagens', cli.texts[2])
+        saved = store.get_project(project['id'])
+        self.assertEqual(len(saved['art']['requests']), 12)
+        self.assertEqual(len(saved['scenes']), 7, 'The direction is kept, not replaced by the fallback.')
+
+    def test_a_new_production_drops_the_previous_arte_images_the_new_scenes_do_not_use(self):
+        project, job = self.start('plan', 'all')
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, art_direction(), APPROVED])):
+            pipeline.produce(job)
+        store.finish(job['id'], 'succeeded', 'Pronto')
+        before = store.get_project(project['id'])
+        self.assertEqual(len(before['images']), 3)
+        response = self.client.post(f'/api/projects/{project["id"]}/run',
+                                    json={'kind': 'plan', 'mode': 'final', 'revision': before['revision']})
+        self.assertEqual(response.status_code, 202, response.text)
+        with patch.object(bridge, 'invoke', side_effect=FakeCLI([FREE_SCRIPT, free_direction(), APPROVED])):
+            pipeline.produce(store.claim())
+        saved = store.get_project(project['id'])
+        self.assertEqual(saved['images'], [], 'Images nothing uses anymore leave the library.')
 
 
 if __name__ == '__main__':

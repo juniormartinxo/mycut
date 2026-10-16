@@ -17,11 +17,12 @@ from .scene_layout import VisualObject, Background
 
 MAX_IMAGES = 12
 MAX_BASES = 4
+# What the director's contract accepts: requests past MAX_IMAGES are corrected, then dropped, not a failed direction.
+MAX_REQUESTED = 2 * MAX_IMAGES
 # Same library limit as the editor's uploads.
 MAX_LIBRARY = 24
 MAX_REFERENCES = 4
 ArtKey = Annotated[str, StringConstraints(pattern=r'^[a-z0-9][a-z0-9-]{0,39}$')]
-MODES = ('bases', 'all', 'none')
 NAMES = covers.NAMES
 
 
@@ -66,13 +67,15 @@ def mode(project):
 def requests(direction, available, problems, repair):
     """The director's image requests, checked; on the last attempt invalid parts are dropped instead of reported."""
     kept, keys, bases = [], set(), 0
-    for index, item in enumerate(direction.images):
-        where = f'images[{index}]'
+    if len(direction.images) > MAX_IMAGES:
+        problems.append(f'images: peça até {MAX_IMAGES} imagens; foram {len(direction.images)}.')
+    for index, item in enumerate(direction.images[:MAX_IMAGES] if repair else direction.images):
+        field = f'images[{index}]'
         if item.key in keys:
-            problems.append(f'{where}.key: “{item.key}” repete outra key.')
+            problems.append(f'{field}.key: “{item.key}” repete outra key.')
             continue
         if item.base and bases >= MAX_BASES:
-            problems.append(f'{where}: use até {MAX_BASES} imagens-base.')
+            problems.append(f'{field}: use até {MAX_BASES} imagens-base.')
             if repair:
                 continue
         references = []
@@ -81,7 +84,7 @@ def requests(direction, available, problems, repair):
             if earlier_base or reference in available:
                 references.append(reference)
             else:
-                problems.append(f'{where}.references: “{reference}” não é uma imagem-base anterior nem um id de available_images.')
+                problems.append(f'{field}.references: “{reference}” não é uma imagem-base anterior nem um id de available_images.')
         keys.add(item.key)
         bases += item.base
         kept.append({**item.model_dump(), 'references': references if repair else list(dict.fromkeys(item.references)),
@@ -100,6 +103,24 @@ def unused(art, problems, repair):
                 continue
         kept.append(item)
     return kept
+
+
+def add_placements(requests_by_key, scene_id, plano, background, blocks):
+    """Where the director put the images still to be generated in one plano: its background and its blocks."""
+    if background:
+        requests_by_key[background['key']]['placements'].append(
+            {'scene': scene_id, 'shot': plano['id'], 'motion': background['motion'], 'dim': background['dim']})
+    for marker, block in zip(blocks, plano['blocks']):
+        if marker:
+            requests_by_key[marker['key']]['placements'].append(
+                {'scene': scene_id, 'shot': plano['id'], 'block': block['id'], 'motion': marker['motion']})
+
+
+def library(images, scenes):
+    """The production's images after a new direction: the Arte's previous images nothing uses anymore leave it."""
+    used = {item.get('asset_id') for scene in scenes for plano in planos(scene)
+            for item in [plano.get('background') or {}, *(block.get('object') or {} for block in plano['blocks'])]}
+    return [image for image in images if not image.get('art') or image['id'] in used]
 
 
 def planos(scene):
@@ -172,25 +193,31 @@ def instructions(project, request, inputs, provider, message=None):
             '\nDADOS:\n' + json.dumps(payload, ensure_ascii=False))
 
 
-def draw(job, request, attempt, message=None, extra=()):
+def missing_bases(request, requests):
+    """The bases an image cites that do not exist yet: without them it would lose the face or the place."""
+    bases = {item['key']: item for item in requests if item['base']}
+    return [bases[key] for key in request['references'] if key in bases and bases[key]['state'] != 'generated']
+
+
+def draw(job, request, attempt, message=None, examples=()):
     """One image for one request, with its references attached; returns the library record."""
     project = job['snapshot']
     config = project['_agents']['art']
     images = {item['id']: item for item in project.get('images', [])}
     generated = {item['key']: item['image_id'] for item in project['art']['requests'] if item['state'] == 'generated'}
     inputs, described = [], []
+
+    def attach(path, origin):
+        inputs.append(data_path(path))
+        described.append({'file': bridge.attachment_name(len(inputs), inputs[-1]), 'origin': origin})
     for reference in request['references']:
         image_id = generated.get(reference, reference)
         if image_id in images:
-            inputs.append(data_path(images[image_id]['path']))
-            described.append({'file': bridge.attachment_name(len(inputs), inputs[-1]),
-                              'origin': f'referência: {images[image_id]["name"]}'})
+            attach(images[image_id]['path'], f'referência: {images[image_id]["name"]}')
     if message is not None and request['image_id'] in images:
-        inputs.append(data_path(images[request['image_id']]['path']))
-        described.append({'file': bridge.attachment_name(len(inputs), inputs[-1]), 'origin': 'versão anterior desta imagem'})
-    for path in extra:
-        inputs.append(data_path(path))
-        described.append({'file': bridge.attachment_name(len(inputs), inputs[-1]), 'origin': 'exemplo enviado pelo autor'})
+        attach(images[request['image_id']]['path'], 'versão anterior desta imagem')
+    for path in examples:
+        attach(path, 'exemplo enviado pelo autor')
     usage_id = uuid.uuid4().hex
     store.usage_start(usage_id, job['id'], 'art', attempt, config['provider'], config['model'])
     try:
@@ -213,7 +240,7 @@ def draw(job, request, attempt, message=None, extra=()):
             'width': width, 'height': height, 'source_url': '', 'page_url': '', 'art': request['key']}
 
 
-def save(job, project, changes):
+def checkpoint(job, changes):
     job = store.checkpoint(job['id'], changes)
     return job, job['snapshot']
 
@@ -232,60 +259,64 @@ def generate(job, only_bases):
     label = 'imagens-base' if only_bases else 'imagens'
     store.step(job['id'], 'art', 'running', f'Arte · {NAMES[provider]} · {len(targets)} {label} · estimativa {money(planned["usd"])}')
     store.progress(job['id'], 40, f'Arte gerando {len(targets)} {label}')
-    job, project = save(job, project, {'art': {**art, 'estimate': planned}})
+    job, project = checkpoint(job, {'art': {**art, 'estimate': planned}})
     try:
         bridge.require_images()
     except ValueError as exc:
         return fail_all(job, project, targets, str(exc))
     for attempt, request in enumerate(targets, 1):
-        job, project = one(job, project, request['key'], attempt)
+        job, project = generate_one(job, project, request['key'], attempt)
     states = {item['key']: item['state'] for item in project['art']['requests']}
     done = sum(states[item['key']] == 'generated' for item in targets)
     failed = len(targets) - done
     store.step(job['id'], 'art', 'failed' if not done else 'succeeded',
                f'Arte · {done} de {len(targets)} {label} geradas' + (f' · {failed} com falha' if failed else ''))
-    pending = any(item['state'] != 'generated' for item in project['art']['requests'])
-    return job, pending
+    remaining = any(item['state'] != 'generated' for item in project['art']['requests'])
+    return job, remaining
 
 
-def one(job, project, key, attempt, message=None, extra=()):
+def generate_one(job, project, key, attempt, message=None, examples=()):
     """Generate one request and save it at once, so a killed production keeps every finished image."""
     art = project['art']
     request = next(item for item in art['requests'] if item['key'] == key)
     images = list(project.get('images', []))
     warnings = list(project.get('warnings', []))
     try:
+        waiting = missing_bases(request, art['requests'])
+        if waiting:
+            raise ValueError(f'gere antes a imagem-base “{waiting[0]["title"]}”.')
         if len(images) >= MAX_LIBRARY + (1 if request['image_id'] else 0):
             raise ValueError(f'a biblioteca da produção já tem {MAX_LIBRARY} imagens.')
-        record = draw(job, request, attempt, message, extra)
+        record = draw(job, request, attempt, message, examples)
     except ValueError as exc:
         warnings.append(f'Arte: a imagem “{request["title"]}” não pôde ser gerada ({exc}).'[:500])
         changed = {**request, 'state': 'failed' if request['state'] != 'generated' else 'generated', 'error': str(exc)[:500]}
-        requests_ = [changed if item['key'] == key else item for item in art['requests']]
-        return save(job, project, {'art': {**art, 'requests': requests_}, 'warnings': warnings})
+        updated = [changed if item['key'] == key else item for item in art['requests']]
+        return checkpoint(job, {'art': {**art, 'requests': updated}, 'warnings': warnings})
+    # The previous version leaves the library but stays on disk: earlier versions of the project may show it.
     previous = request['image_id']
     images = [record if item['id'] == previous else item for item in images] if previous else [*images, record]
     scenes = place([dict(scene) for scene in json.loads(json.dumps(project['scenes']))], request, record['id'], previous)
-    history = [*request['messages'], {'text': message, 'attachments': len(extra)}] if message is not None else request['messages']
+    history = [*request['messages'], {'text': message, 'attachments': len(examples)}] if message is not None else request['messages']
     changed = {**request, 'state': 'generated', 'image_id': record['id'], 'error': '', 'messages': history, 'outdated': False}
-    requests_ = []
+    updated = []
     for item in art['requests']:
         if item['key'] == key:
             item = changed
         elif previous and request['base'] and key in item['references'] and item['state'] == 'generated':
             # Made with the previous version of this base: the user decides whether to redo it.
             item = {**item, 'outdated': True}
-        requests_.append(item)
-    return save(job, project, {'art': {**art, 'requests': requests_}, 'images': images, 'scenes': scenes})
+        updated.append(item)
+    return checkpoint(job, {'art': {**art, 'requests': updated}, 'images': images, 'scenes': scenes})
 
 
 def fail_all(job, project, targets, reason):
     store.step(job['id'], 'art', 'failed', f'Arte indisponível: {reason}'[:500])
     keys = {item['key'] for item in targets}
     art = project['art']
-    requests_ = [{**item, 'state': 'failed', 'error': reason[:500]} if item['key'] in keys else item for item in art['requests']]
+    updated = [{**item, 'state': 'failed', 'error': reason[:500]} if item['key'] in keys else item for item in art['requests']]
     warnings = [*project.get('warnings', []), f'Arte indisponível: {reason}'[:500]]
-    job, project = save(job, project, {'art': {**art, 'requests': requests_}, 'warnings': warnings})
+    job, project = checkpoint(job, {'art': {**art, 'requests': updated}, 'warnings': warnings})
     return job, True
 
 
@@ -296,7 +327,7 @@ def after_production(job, kind):
     current = mode(project)
     if current == 'none' or not project['art']['requests']:
         return job, True
-    job, pending = generate(job, only_bases=current == 'bases')
+    job, _ = generate(job, only_bases=current == 'bases')
     if current == 'bases' and any(not item['base'] for item in job['snapshot']['art']['requests']):
         art = job['snapshot']['art']
         job = store.checkpoint(job['id'], {'art': {**art, 'then': kind}})
@@ -304,14 +335,33 @@ def after_production(job, kind):
     return job, True
 
 
-def pending(project):
-    """What a new Arte run would generate; refuses a project with nothing to generate."""
+def resumes(project):
+    """Whether the production stopped for the bases still has to go on to the voice and the video."""
+    return (project.get('art') or {}).get('then') == 'pipeline'
+
+
+def check_run(project):
+    """Refuses an Arte run with nothing to generate and no production to resume."""
     if not project.get('free') or mode(project) == 'none':
         raise ValueError('Só um Short livre com imagens da Arte tem imagens para gerar.')
-    missing = [item for item in project['art'].get('requests', []) if item['state'] != 'generated']
-    if not missing:
+    if all(item['state'] == 'generated' for item in project['art']['requests']) and not resumes(project):
         raise ValueError('Todas as imagens da Arte já foram geradas.')
-    return missing
+
+
+def check_redo(project, key):
+    """An image can be guided once it is one of the Arte's requests and the bases it cites exist."""
+    requests = (project.get('art') or {}).get('requests', []) if project.get('free') else []
+    request = next((item for item in requests if item['key'] == key), None)
+    if request is None:
+        raise ValueError('Essa imagem não está entre os pedidos da Arte deste Short.')
+    waiting = missing_bases(request, requests)
+    if waiting:
+        raise ValueError(f'Gere antes a imagem-base “{waiting[0]["title"]}”: esta imagem a usa como referência.')
+
+
+def resumed(job):
+    """The voice of a production that stopped for the bases exists: nothing is left to resume."""
+    return store.checkpoint(job['id'], {'art': {**job['snapshot']['art'], 'then': None}})
 
 
 def produce(job):
@@ -320,20 +370,27 @@ def produce(job):
     request = job['snapshot']['_art']
     if request['action'] == 'pending':
         job, _ = generate(job, only_bases=False)
-        art = job['snapshot']['art']
-        job = store.checkpoint(job['id'], {'art': {**art, 'then': None}})
-        return job, art.get('then') == 'pipeline'
+        return job, resumes(job['snapshot'])
+    try:
+        return redo(job, request), False
+    finally:
+        for path in request['attachments']:
+            data_path(path).unlink(missing_ok=True)
+
+
+def redo(job, request):
     project = job['snapshot']
     target = next(item for item in project['art']['requests'] if item['key'] == request['key'])
     provider = project['_agents']['art']['provider']
+    planned = estimate(1, provider)
     store.step(job['id'], 'art', 'running', f'Arte · {NAMES[provider]} · refazendo “{target["title"]}” · estimativa '
-               f'{money(estimate(1, provider)["usd"])}')
-    job, project = save(job, project, {'art': {**project['art'], 'estimate': estimate(1, provider)}})
+               f'{money(planned["usd"])}')
+    job, project = checkpoint(job, {'art': {**project['art'], 'estimate': planned}})
     bridge.require_images()
-    job, project = one(job, project, request['key'], 1, request['message'], request['attachments'])
+    job, project = generate_one(job, project, request['key'], 1, request['message'], request['attachments'])
     redone = next(item for item in project['art']['requests'] if item['key'] == request['key'])
     if redone['error'] and redone['image_id'] == target['image_id']:
         store.step(job['id'], 'art', 'failed', f'Arte: {redone["error"]}'[:500])
         raise ValueError(f'A imagem não pôde ser refeita: {redone["error"]}'[:600])
     store.step(job['id'], 'art', 'succeeded', f'Arte · “{target["title"]}” refeita')
-    return job, False
+    return job

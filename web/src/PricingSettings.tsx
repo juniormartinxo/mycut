@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Coins, Plus, Save, Trash2 } from "lucide-react";
 import { request } from "./api";
 import type { Integrations, Pricing } from "./types";
+import { providers } from "./ProjectCosts";
 import "./ProjectCosts.css";
 
 type Row = { model: string; input: string; cache_read: string; output: string };
@@ -118,7 +119,7 @@ export function PricingSettings({
           </label>
           {(["codex", "grok"] as const).map((provider) => (
             <label key={provider}>
-              Arte com {provider === "codex" ? "Codex" : "Grok"}: US$ por imagem
+              Arte com {providers[provider]}: US$ por imagem
               <input
                 inputMode="decimal"
                 value={images[provider]}

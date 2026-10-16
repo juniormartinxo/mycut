@@ -10,7 +10,7 @@ from .costs import DEFAULTS as PRICING
 
 ROLES = ('research', 'writer', 'director', 'reviewer', 'art')
 # Roles of every production; the Arte only works for a Short livre that generates images.
-TEXT_ROLES = ROLES[:4]
+TEXT_ROLES = ('research', 'writer', 'director', 'reviewer')
 DEFAULTS = {
     'agents': {role: {'provider': provider, 'model': ''} for role, provider in zip(
         ROLES, ('grok', 'claude', 'codex', 'codex', 'codex'))},

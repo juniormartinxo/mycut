@@ -94,7 +94,11 @@ Short completo. Em **Novo** também dá para gerar tudo de uma vez ou nenhuma
 imagem. São até 12 imagens por Short, até 4 delas bases, uma por chamada. As
 cenas nunca apontam para uma imagem inexistente: o pedido guarda o bloco ou o
 fundo do plano onde ela entra, e a imagem só ocupa esse lugar se o autor não o
-preencheu nesse meio-tempo. Uma imagem que falha vira aviso dos agentes. A
+preencheu nesse meio-tempo. Uma imagem que falha vira aviso dos agentes, e
+uma imagem que cita uma base ainda inexistente espera por ela, em vez de sair
+sem a referência. Pedidos além do limite recebem uma correção e depois são
+descartados, sem perder a direção. Uma nova produção tira da biblioteca as
+imagens antigas da Arte que as novas cenas não usam. A
 estimativa (imagens × preço por imagem, editável) é gravada antes da primeira
 chamada, e cada chamada registra as imagens recebidas em Custos. Como os CLIs
 não informam o custo de uma imagem, o preço serve só como referência (decisão do

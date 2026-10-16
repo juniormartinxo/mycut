@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { request } from "./api";
 import { FormatPicker } from "./FormatPicker";
-import { money } from "./ProjectCosts";
+import { money, providers } from "./ProjectCosts";
 import type { ArtMode, Integrations, Job, Project, VisualStyle } from "./types";
 
 export function useIntegrations() {
@@ -410,7 +410,7 @@ export function NewProduction({
             {art !== "none" && (
               <p className="connection-help" role="status">
                 Até {MAX_ART_IMAGES} imagens
-                {artist && ` com ${artist === "codex" ? "Codex" : "Grok"}`}
+                {artist && ` com ${providers[artist]}`}
                 {typeof perImage === "number"
                   ? ` · estimativa de até ${money(MAX_ART_IMAGES * perImage)} (${money(perImage)} por imagem)`
                   : " · sem preço por imagem configurado"}

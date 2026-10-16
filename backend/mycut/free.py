@@ -117,7 +117,7 @@ class FreeDirection(Output):
     scenes: list[FreeScene] = Field(min_length=1, max_length=12)
     # Visual bible and image requests for the Arte; empty when the Short has no generated images.
     bible: Bible | None = None
-    images: list[ArtRequest] = Field(default_factory=list, max_length=artwork.MAX_IMAGES)
+    images: list[ArtRequest] = Field(default_factory=list, max_length=artwork.MAX_REQUESTED)
 
 
 WRITER = (
@@ -333,13 +333,7 @@ def compose(direction, script, project, repair, notes, problems, requests=()):
                  'shots': [Shot(id=new_id(), **shot).model_dump() for shot in built[1:]], 'pauses': pauses(source, index, notes)}
         del scene['anchor'], scene['transition']
         for (background, blocks), stored in zip(markers, [scene, *scene['shots']]):
-            if background:
-                art[background['key']]['placements'].append({'scene': scene['id'], 'shot': stored['id'],
-                                                             'motion': background['motion'], 'dim': background['dim']})
-            for marker, block in zip(blocks, stored['blocks']):
-                if marker:
-                    art[marker['key']]['placements'].append({'scene': scene['id'], 'shot': stored['id'],
-                                                             'block': block['id'], 'motion': marker['motion']})
+            artwork.add_placements(art, scene['id'], stored, background, blocks)
         scenes.append(settle(scene, index, project, problems, repair, notes))
     return problems, scenes
 
@@ -357,7 +351,7 @@ def plano(shot, scene, number, images, problems, art):
     for i, (block, height) in enumerate(zip(shot.blocks, heights)):
         value, marker = block.object, None
         if value is not None and value.type == 'image' and value.art is not None and value.image_id not in images:
-            marker = generated(value.art, art, f'{where}.blocks[{i}].object', problems) and {'key': value.art, 'motion': value.motion}
+            marker = requested(value.art, art, f'{where}.blocks[{i}].object', problems) and {'key': value.art, 'motion': value.motion}
             value = None
         blocks.append({**SceneBlock(height=height, object=visual_object(value, f'{where}.blocks[{i}]', images, problems)).model_dump(),
                        **({'_art': marker} if marker else {})})
@@ -365,7 +359,7 @@ def plano(shot, scene, number, images, problems, art):
     if shot.background and shot.background.kind == 'image' and shot.background.art is not None \
             and shot.background.image_id not in images:
         value = shot.background
-        marker = generated(value.art, art, f'{where}.background', problems) and {'key': value.art, 'motion': value.motion,
+        marker = requested(value.art, art, f'{where}.background', problems) and {'key': value.art, 'motion': value.motion,
                                                                                   'dim': value.dim}
     elif shot.background:
         value = shot.background
@@ -381,8 +375,8 @@ def plano(shot, scene, number, images, problems, art):
             'background': background, 'blocks': blocks, **({'_art': marker} if marker else {})}
 
 
-def generated(key, art, where, problems):
-    """Whether an object or background asks for an image the Arte will generate."""
+def requested(key, art, where, problems):
+    """Whether an object or background uses an image the director asked the Arte for."""
     if key in art:
         return True
     problems.append(f'{where}: use em art a key de uma imagem de images, ou um image_id de available_images.')
@@ -538,7 +532,7 @@ def produce(job, folder):
     if not review.approved:
         warnings = warnings + [f'Conferência: {issue}' for issue in issues] + interrupted
     values = {'title': script.titles[0], 'description': script.description, 'tags': script.tags, 'sources': '\n'.join(sources),
-              'scenes': scenes, 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
+              'scenes': scenes, 'images': artwork.library(project.get('images', []), scenes), 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
               'agent_review': review.model_dump(), 'audio': None, 'warnings': warnings, 'visual_style': style,
               'publication': {'titles': script.titles, 'description': script.description, 'hashtags': script.hashtags,
                               'pinned_comment': script.pinned_comment},

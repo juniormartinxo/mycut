@@ -181,7 +181,9 @@ def enqueue(project_id, mode, revision, kind='render', settings=None, request=No
         project = project_row(db.execute('SELECT * FROM projects WHERE id=?', (project_id,)).fetchone())
         if project['revision'] != revision:
             raise Conflict('Salve e atualize o projeto antes de produzir.')
-        if kind in ('render', 'voice') and any(not s['narration'].strip() or not s['title'].strip() for s in project['scenes']):
+        # An Arte run that resumes a production stopped for the bases goes on to the voice.
+        voiced = kind in ('render', 'voice') or kind == 'art' and (project.get('art') or {}).get('then') == 'pipeline'
+        if voiced and any(not s['narration'].strip() or not s['title'].strip() for s in project['scenes']):
             raise Conflict('Preencha o título e a narração de todas as cenas.')
         if kind == 'scenes' and any(not s['narration'].strip() for s in project['scenes']):
             raise Conflict('Gere ou salve o roteiro antes de criar as cenas com agentes.')

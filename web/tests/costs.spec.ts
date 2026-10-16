@@ -165,7 +165,7 @@ test("editar os preços do Codex e as conversões", async ({ page }) => {
   await page.getByRole("button", { name: "Adicionar modelo" }).click();
   const rows = page.locator(".pricing-form tbody tr");
   const added = rows.last();
-  await added.getByRole("textbox", { name: "Modelo" }).fill("gpt-teste");
+  await added.getByRole("textbox", { name: "Modelo", exact: true }).fill("gpt-teste");
   await added
     .getByRole("textbox", { name: "gpt-teste: entrada", exact: true })
     .fill("1");

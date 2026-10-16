@@ -273,6 +273,14 @@ test("A Arte gera primeiro as imagens-base e deixa orientar cada uma antes das d
   const bases = page.getByRole("region", { name: "Imagens-base" });
   await expect(bases.getByRole("img", { name: "Ficha da Comandante Ira Vale" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Imagens das cenas" })).toContainText("Aguardando geração · 9:16 · com Ficha da Comandante Ira Vale");
+  // A scene image waits for its bases: it cannot be guided before they exist.
+  project.art!.requests[0] = { ...project.art!.requests[0], state: "failed", image_id: null };
+  await page.reload();
+  const scenes = page.getByRole("region", { name: "Imagens das cenas" });
+  await expect(scenes).toContainText("Gere antes a imagem-base “Ficha da Comandante Ira Vale”");
+  await expect(scenes.getByLabel("Orientação para a Arte")).toBeDisabled();
+  project.art!.requests[0] = { ...project.art!.requests[0], state: "generated", image_id: base };
+  await page.reload();
   await expect(page.getByText("1 imagem · estimativa US$ 0,05.")).toBeVisible();
   await bases.getByLabel("Orientação para a Arte").fill("Cicatriz bem visível");
   await bases.locator("input[type=file]").setInputFiles({ name: "exemplo.png", mimeType: "image/png", buffer: png });
