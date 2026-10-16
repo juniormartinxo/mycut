@@ -8,10 +8,10 @@ from datetime import datetime, timezone
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from pydantic import Field, StringConstraints
-from . import flow, store, visuals
+from . import flow, store, visuals, google_fonts
 from .block_render import inspect, text_layout
 from .flow import FlowSpec
-from .models import Scene, ProjectInput
+from .models import Scene, ProjectInput, CaptionStyle, Pause, VisualStyle
 from .pipeline import Output, Source, Review, AgentOutputError, agent, save_editorial
 from .scene_layout import VisualObject, SceneBlock, Background, Shot, Motion, geometry, new_id, MAX_SHOTS, MAX_PROJECT_SHOTS, AREA
 
@@ -27,14 +27,21 @@ class ScriptScene(Output):
     narration: str = Field(min_length=1, max_length=1400)
     screen_text: list[Annotated[str, StringConstraints(max_length=300)]] = Field(max_length=6)
     visual: str = Field(max_length=1500)
+    pauses: list[Pause] = Field(max_length=4)
+
+
+Hashtag = Annotated[str, StringConstraints(pattern=r'^#[^\s#]{1,60}$')]
 
 
 class FreeScript(Output):
     # 'script': the prompt brought the whole script and it is followed literally; 'idea': the writer wrote it.
     mode: Literal['script', 'idea']
-    title: str = Field(min_length=1, max_length=100)
+    # Publication package: the first title is the one used; the others stay as options.
+    titles: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]] = Field(min_length=1, max_length=5)
     description: str = Field(min_length=1, max_length=5000)
     tags: str = Field(min_length=1, max_length=500)
+    hashtags: list[Hashtag] = Field(max_length=15)
+    pinned_comment: str = Field(max_length=5000)
     scenes: list[ScriptScene] = Field(min_length=1, max_length=12)
     claims: list[Annotated[str, StringConstraints(min_length=1, max_length=600)]] = Field(max_length=12)
 
@@ -91,8 +98,17 @@ class FreeScene(Output):
     shots: list[FreeShot] = Field(min_length=1, max_length=MAX_SHOTS)
 
 
+class FreeStyle(Output):
+    background: Color
+    text_color: Color
+    font: str = Field(min_length=1, max_length=150)
+
+
 class FreeDirection(Output):
     accent: Color
+    style: FreeStyle
+    captions: CaptionStyle
+    loop: bool
     scenes: list[FreeScene] = Field(min_length=1, max_length=12)
 
 
@@ -105,9 +121,13 @@ WRITER = (
     'screen_text traz, literalmente, o texto na tela pedido para o trecho (vazio se não houver); visual resume o que o prompt '
     'pede para mostrar. Se o prompt é só uma ideia, use mode="idea" e escreva o roteiro com liberdade de estrutura: número de '
     'cenas, ritmo e tom vêm do pedido. Até 12 cenas, até 180 s e até 500 palavras de narração no total, vídeo vertical 9:16. '
+    'Uma pausa pedida na fala, como "(pausa)", não entra em narration: vira pauses, com after copiado literalmente da '
+    'narração da cena (o trecho logo antes da pausa) e seconds (0,2 a 3; 0,8 quando o prompt não diz). '
     'Em claims, liste somente as afirmações factuais externas da narração e do texto na tela que precisam de fonte '
     '(ferramentas, preços, datas, números, lançamentos). Método próprio, opinião e ficção não entram; sem fatos externos, '
-    'claims=[]. Título fiel com hashtags, descrição e tags separadas por vírgula, aproveitando o que o prompt já trouxer. '
+    'claims=[]. Pacote de publicação, aproveitando o que o prompt já trouxer: titles com 1 a 5 opções de título fiel (a '
+    'primeira é a usada), descrição, tags separadas por vírgula, hashtags (cada uma começando por #) e pinned_comment, o '
+    'comentário fixado pedido no prompt (vazio se não houver). '
     'Corrija os problemas em issues_to_fix.')
 
 RESEARCH = (
@@ -125,10 +145,16 @@ DIRECTOR = (
     'O primeiro plano começa com a cena; cada plano seguinte começa na anchor, um trecho copiado literalmente da narração '
     'da cena e em ordem; transition=cut (corte seco) ou fade (fusão). Ritmo de corte, tom e cores vêm do prompt. '
     'Fundo do plano: color, gradient (color e color_to, com angle) ou image (image_id, com motion), e dim escurece a mídia '
-    'para o texto ficar legível; background=null usa o fundo do projeto (style). Dê aos textos color com bom contraste '
-    'sobre o fundo, ou null para a cor do projeto. brand=false oculta a marca do canal, como num B-roll em tela cheia. '
-    'A área dos blocos tem area.width × area.height px por plano; a legenda fica abaixo dela. Textos concisos que caibam, '
-    'font_size de 16 a 200. accent é a cor de destaque do Short, tirada do tom do prompt. Use somente image_id de '
+    'para o texto ficar legível; background=null usa style.background. Dê aos textos color com bom contraste '
+    'sobre o fundo, ou null para style.text_color. brand=false oculta a marca do canal, como num B-roll em tela cheia. '
+    'A área dos blocos tem area.width × area.height px por plano. Textos concisos que caibam, font_size de 16 a 200. '
+    'Não há formato de base: accent (cor de destaque) e style vêm do tom do prompt. style.background é o fundo do projeto, '
+    'style.text_color a cor dos textos e style.font uma família do Google Fonts que combine com o tom (ex.: Roboto, Inter, '
+    'Montserrat, Oswald, Bebas Neue, Space Grotesk, Orbitron, Exo 2, Playfair Display, Merriweather, JetBrains Mono). '
+    'captions é a legenda: words (2 a 4) palavras por vez, position (top, middle ou bottom, todas na área segura, fora dos '
+    '15% inferiores e da faixa direita dos botões do YouTube), font_size de 40 a 110 e keywords, as palavras da narração '
+    'destacadas na cor accent (números e termos-chave pedidos). loop=true só quando o prompt pede que o último quadro case '
+    'com o primeiro. Use somente image_id de '
     'available_images e nunca invente ids; objetos que não são flow usam flow=null. Não altere a narração. '
     'Corrija os problemas em issues_to_fix. ')
 
@@ -221,11 +247,9 @@ def direct(ask, project, script, issues):
     """One bounded correction; then the composition is repaired, or rebuilt from the script if unusable.
     Returns the direction, the scenes and the warnings about what the repair changed."""
     images = project.get('images', [])
-    style = visuals.resolve(project)
     payload = {'prompt': project['brief'], 'script': script.model_dump(), 'flow_icons': flow.icon_names(),
                'available_images': [{k: v for k, v in item.items() if k != 'path'} for item in images],
-               'area': {'width': AREA[2], 'height': AREA[3]},
-               'style': {key: style[key] for key in ('background', 'text_color')}}
+               'area': {'width': AREA[2], 'height': AREA[3]}}
     corrections = list(issues)
     for final in (False, True):
         try:
@@ -234,20 +258,42 @@ def direct(ask, project, script, issues):
             if final:
                 message = f'A direção não pôde ser usada ({exc}); as cenas mostram o texto na tela do roteiro.'[:500]
                 store.step(ask.job['id'], 'director', 'failed', message)
-                notes = [message]
-                return None, [fallback(scene, index, project, notes) for index, scene in enumerate(script.scenes)], notes
+                notes, style = [message], generated_style(None, [], True, [])
+                styled = {**project, 'visual_style': style}
+                return None, [fallback(scene, index, styled, notes) for index, scene in enumerate(script.scenes)], notes, style
             corrections = [*issues, str(exc)]
             continue
-        notes = []
-        problems, scenes = compose(direction, script, project, final, notes)
+        notes, problems = [], []
+        # Text is measured with the font the Short will be drawn with.
+        style = generated_style(direction, problems, final, notes)
+        problems, scenes = compose(direction, script, {**project, 'visual_style': style}, final, notes, problems)
         if final or not problems:
-            return direction, scenes, notes
+            return direction, scenes, notes, style
         corrections = [*issues, *problems[:8]]
 
 
-def compose(direction, script, project, repair, notes):
+def generated_style(direction, problems, repair, notes):
+    """The Short's visual_style from the prompt's tone, chosen by the director with no format as a base (ADR 0005)."""
+    base = {'format_id': 'free', 'font': 'sans', 'media_mode': 'mixed', 'image_source': 'library'}
+    if direction is None:
+        return VisualStyle(**base, google_font='Roboto', captions=CaptionStyle()).model_dump()
+    font = direction.style.font
+    try:
+        google_fonts.entry(font)
+    except ValueError as exc:
+        problems.append(f'style.font: {exc}')
+        font = 'Roboto'
+    try:
+        google_fonts.install(font)
+    except ValueError as exc:
+        notes.append(f'A fonte {font} não pôde ser baixada ({exc}); o Short usa Roboto.'[:500])
+        font = 'Roboto'
+    return VisualStyle(**base, google_font=font, background=direction.style.background, text_color=direction.style.text_color,
+                       captions=direction.captions, loop=direction.loop).model_dump()
+
+
+def compose(direction, script, project, repair, notes, problems):
     """Project scenes from the director's output, with the problems found; with repair, fixes them instead."""
-    problems = []
     if len(direction.scenes) != len(script.scenes):
         problems.append(f'scenes: crie exatamente {len(script.scenes)} cenas, uma por cena do roteiro.')
     images = {item['id'] for item in project.get('images', [])}
@@ -267,7 +313,7 @@ def compose(direction, script, project, repair, notes):
         built = [plano(shot, index, number, images, problems) for number, shot in enumerate(planos)]
         scene = {**built[0], 'id': new_id(), 'title': visual.title or (source.screen_text or [''])[0][:100] or f'Cena {index+1}',
                  'narration': source.narration, 'layout': 'statement', 'items': items(source),
-                 'shots': [Shot(id=new_id(), **shot).model_dump() for shot in built[1:]]}
+                 'shots': [Shot(id=new_id(), **shot).model_dump() for shot in built[1:]], 'pauses': pauses(source, index, notes)}
         del scene['anchor'], scene['transition']
         scenes.append(settle(scene, index, project, problems, repair, notes))
     return problems, scenes
@@ -380,6 +426,17 @@ def fit(obj, issue, box, project, index, notes):
     return obj
 
 
+def pauses(source, index, notes):
+    """The script's pauses whose passage is in the narration; any other one is dropped and the user is told."""
+    kept = []
+    for pause in source.pauses:
+        if flow.pause_points({'narration': source.narration, 'pauses': [pause.model_dump()]}):
+            kept.append(pause.model_dump())
+        else:
+            notes.append(f'Cena {index+1}: a pausa depois de “{pause.after}” não está na narração e foi removida.')
+    return kept
+
+
 def items(source):
     return [text[:100] for text in source.screen_text if text.strip()][:4]
 
@@ -392,13 +449,13 @@ def fallback(source, index, project, notes):
     rest = VisualObject(type='paragraph', text='\n'.join(lines[1:]), font_size=44, reveal='lines') if lines[1:] else None
     blocks = [SceneBlock(height=30, object=title), SceneBlock(height=70, object=rest)]
     scene = {'id': new_id(), 'title': title.text[:100], 'narration': source.narration, 'layout': 'statement',
-             'items': items(source), 'blocks': [block.model_dump() for block in blocks]}
+             'items': items(source), 'blocks': [block.model_dump() for block in blocks], 'pauses': pauses(source, index, notes)}
     return settle(scene, index, project, [], True, notes)
 
 
 def summary(script, scenes):
     """What the conference compares with the prompt: requested time, narration and texts on screen, plano by plano."""
-    return [{'timing': source.timing, 'narration': scene['narration'],
+    return [{'timing': source.timing, 'narration': scene['narration'], 'pauses': scene.get('pauses', []),
              'shots': [{'anchor': shot.get('anchor'), 'texts': [b['object']['text'] for b in shot['blocks']
                                                                 if b.get('object') and b['object']['type'] in ('title', 'paragraph')]}
                        for shot in [scene, *scene.get('shots', [])]]} for source, scene in zip(script.scenes, scenes)]
@@ -413,7 +470,7 @@ def produce(job, folder):
         try:
             script = write(ask, project, issues)
             script, warnings = verify(ask, project, script, issues, known)
-            direction, scenes, notes = direct(ask, project, script, issues)
+            direction, scenes, notes, style = direct(ask, project, script, issues)
         except ValueError as exc:
             if kept is None:
                 raise
@@ -427,19 +484,21 @@ def produce(job, folder):
         except ValueError as exc:
             # Invalid output, CLI error or timeout: the paid script and scenes are kept, as after a rejection.
             review = Review(approved=False, issues=[str(exc)[:500]])
-        kept = script, warnings + notes, direction, scenes, checked, review
+        kept = script, warnings + notes, direction, scenes, style, checked, review
         if review.approved:
             break
         issues = review.issues or ['A conferência não aprovou a fidelidade ao prompt.']
-    script, warnings, direction, scenes, checked, review = kept
+    script, warnings, direction, scenes, style, checked, review = kept
     sources = list(dict.fromkeys(item['source']['url'] for item in checked if item['verified']))
     accent = project['accent'] if project.get('accent_locked') or direction is None else direction.accent
     if not review.approved:
         warnings = warnings + [f'Conferência: {issue}' for issue in issues] + interrupted
-    values = {'title': script.title, 'description': script.description, 'tags': script.tags, 'sources': '\n'.join(sources),
+    values = {'title': script.titles[0], 'description': script.description, 'tags': script.tags, 'sources': '\n'.join(sources),
               'scenes': scenes, 'accent': accent, 'research': {'checks': checked}, 'free_script': script.model_dump(),
-              'agent_review': review.model_dump(), 'audio': None, 'warnings': warnings}
-    ProjectInput.model_validate({'title': script.title, 'scenes': scenes})
+              'agent_review': review.model_dump(), 'audio': None, 'warnings': warnings, 'visual_style': style,
+              'publication': {'titles': script.titles, 'description': script.description, 'hashtags': script.hashtags,
+                              'pinned_comment': script.pinned_comment}}
+    ProjectInput.model_validate({'title': script.titles[0], 'scenes': scenes, 'visual_style': style})
     job = store.checkpoint(job['id'], values)
     save_editorial(job, folder)
     if not review.approved:

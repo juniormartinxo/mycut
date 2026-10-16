@@ -378,9 +378,20 @@ def produce(job):
 def save_editorial(job, folder):
     project = job['snapshot']
     (folder / 'roteiro.txt').write_text(store.script(project) + '\n')
-    (folder / 'publicacao.txt').write_text('\n\n'.join(project.get(key, '') for key in ('title','description','tags','sources')))
+    (folder / 'publicacao.txt').write_text('\n\n'.join(project.get(key, '') for key in ('title','description','tags','sources'))
+                                           + package_text(project))
     if project.get('cover'):
         shutil.copy2(data_path(project['cover']['path']), folder / 'capa.png')
+
+
+def package_text(project):
+    """The Short livre's publication package, appended to publicacao.txt; formats have none."""
+    package = project.get('publication')
+    if not package:
+        return ''
+    titles = '\n'.join(f'{number}. {title}' for number, title in enumerate(package['titles'], 1))
+    return (f'\n\nOPÇÕES DE TÍTULO\n{titles}\n\nHASHTAGS\n{" ".join(package["hashtags"])}'
+            f'\n\nCOMENTÁRIO FIXADO\n{package["pinned_comment"]}\n')
 
 
 if __name__ == '__main__':

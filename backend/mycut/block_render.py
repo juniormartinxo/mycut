@@ -2,7 +2,7 @@
 import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
-from . import visuals, google_fonts, flow
+from . import visuals, google_fonts, flow, captions
 from .scene_layout import geometry, validate_assets, shots
 from .scene_media import VideoFrames
 from .media import data_path, digest
@@ -16,6 +16,8 @@ REVEAL_SPAN, LINE_IN, LINE_RISE = .7, .25, 16
 TYPING_CPS, TYPING_SPAN = 18, .8
 # Camera motion travels over this extra framing.
 MOTION_ZOOM = 1.15
+# A looping Short livre fades into its first frame and holds it, so the restart has no visible seam.
+LOOP_FADE, LOOP_HOLD = .4, .1
 
 
 def wrapped_lines(obj, box, face, draw):
@@ -84,7 +86,8 @@ def shot_windows(scene, clock):
 
 def shot_clock(clock, window):
     start, end = window
-    return {**clock, 'duration': end-start, 'words': [w-start for w in clock['words']]}
+    return {**clock, 'duration': end-start, 'words': [w-start for w in clock['words']],
+            'ends': [w-start for w in clock.get('ends', [])]}
 
 
 def inspect(scene, project, clock=None):
@@ -368,19 +371,37 @@ class ShotComposition:
         self.readers.clear()
 
 
+def loops(project):
+    """A Short livre asked to loop does, unless a video ending plays after its last frame."""
+    return bool(visuals.resolve(project).get('loop')) and not project.get('ending_id')
+
+
+def first_frame(project, clock=None):
+    """The Short's first frame without its caption: where a loop ends."""
+    first = BlockComposition(project['scenes'][0], project, clock=clock)
+    try:
+        return first.shots[0].frame(0.0)
+    finally:
+        first.close()
+
+
 class BlockComposition:
-    def __init__(self, scene, project, width=1080, fps=30, clock=None):
+    def __init__(self, scene, project, width=1080, fps=30, clock=None, loop_to=None):
         self.scene, self.project, self.fps = scene, project, fps
         self.scale = width / 1080
         self.size = (width, round(1920*self.scale))
         self.style = visuals.resolve(project)
         validate_assets(scene, project)
-        clock = clock or flow.estimate_clock(scene.get('narration', ''))
+        clock = clock or flow.estimate_clock(scene.get('narration', ''), flow.pause_points(scene))
         planos = shots(scene)
         self.windows = shot_windows(scene, clock)
         self.transitions = [shot.get('transition', 'cut') for shot in planos]
         self.shots = [ShotComposition(shot, scene, project, self.style, fps, shot_clock(clock, window), window[1]-window[0])
                       for shot, window in zip(planos, self.windows)]
+        # A Short livre times and draws its own captions; the others receive the caption text from the caller.
+        self.captions = captions.timed(scene, clock, self.style['captions']) if self.style.get('captions') else None
+        # Only the last scene of a looping Short carries the frame it ends on.
+        self.loop_to = loop_to
 
     @property
     def flows(self):
@@ -390,6 +411,7 @@ class BlockComposition:
         return max(i for i, (start, _) in enumerate(self.windows) if i == 0 or elapsed >= start - 1e-9)
 
     def frame(self, elapsed=None, phase=0, caption='', videos=True):
+        looping = False
         if elapsed is None:
             image = self.shots[0].frame(None, videos)
         else:
@@ -404,7 +426,16 @@ class BlockComposition:
             if fading:
                 previous = self.shots[index-1].frame(elapsed-self.windows[index-1][0], videos)
                 image = Image.blend(previous, image, max(0.0, elapsed-start)/FADE)
-        if caption:
+            closing = elapsed - (self.windows[-1][1]-LOOP_HOLD-LOOP_FADE)
+            looping = self.loop_to is not None and closing > 0
+            if looping:
+                image = Image.blend(image.convert('RGB'), self.loop_to.convert('RGB'), min(1.0, closing/LOOP_FADE))
+        if self.captions is not None:
+            # The loop ends on the bare first frame: no caption over the fade.
+            current = None if looping else captions.active(self.captions, elapsed)
+            if current:
+                captions.draw(image, current, self.style)
+        elif caption:
             draw = ImageDraw.Draw(image)
             draw.rounded_rectangle((70, 1620, 1010, 1810), radius=16,
                                    fill=visuals.blend(self.style['background'], self.style['text_color'], .08))

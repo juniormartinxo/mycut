@@ -17,7 +17,7 @@ from .config import ROOT, DATA, UPLOAD_LIMIT
 from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
 from . import voice_tests, covers, endings, flow
-from . import visuals, scene_layout, scene_media, google_fonts
+from . import visuals, scene_layout, scene_media, google_fonts, block_render
 from .scene_api import router as scene_router
 from .models import ScenePreview
 from .seed import blank, initialize_example
@@ -77,6 +77,8 @@ def present(project):
     project.setdefault('ending_id', None)
     project.setdefault('free', False)
     project.setdefault('warnings', [])
+    if (project.get('visual_style') or {}).get('loop') and project.get('ending_id'):
+        project['warnings'] = [*project['warnings'], 'O loop não é aplicado porque o Short termina com um vídeo de encerramento.']
     project['jobs'] = store.jobs(project['id'])
     for key in ['audio', 'cover']:
         if project.get(key):
@@ -113,14 +115,20 @@ def format_preview(format_id: str):
 def scene_preview(body: ScenePreview):
     document = body.model_dump()
     scene = body.scene.model_dump()
-    clock = flow.estimate_clock(scene['narration'])
+    clock = flow.estimate_clock(scene['narration'], flow.pause_points(scene))
+    loop_to = None
     if body.project_id:
         owner = store.get_project(body.project_id)
         document['images'] = owner.get('images', [])
         document['videos'] = owner.get('videos', [])
         clock = flow.scene_clock(owner, scene)
+        scenes = owner['scenes']
+        # The last scene of a looping Short ends on its first frame, as in the export.
+        if (body.elapsed is not None and scene.get('id') and scene['id'] == scenes[-1].get('id') and scenes[0].get('blocks')
+                and block_render.loops({**document, 'ending_id': owner.get('ending_id')})):
+            loop_to = block_render.first_frame({**owner, **document, 'scenes': scenes}, flow.scene_clock(owner, scenes[0]))
     width = 1080 if body.width == 'full' else 360
-    return Response(visuals.preview_png(scene, document, width, body.elapsed, clock), media_type='image/png')
+    return Response(visuals.preview_png(scene, document, width, body.elapsed, clock, loop_to), media_type='image/png')
 
 
 @app.post('/api/projects/{project_id}/images')
@@ -164,6 +172,7 @@ def projects():
 def create(body: CreateProject):
     if len(body.brief) > FORMAT_BRIEF_LIMIT:
         raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta. Para um prompt maior, escolha Livre.')
+    check_free_only(body, False)
     if body.automation != 'none':
         if not body.brief.strip():
             raise ValueError('Informe a pauta ou link para iniciar os agentes.')
@@ -222,6 +231,16 @@ def create_free(project: str = Form(max_length=200_000), files: list[UploadFile]
         raise
     store.enqueue(result['id'], 'final', result['revision'], body.automation, settings)
     return present(store.get_project(result['id']))
+
+
+def check_free_only(body, free):
+    """The director's generated style and the pauses belong to a Short livre; the formats keep theirs (ADR 0005)."""
+    style = body.visual_style
+    if style is not None and (style.format_id == 'free') != bool(free):
+        raise ValueError('O estilo gerado pelo diretor só vale para um Short livre.' if style.format_id == 'free' else
+                         'Um Short livre não usa um dos quatro formatos.')
+    if not free and any(scene.pauses for scene in getattr(body, 'scenes', [])):
+        raise ValueError('Pausas na narração só valem para um Short livre.')
 
 
 def ready_for(kind):
@@ -393,6 +412,7 @@ def update(project_id: str, body: ProjectInput):
     # The saved project decides the mode; a Short livre is created as such and stays one (ADR 0005).
     if not current.get('free') and len(body.brief) > FORMAT_BRIEF_LIMIT:
         raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta.')
+    check_free_only(body, current.get('free'))
     images = {item['id'] for item in current.get('images', [])}
     if body.visual_style and body.visual_style.google_font:
         google_fonts.entry(body.visual_style.google_font)

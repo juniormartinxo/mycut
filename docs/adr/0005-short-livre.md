@@ -18,6 +18,22 @@ a passo e Impacto. Os quatro formatos continuam com o fluxo atual. No modo
 Livre, paleta, fontes e fundo do Short nascem do tom do prompt, escolhidos pelo
 diretor, sem um formato de base.
 
+Implementado no MYC-5. O diretor devolve fundo, cor do texto, cor de destaque e
+uma família do Google Fonts, e o projeto guarda isso como um estilo próprio
+(`format_id` "free"), que nunca aparece entre os formatos e só vale para um
+Short livre. Uma fonte fora do catálogo pede correção. Uma fonte que não baixa
+vira Roboto, com aviso.
+
+## Legendas
+
+O diretor também define a legenda: de 2 a 4 palavras por vez, as
+palavras-chave na cor de destaque, o tamanho e a posição (no alto, no meio ou
+embaixo). Todas as posições ficam na área segura, fora dos 15% inferiores e da
+faixa direita dos botões do YouTube. Uma frase de uma palavra junta-se à
+vizinha, e uma pausa sempre corta a legenda. A prévia e o MP4 calculam e
+desenham a legenda com o mesmo código, a partir do relógio da cena, e o
+`legendas.srt` traz os mesmos trechos. Os formatos mantêm a legenda anterior.
+
 ## Fidelidade ao prompt
 
 Quando o prompt traz um roteiro completo, narração, texto na tela e ordem dos
@@ -78,3 +94,28 @@ exportação. Importar o clipe substitui o fundo do plano.
 Pausas explícitas no roteiro livre viram silêncio no áudio, inserido entre
 trechos sintetizados, sem depender de tags do provedor de voz. Planos e
 legendas consideram esse silêncio. Os formatos continuam sem pausas.
+
+Implementado no MYC-5. A pausa fica na cena como uma âncora: o trecho da
+narração depois do qual ela entra e a duração, de 0,2 a 3 s. Uma pausa cujo
+trecho não está na fala é removida, com aviso. Se a narração for editada
+depois e o trecho sair da fala, a pausa continua salva, mas não tem efeito, e a
+aba Roteiro a mostra como não aplicada. A voz é pedida por trechos, cada um com
+o texto vizinho (`previous_text` e `next_text`) para manter a entonação. O
+`eleven_v3` não aceita essa costura, então nele cada trecho é falado sozinho.
+Os trechos são unidos com silêncio real, e os tempos das palavras são
+deslocados. A estimativa sem narração soma o mesmo silêncio. Mudar uma pausa
+muda o roteiro falado, e a narração salva deixa de valer.
+
+## Loop e pacote de publicação
+
+Quando o prompt pede loop, o último plano funde em 0,4 s no primeiro quadro do
+Short, sem legenda, e o mantém nos últimos 0,1 s, na prévia e no MP4. Com um
+vídeo de encerramento, o loop não é aplicado, porque o encerramento vem depois
+do último quadro. Um aviso dos agentes explica isso (decisão do usuário em
+16/10/2026).
+
+O roteirista entrega o pacote de publicação: de 1 a 5 opções de título (a
+primeira é a usada), descrição, tags, hashtags e o comentário fixado pedido no
+prompt. Na aba Publicação, cada opção pode virar o título, e hashtags e
+comentário têm um botão de copiar. O pacote não é editável nesta versão. O
+`publicacao.txt` traz o pacote completo.

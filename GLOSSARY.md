@@ -39,6 +39,26 @@ Ponto que os agentes de um Short livre deixam para revisão, sem recusar a produ
 verificada, texto na tela encurtado para caber, pesquisa ou direção indisponível e problemas apontados
 pela conferência.
 
+**Estilo gerado**:
+Fundo, cor do texto, cor de destaque, fonte e legenda de um Short livre,
+escolhidos pelo diretor a partir do tom do prompt, sem um formato de base.
+
+**Área segura**:
+Parte do quadro fora dos 15% inferiores e da faixa direita, onde o YouTube não
+desenha botões nem textos; as legendas do Short livre ficam nela.
+
+**Pausa**:
+Silêncio na narração de um Short livre depois de um trecho da fala da cena,
+com duração própria; adia as palavras, as legendas e os planos seguintes.
+
+**Loop**:
+Fim de um Short livre em que o último quadro funde no primeiro, para o vídeo
+recomeçar sem emenda visível.
+
+**Pacote de publicação**:
+Opções de título, descrição, tags, hashtags e comentário fixado que o
+roteirista entrega com um Short livre.
+
 **Bíblia visual**:
 Tom, fichas de personagem e de cenário extraídos do prompt de um Short livre,
 que servem de referência para todas as imagens geradas.

@@ -116,17 +116,25 @@ class FlowSpec(BaseModel):
 
 # ---------------------------------------------------------------- narration clock
 
-def estimate_clock(narration):
-    """Same estimate as production.estimated_timing for a scene without generated narration."""
+def estimate_clock(narration, pauses=None):
+    """Same estimate as production.estimated_timing for a scene without generated narration; `pauses` are the
+    seconds of silence after word indices (pause_points), which delay every later word."""
     words = narration.split()
-    duration = max(2.0, len(words)/2.7 + .3)
-    return {'duration': duration, 'words': [duration*k/len(words) for k in range(len(words))], 'source': 'estimate'}
+    spoken = max(2.0, len(words)/2.7 + .3)
+    pauses = {index: seconds for index, seconds in (pauses or {}).items() if index < len(words)}
+    starts, ends, silence = [], [], 0
+    for k in range(len(words)):
+        starts.append(spoken*k/len(words) + silence)
+        ends.append(spoken*(k+1)/len(words) + silence)
+        silence += pauses.get(k, 0)
+    return {'duration': spoken + sum(pauses.values()), 'words': starts, 'ends': ends, 'source': 'estimate'}
 
 
 def clock_from_timing(timing, index):
     bounds = timing['scenes'][index]
-    words = [w['start']-bounds['start'] for w in timing.get('words', []) if w['scene'] == index]
-    return {'duration': bounds['end']-bounds['start'], 'words': words,
+    spoken = [w for w in timing.get('words', []) if w['scene'] == index]
+    return {'duration': bounds['end']-bounds['start'], 'words': [w['start']-bounds['start'] for w in spoken],
+            'ends': [w['end']-bounds['start'] for w in spoken],
             'source': 'estimate' if timing.get('timing_source') == 'estimated_preview_only' else 'narration'}
 
 
@@ -145,25 +153,42 @@ def scene_clock(project, scene):
             return clock_from_timing(timing, index)
         except (OSError, ValueError, KeyError, IndexError, TypeError):
             # Imported narration has no saved word alignment: the export aligns it with Whisper.
-            return {**estimate_clock(scene['narration']), 'source': 'export'}
-    return estimate_clock(scene['narration'])
+            return {**estimate_clock(scene['narration'], pause_points(scene)), 'source': 'export'}
+    return estimate_clock(scene['narration'], pause_points(scene))
+
+
+def anchor_spans(anchors, narration):
+    """First and last narration word index of each anchor passage, searched in order; None when absent or not found.
+    Words with nothing to say, like a spaced "—", are skipped on both sides but keep their place in the narration."""
+    spoken = [(i, n) for i, n in enumerate(normalized(w) for w in narration.split()) if n]
+    words = [n for _, n in spoken]
+    cursor, found = 0, []
+    for anchor in anchors:
+        span = None
+        needle = [n for n in (normalized(w) for w in (anchor or '').split()) if n]
+        if needle:
+            for i in range(cursor, len(words)-len(needle)+1):
+                if words[i:i+len(needle)] == needle:
+                    span = (spoken[i][0], spoken[i+len(needle)-1][0])
+                    cursor = i+1
+                    break
+        found.append(span)
+    return found
 
 
 def resolve_anchors(flow, narration):
     """Word index of each step anchor, searched in order; None when absent or not found."""
-    words = [normalized(w) for w in narration.split()]
-    cursor, found = 0, []
-    for step in flow['steps']:
-        index = None
-        needle = [n for n in (normalized(w) for w in (step.get('anchor') or '').split()) if n]
-        if needle:
-            for i in range(cursor, len(words)-len(needle)+1):
-                if words[i:i+len(needle)] == needle:
-                    index = i
-                    cursor = i+1
-                    break
-        found.append(index)
-    return found
+    return [span and span[0] for span in anchor_spans([step.get('anchor') for step in flow['steps']], narration)]
+
+
+def pause_points(scene):
+    """Seconds of silence after each word index, for the pauses whose passage is found in the narration, in order."""
+    pauses = scene.get('pauses') or []
+    points = {}
+    for pause, span in zip(pauses, anchor_spans([pause['after'] for pause in pauses], scene.get('narration', ''))):
+        if span is not None:
+            points[span[1]] = points.get(span[1], 0) + pause['seconds']
+    return points
 
 
 def anchor_warnings(flow, narration):
