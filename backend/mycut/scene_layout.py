@@ -198,6 +198,21 @@ def validate_assets(scene, project):
                     raise ValueError('Escolha uma mídia da biblioteca desta produção.')
 
 
+def image_uses(project, image_id):
+    """Numbers of the scenes that show this image, in a block, a plano background or the older scene image."""
+    numbers = []
+    for number, scene in enumerate(project.get('scenes', []), 1):
+        used = scene.get('image_id') == image_id
+        for shot in shots(scene) if scene.get('blocks') is not None else []:
+            background = shot.get('background') or {}
+            used = used or (background.get('kind') == 'image' and background.get('asset_id') == image_id)
+            used = used or any((block.get('object') or {}).get('type') == 'image' and block['object'].get('asset_id') == image_id
+                               for block in shot['blocks'])
+        if used:
+            numbers.append(number)
+    return numbers
+
+
 def shot_of(scene, scope, target_id):
     """The plano a conversation works on: the one holding its block or object, or the plano itself."""
     for shot in shots(scene):

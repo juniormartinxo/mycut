@@ -150,6 +150,26 @@ def upload_scene_image(project_id: str, file: UploadFile, revision: int = Query(
         file.file.close()
 
 
+@app.delete('/api/projects/{project_id}/images/{image_id}')
+def delete_scene_image(project_id: str, image_id: str, revision: int = Query(ge=1)):
+    """Remove an image from the library; one still shown in a scene stays until it is swapped out."""
+    from .scene_images import files
+    from .scene_layout import image_uses
+    project = store.get_project(project_id)
+    record = next((item for item in project.get('images', []) if item['id'] == image_id), None)
+    if record is None:
+        raise HTTPException(404, 'Imagem não encontrada.')
+    if project['revision'] != revision:
+        raise store.Conflict('O projeto mudou em outra tela. Reabra-o antes de excluir.')
+    if numbers := image_uses(project, image_id):
+        where = f'na cena {numbers[0]}' if len(numbers) == 1 else 'nas cenas ' + ', '.join(map(str, numbers))
+        raise store.Conflict(f'Esta imagem está em uso {where}. Troque-a ou remova o objeto antes de excluir.')
+    saved = store.update_project(project_id, {'images': [item for item in project['images'] if item['id'] != image_id]}, revision)
+    for path in files(record):
+        path.unlink(missing_ok=True)
+    return present(saved)
+
+
 @app.get('/api/projects/{project_id}/images/{image_id}')
 def project_image(project_id: str, image_id: str):
     record = next((item for item in store.get_project(project_id).get('images', []) if item['id'] == image_id), None)

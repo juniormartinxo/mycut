@@ -6,6 +6,7 @@ import { request } from "./api";
 import { RenderedScene } from "./FormatPicker";
 import { GoogleFontPicker } from "./GoogleFontPicker";
 import { SceneConversation } from "./SceneConversation";
+import { ImageLibrary, imagesInUse } from "./ImageLibrary";
 import { FlowControls, useFlowPlayer } from "./FlowPlayer";
 import { appendBlock, insertShot, mapObject, MAX_PROJECT_SHOTS, MAX_SHOTS, mediaExtent, moveShot, newObject, removeBlock, removeShot, resizeBlock, resizeBlockEdge, shotCount, shotsOf, shotView, withShot } from "./sceneLayout";
 import "./SceneEditor.css";
@@ -144,6 +145,14 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
         setPast(old => [...old, structuredClone(savedScene)]); setFuture([]);
         onChange(mapObject(savedScene, capturedId, object => ({ ...object, asset_id: uploaded.id })));
       }
+    });
+  };
+  // The server refuses an image still shown in a saved scene; the draft is saved first so it judges the current one.
+  const used = imagesInUse(project.scenes.map(saved => saved.id === scene.id ? scene : saved));
+  const removeImage = (id: string) => {
+    void action(async () => {
+      const current = await save();
+      onProject(await request<Project>(`/projects/${project.id}/images/${id}?revision=${current.revision}`, { method: "DELETE" }));
     });
   };
   const uploadBackground = (file?: File) => {
@@ -328,7 +337,10 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             {background.kind === "gradient" && <NumberField label="Ângulo (°)" value={background.angle ?? 180} min={0} max={360} onChange={angle => patchBackground({ angle })} />}
           </div>}
           {background && (background.kind === "image" || background.kind === "video") && <>
-            <label>Arquivo da biblioteca<select value={background.asset_id || ""} onChange={e => patchBackground({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{(background.kind === "image" ? project.images : project.videos)?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
+            {background.kind === "image"
+              ? <ImageLibrary images={project.images || []} value={background.asset_id} used={used} disabled={locked} label="Imagem do fundo"
+                  onSelect={asset_id => patchBackground({ asset_id })} onDelete={removeImage} />
+              : <label>Arquivo da biblioteca<select value={background.asset_id || ""} onChange={e => patchBackground({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{project.videos?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>}
             <div className="block-media-import">
               <button type="button" className="button secondary" disabled={locked} onClick={() => backgroundInput.current?.click()}><Upload size={16} /> Importar {background.kind === "image" ? "imagem" : "vídeo"}</button>
               <small>Ocupa o quadro inteiro, atrás dos blocos. {background.kind === "video" ? "Sem áudio; repete até o fim do plano." : "Preenche com corte."}</small>
@@ -400,16 +412,6 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             <label className="block-color">Cor do texto<input type="color" value={obj.color || project.visual_style?.text_color || "#292e29"} onChange={e => patchObject({ color: e.target.value })} /></label>
             <button type="button" className="text-button" disabled={!obj.color} onClick={() => patchObject({ color: null })}>{obj.color ? "Herdar cor do projeto" : "Cor herdada do projeto"}</button>
           </> : <>
-            <label>Arquivo da biblioteca<select value={obj.asset_id || ""} onChange={e => patchObject({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{(obj.type === "image" ? project.images : project.videos)?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
-            <div className="block-media-import">
-              <button type="button" className="button secondary" disabled={locked} onClick={() => mediaInput.current?.click()}>
-                <Upload size={16} /> Importar {obj.type === "image" ? "imagem" : "vídeo"}
-              </button>
-              <small>{obj.type === "image" ? "PNG, JPG, WebP ou GIF, animados ou não · até 15 MB" : "MP4, MOV ou WebM · até 100 MB"}</small>
-              <input ref={mediaInput} type="file" hidden aria-label={`Importar ${obj.type === "image" ? "imagem" : "vídeo"}`} disabled={locked}
-                accept={obj.type === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
-                onChange={e => { upload(e.target.files?.[0]); e.target.value = ""; }} />
-            </div>
             <label>Enquadramento<select value={obj.fit} onChange={e => patchObject({ fit: e.target.value as VisualObject["fit"] })}><option value="contain">Mostrar inteiro</option><option value="cover">Preencher com corte</option></select></label>
             {obj.fit === "cover" && <label>Zoom no recorte · {Math.round((obj.zoom ?? 1)*100)}%
               <input type="range" aria-label="Zoom no recorte" min="1" max="5" step="0.05" value={obj.zoom ?? 1} onChange={e => patchObject({ zoom: e.currentTarget.valueAsNumber })} />
@@ -429,6 +431,22 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
           </div>)}
           <button type="button" className="text-button destructive" onClick={() => patchBlock({ object: null })}><Trash2 size={15} /> Remover objeto</button>
         </fieldset>}
+        {obj && (obj.type === "image" || obj.type === "video") && <section className="block-library" aria-labelledby={`${tabId}-library`}>
+          <h3 id={`${tabId}-library`}>{obj.type === "image" ? "Imagens da produção" : "Vídeos da produção"}</h3>
+          {obj.type === "image"
+            ? <ImageLibrary images={project.images || []} value={obj.asset_id} used={used} disabled={locked} label="Imagens da produção"
+                onSelect={asset_id => patchObject({ asset_id })} onDelete={removeImage} />
+            : <label>Arquivo da biblioteca<select value={obj.asset_id || ""} onChange={e => patchObject({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{project.videos?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>}
+          <div className="block-media-import">
+            <button type="button" className="button secondary" disabled={locked} onClick={() => mediaInput.current?.click()}>
+              <Upload size={16} /> Importar {obj.type === "image" ? "imagem" : "vídeo"}
+            </button>
+            <small>{obj.type === "image" ? "PNG, JPG, WebP ou GIF, animados ou não · até 15 MB" : "MP4, MOV ou WebM · até 100 MB"}</small>
+            <input ref={mediaInput} type="file" hidden aria-label={`Importar ${obj.type === "image" ? "imagem" : "vídeo"}`} disabled={locked}
+              accept={obj.type === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
+              onChange={e => { upload(e.target.files?.[0]); e.target.value = ""; }} />
+          </div>
+        </section>}
         {!obj && <p className="block-hint">Este bloco está vazio. Escolha um objeto no dropdown ou peça uma proposta ao agente.</p>}
         </div>
         {issues.some(issue => issue.object_id !== obj?.id) && <p className="notice">Há pendências em outros blocos ou planos. Revise cada um antes de exportar.</p>}
