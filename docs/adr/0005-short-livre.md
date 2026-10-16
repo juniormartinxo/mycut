@@ -97,8 +97,11 @@ legendas consideram esse silêncio. Os formatos continuam sem pausas.
 
 Implementado no MYC-5. A pausa fica na cena como uma âncora: o trecho da
 narração depois do qual ela entra e a duração, de 0,2 a 3 s. Uma pausa cujo
-trecho não está na fala é removida, com aviso. A voz é pedida por trechos, cada
-um com o texto vizinho (`previous_text` e `next_text`) para manter a entonação.
+trecho não está na fala é removida, com aviso. Se a narração for editada
+depois e o trecho sair da fala, a pausa continua salva, mas não tem efeito, e a
+aba Roteiro a mostra como não aplicada. A voz é pedida por trechos, cada um com
+o texto vizinho (`previous_text` e `next_text`) para manter a entonação. O
+`eleven_v3` não aceita essa costura, então nele cada trecho é falado sozinho.
 Os trechos são unidos com silêncio real, e os tempos das palavras são
 deslocados. A estimativa sem narração soma o mesmo silêncio. Mudar uma pausa
 muda o roteiro falado, e a narração salva deixa de valer.

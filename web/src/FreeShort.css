@@ -37,6 +37,9 @@
   font-size: 11px;
   color: var(--muted);
 }
+.scene-pauses .not-applied {
+  color: #a23320;
+}
 .publication-package {
   display: grid;
   gap: 20px;

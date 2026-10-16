@@ -190,6 +190,12 @@ test("Short livre mostra o estilo gerado, a pausa do roteiro e o pacote de publi
   await expect(style).toContainText("Loop");
   await page.getByRole("tab", { name: "Roteiro" }).click();
   await expect(page.getByText("Pausa de 0,8 s depois de “Resultado: isso.”")).toBeVisible();
+  await expect(page.getByText("não aplicada")).toHaveCount(0);
+  // Editing the passage away leaves the pause without effect: the voice has no silence there, and the user is told.
+  await page.getByLabel("Narração da cena 1").fill("Resultado: pronto. O prompt completo está no comentário fixado.");
+  await expect(page.getByText("Pausa de 0,8 s depois de “Resultado: isso.” · não aplicada: o trecho não está na narração")).toBeVisible();
+  await page.getByLabel("Narração da cena 1").fill(project.scenes[0].narration);
+  await expect(page.getByText("não aplicada")).toHaveCount(0);
   await page.getByRole("tab", { name: "Publicação" }).click();
   const titles = page.getByRole("list", { name: "Opções de título" });
   await expect(titles.getByRole("listitem")).toHaveCount(2);

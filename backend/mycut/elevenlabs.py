@@ -197,11 +197,13 @@ def speak_passages(parts, settings, voice, folder, wav, loudnorm, spent):
     times of every passage are shifted by the audio and silence before it."""
     signal, words, credits, estimated = [], [], 0.0, False
     offset = 0
+    # Request stitching is not available on eleven_v3; there each passage is spoken on its own.
+    stitched = not settings['model_id'].startswith('eleven_v3')
     for number, (text, silence) in enumerate(parts):
         body = {'text': text, 'model_id': settings['model_id'], 'voice_settings': voice}
-        if number:
+        if stitched and number:
             body['previous_text'] = parts[number-1][0]
-        if number+1 < len(parts):
+        if stitched and number+1 < len(parts):
             body['next_text'] = parts[number+1][0]
         raw = folder / f'elevenlabs-{number+1}.mp3'
         alignment, billed = speak(settings, body, raw)

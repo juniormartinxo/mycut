@@ -252,6 +252,12 @@ class FreeShortTests(unittest.TestCase):
         with patch.object(elevenlabs, 'api', side_effect=fake_voice([])):
             closing = elevenlabs.synthesize(ending, settings, DATA/'pause-end-test')
         self.assertAlmostEqual(closing['duration'], len('Resultado: isso.') / 20 + .8, delta=.12)
+        # eleven_v3 has no request stitching: the passages go without their neighbours instead of being refused.
+        v3 = []
+        with patch.object(elevenlabs, 'api', side_effect=fake_voice(v3)):
+            elevenlabs.synthesize(project, {**settings, 'model_id': 'eleven_v3'}, DATA/'pause-v3-test')
+        self.assertEqual([r['text'] for r in v3], [first, second])
+        self.assertFalse(any('previous_text' in r or 'next_text' in r for r in v3))
         # Changing a pause changes what the voice says, so the saved audio no longer matches.
         longer = {'scenes': [project['scenes'][0], {**project['scenes'][1], 'pauses': [{**pause, 'seconds': 1.2}]}]}
         self.assertNotEqual(store.script_hash(longer), record['script_hash'])

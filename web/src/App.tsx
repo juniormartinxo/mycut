@@ -957,7 +957,7 @@ function Editor({
                           }
                           placeholder="Escreva o que será narrado nesta cena…"
                         />
-                        <ScenePauses pauses={s.pauses} />
+                        <ScenePauses narration={s.narration} pauses={s.pauses} />
                       </div>
                     </label>
                   ))}

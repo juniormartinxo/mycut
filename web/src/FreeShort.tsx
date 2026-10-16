@@ -35,12 +35,37 @@ export function GeneratedStyle({ style, accent }: { style: VisualStyle; accent: 
   );
 }
 
-export function ScenePauses({ pauses }: { pauses?: Pause[] }) {
+// Same word matching as the backend's anchors (flow.resolve_anchors): accents, case and punctuation do not count.
+const normalized = (word: string) => word.normalize("NFKD").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+const words = (text: string) => text.split(/\s+/).map(normalized).filter(Boolean);
+
+/** Whether each pause's passage is found in the narration, searched in order; a pause that is not has no silence. */
+function applied(narration: string, pauses: Pause[]) {
+  const spoken = words(narration);
+  let cursor = 0;
+  return pauses.map((pause) => {
+    const needle = words(pause.after);
+    if (!needle.length) return false;
+    for (let i = cursor; i + needle.length <= spoken.length; i++) {
+      if (needle.every((word, k) => spoken[i + k] === word)) {
+        cursor = i + 1;
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+export function ScenePauses({ narration, pauses }: { narration: string; pauses?: Pause[] }) {
   if (!pauses?.length) return null;
+  const found = applied(narration, pauses);
   return (
     <ul className="scene-pauses">
       {pauses.map((pause, i) => (
-        <li key={i}>Pausa de {seconds(pause.seconds)} depois de “{pause.after}”</li>
+        <li key={i} className={found[i] ? undefined : "not-applied"}>
+          Pausa de {seconds(pause.seconds)} depois de “{pause.after}”
+          {!found[i] && " · não aplicada: o trecho não está na narração"}
+        </li>
       ))}
     </ul>
   );
