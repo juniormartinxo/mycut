@@ -2,7 +2,7 @@
 import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
-from . import visuals, google_fonts, flow, captions
+from . import visuals, google_fonts, flow, captions, typeset
 from .scene_layout import geometry, validate_assets, shots
 from .scene_media import VideoFrames
 from .media import data_path, digest
@@ -20,7 +20,7 @@ MOTION_ZOOM = 1.15
 LOOP_FADE, LOOP_HOLD = .4, .1
 
 
-def wrapped_lines(obj, box, face, draw):
+def wrapped_lines(obj, box, face):
     """Lines as drawn in the box, each with the index of the text line it came from."""
     width = max(1, box[2]-16)
     lines = []
@@ -29,13 +29,13 @@ def wrapped_lines(obj, box, face, draw):
         for word in paragraph.split():
             # Preserve long tokens by wrapping characters, never clipping silently.
             pieces = ['']
-            for char in word:
-                if pieces[-1] and draw.textlength(pieces[-1]+char, font=face) > width:
+            for char in typeset.clusters(word):
+                if pieces[-1] and typeset.length(pieces[-1]+char, face) > width:
                     pieces.append('')
                 pieces[-1] += char
             for piece in pieces:
                 candidate = (line+' '+piece).strip()
-                if line and draw.textlength(candidate, font=face) > width:
+                if line and typeset.length(candidate, face) > width:
                     lines.append((line, number))
                     line = piece
                 else:
@@ -47,12 +47,11 @@ def wrapped_lines(obj, box, face, draw):
 def text_layout(obj, box, style, size=None):
     pixels = size or obj['font_size']
     face = google_fonts.face(obj.get('font') or style.get('google_font') or 'Roboto', round(pixels))
-    draw = ImageDraw.Draw(Image.new('RGB', (1, 1)))
     width, height = max(1, box[2]-16), max(1, box[3]-16)
-    lines = [line for line, _ in wrapped_lines(obj, box, face, draw)]
+    lines = [line for line, _ in wrapped_lines(obj, box, face)]
     ascent, descent = face.getmetrics()
     leading = max(pixels * 1.3, ascent + descent)
-    overflow = len(lines)*leading > height or any(draw.textlength(line, font=face) > width for line in lines)
+    overflow = len(lines)*leading > height or any(typeset.length(line, face) > width for line in lines)
     return face, lines, leading, overflow
 
 
@@ -192,21 +191,22 @@ class TextReveal:
     def __init__(self, obj, box, style, size, duration):
         self.obj, self.size, self.duration = obj, size, max(.1, duration)
         self.face = google_fonts.face(obj.get('font') or style.get('google_font') or 'Roboto', round(obj['font_size']))
-        pen = ImageDraw.Draw(Image.new('RGBA', size))
-        self.lines = wrapped_lines(obj, box, self.face, pen)
+        self.lines = wrapped_lines(obj, box, self.face)
         ascent, descent = self.face.getmetrics()
         self.leading = max(obj['font_size'] * 1.3, ascent + descent)
-        text_height = max((n*self.leading+pen.textbbox((0, 0), line, font=self.face, anchor='lt')[3]
+        text_height = max((n*self.leading+typeset.bbox(line, self.face, 'lt')[3]
                            for n, (line, _) in enumerate(self.lines)), default=0)
         self.dy = max(0, size[1]-16-text_height) * {'top': 0, 'center': .5, 'bottom': 1}[obj.get('text_vertical', 'top')]
         self.color = obj.get('color') or style['text_color']
         self.accent = style['accent']
-        self.offsets = [(size[0]-16-pen.textlength(line, font=self.face)) * {'left': 0, 'center': .5, 'right': 1}[obj['align']]
+        self.offsets = [(size[0]-16-typeset.length(line, self.face)) * {'left': 0, 'center': .5, 'right': 1}[obj['align']]
                         for line, _ in self.lines]
         sources = sorted({number for line, number in self.lines if line})
         span = self.duration*REVEAL_SPAN
         self.entries = {number: span*k/max(1, len(sources)) for k, number in enumerate(sources)}
-        self.characters = sum(len(line) for line, _ in self.lines)
+        # Typing advances by whole characters as seen: an emoji sequence appears at once.
+        self.units = [typeset.clusters(line) for line, _ in self.lines]
+        self.characters = sum(len(units) for units in self.units)
         self.speed = max(TYPING_CPS, self.characters/(self.duration*TYPING_SPAN))
 
     def layer(self, elapsed):
@@ -216,14 +216,14 @@ class TextReveal:
             remaining = int(elapsed*self.speed + 1e-6)
             typing = remaining < self.characters
             caret = None
-            for n, (line, _) in enumerate(self.lines):
-                shown = line[:max(0, remaining)]
-                remaining -= len(line)
+            for n, units in enumerate(self.units):
+                shown = ''.join(units[:max(0, remaining)])
+                remaining -= len(units)
                 x, y = 8+self.offsets[n], 8+self.dy+n*self.leading
                 if shown:
-                    pen.text((x, y), shown, fill=self.color, font=self.face, anchor='lt')
+                    typeset.text(pen, (x, y), shown, self.face, self.color, 'lt')
                 if caret is None and remaining <= 0:
-                    caret = (x+pen.textlength(shown, font=self.face), y)
+                    caret = (x+typeset.length(shown, self.face), y)
             if typing and caret:
                 pen.rectangle((caret[0]+3, caret[1], caret[0]+3+max(3, self.obj['font_size']*.08), caret[1]+self.obj['font_size']), fill=self.accent)
             return image
@@ -235,10 +235,10 @@ class TextReveal:
                 continue
             position = (8+self.offsets[n], 8+self.dy+n*self.leading+LINE_RISE*(1-amount))
             if amount >= 1:
-                pen.text(position, line, fill=self.color, font=self.face, anchor='lt')
+                typeset.text(pen, position, line, self.face, self.color, 'lt')
                 continue
             piece = Image.new('RGBA', self.size)
-            ImageDraw.Draw(piece).text(position, line, fill=self.color, font=self.face, anchor='lt')
+            typeset.text(ImageDraw.Draw(piece), position, line, self.face, self.color, 'lt')
             piece.putalpha(piece.getchannel('A').point(lambda value: round(value*amount)))
             image.alpha_composite(piece)
         return image

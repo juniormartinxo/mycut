@@ -3,6 +3,7 @@
 Everything is a pure function of (flow, object box, style, narration clock, elapsed). The same SVG,
 rasterized by resvg with the project's Google Font, feeds the editor preview and the exported MP4.
 """
+import base64
 import io
 import json
 import math
@@ -12,7 +13,7 @@ from typing import Annotated, Literal
 from xml.sax.saxutils import escape
 from PIL import Image
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
-from . import google_fonts
+from . import google_fonts, typeset
 from .alignment import normalized
 
 ICONS = json.loads((Path(__file__).with_name('flow_icons') / 'icons.json').read_text())
@@ -254,7 +255,7 @@ def wrap(face, text, width):
     lines, line = [], ''
     for word in text.split():
         candidate = (line+' '+word).strip()
-        if line and face.getlength(candidate) > width:
+        if line and typeset.length(candidate, face) > width:
             lines.append(line)
             line = word
         else:
@@ -292,7 +293,7 @@ class Layout:
                 label_width = hw*2*.88
                 lines = wrap(self.face, node['label'], label_width)
                 top, lx = cy-hh+hw*.08, cx
-                if len(lines) > 1 or any(self.face.getlength(line) > label_width for line in lines):
+                if len(lines) > 1 or any(typeset.length(line, self.face) > label_width for line in lines):
                     self.problems.append(node['id'])
             else:
                 label_width = min(width, max(hw*2.6, width*.3))
@@ -302,7 +303,7 @@ class Layout:
                 if top+block > height:
                     top = cy-hh-self.size*.35-block
                 lx = clamp(cx, label_width/2, width-label_width/2)
-                if len(lines) > 2 or top < 0 or any(self.face.getlength(line) > label_width for line in lines):
+                if len(lines) > 2 or top < 0 or any(typeset.length(line, self.face) > label_width for line in lines):
                     self.problems.append(node['id'])
             self.nodes[node['id']] = {**node, 'cx': cx, 'cy': cy, 'hw': hw, 'hh': hh,
                                       'lines': lines, 'label_top': top, 'label_x': lx, 'leading': leading}
@@ -434,10 +435,31 @@ def shape(node, scale, fill, stroke, width, extra=''):
     return f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}" fill="{fill}" stroke="{stroke}" stroke-width="{width:.2f}" {extra}/>'
 
 
-def text(x, y, value, size, color, opacity=1.0, anchor='middle', weight=None):
+def text(x, y, value, size, color, opacity=1.0, anchor='middle', weight=None, face=None):
     bold = f' font-weight="{weight}"' if weight else ''
+    if face is not None and typeset.has_emoji(value, face):
+        # resvg has no color emoji: text runs stay SVG text, each emoji run becomes an embedded image.
+        spots, baseline = typeset.placed(value, face, (x, y), {'start': 'ls', 'middle': 'ms', 'end': 'rs'}[anchor])
+        parts = []
+        for piece, emoji, left in spots:
+            if emoji:
+                width, height, data = emoji_png(piece, face.size)
+                parts.append(f'<image x="{left:.2f}" y="{typeset.emoji_top(face, baseline):.2f}" width="{width}" '
+                             f'height="{height}" href="data:image/png;base64,{data}"/>')
+            elif piece.strip():
+                parts.append(f'<text x="{left:.2f}" y="{baseline:.2f}" font-size="{size:.2f}" fill="{color}" '
+                             f'text-anchor="start" xml:space="preserve"{bold}>{escape(piece)}</text>')
+        return f'<g opacity="{opacity:.3f}">' + ''.join(parts) + '</g>'
     return (f'<text x="{x:.2f}" y="{y:.2f}" font-size="{size:.2f}" fill="{color}" text-anchor="{anchor}" '
             f'opacity="{opacity:.3f}"{bold}>{escape(value)}</text>')
+
+
+@lru_cache(maxsize=256)
+def emoji_png(piece, size):
+    image = typeset.glyphs(piece, size)
+    buffer = io.BytesIO()
+    image.save(buffer, 'PNG')
+    return image.width, image.height, base64.b64encode(buffer.getvalue()).decode()
 
 
 class FlowRenderer:
@@ -530,10 +552,10 @@ class FlowRenderer:
             baseline = node['label_top']+ascent+n*node['leading']
             if not node.get('chart'):
                 # A backdrop keeps labels legible where a connection passes behind them.
-                half = lay.face.getlength(value)/2+lay.size*.25
+                half = typeset.length(value, lay.face)/2+lay.size*.25
                 parts.append(f'<rect x="{node["label_x"]-half:.2f}" y="{baseline-ascent-lay.size*.1:.2f}" width="{2*half:.2f}" '
                              f'height="{node["leading"]:.2f}" rx="{lay.size*.2:.2f}" fill="{self.background}" opacity=".88"/>')
-            parts.append(text(node['label_x'], baseline, value, lay.size, self.ink))
+            parts.append(text(node['label_x'], baseline, value, lay.size, self.ink, face=lay.face))
         return f'<g opacity="{opacity:.3f}">' + ''.join(parts) + '</g>'
 
     def chart(self, node, t, scale):
@@ -565,9 +587,9 @@ class FlowRenderer:
                 x = left+slot*i+slot*.2
                 parts.append(f'<rect x="{x:.2f}" y="{bottom-height:.2f}" width="{slot*.6:.2f}" height="{max(.1, height):.2f}" '
                              f'rx="{slot*.08:.2f}" fill="{self.accent}"/>')
-                parts.append(text(x+slot*.3, bottom-height-small*.3, number(value*p, chart['unit']), small, self.ink, p))
+                parts.append(text(x+slot*.3, bottom-height-small*.3, number(value*p, chart['unit']), small, self.ink, p, face=lay.small))
                 if chart['labels']:
-                    parts.append(text(x+slot*.3, bottom+small*1.05, chart['labels'][i], small, self.ink, p))
+                    parts.append(text(x+slot*.3, bottom+small*1.05, chart['labels'][i], small, self.ink, p, face=lay.small))
         elif chart['kind'] == 'line':
             count = len(values)
             points = [(left+(right-left)*i/(count-1), bottom-(bottom-top)*v/top_value) for i, v in enumerate(values)]
@@ -589,9 +611,9 @@ class FlowRenderer:
                 if p <= 0:
                     continue
                 parts.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{stroke*2.2:.2f}" fill="{self.accent}" opacity="{p:.3f}"/>')
-                parts.append(text(x, y-small*.6, number(values[i], chart['unit']), small, self.ink, p))
+                parts.append(text(x, y-small*.6, number(values[i], chart['unit']), small, self.ink, p, face=lay.small))
                 if chart['labels']:
-                    parts.append(text(x, bottom+small*1.05, chart['labels'][i], small, self.ink, p))
+                    parts.append(text(x, bottom+small*1.05, chart['labels'][i], small, self.ink, p, face=lay.small))
         else:
             radius = min(hw-pad, (bottom-top)*.9)
             base_y = bottom-(bottom-top-radius)/2
@@ -606,9 +628,9 @@ class FlowRenderer:
                 y, x = arc(share)
                 parts.append(f'<path d="M {cx-radius:.2f} {base_y:.2f} A {radius:.2f} {radius:.2f} 0 0 1 {x:.2f} {y:.2f}" '
                              f'fill="none" stroke="{self.accent}" stroke-width="{radius*.18:.2f}" stroke-linecap="round"/>')
-                parts.append(text(cx, base_y-radius*.15, number(values[0]*ease(progress), chart['unit']), lay.size, self.ink, ease(progress*2)))
+                parts.append(text(cx, base_y-radius*.15, number(values[0]*ease(progress), chart['unit']), lay.size, self.ink, ease(progress*2), face=lay.face))
                 if chart['labels']:
-                    parts.append(text(cx, base_y+small*1.3, chart['labels'][0], small, self.ink, ease(progress*2)))
+                    parts.append(text(cx, base_y+small*1.3, chart['labels'][0], small, self.ink, ease(progress*2), face=lay.small))
         return ''.join(parts)
 
     def layer(self, t=None):

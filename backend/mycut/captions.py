@@ -3,7 +3,7 @@
 The preview and the MP4 time and draw them with the same code, from the scene's clock."""
 import math
 from PIL import ImageDraw
-from . import google_fonts, flow
+from . import google_fonts, flow, typeset
 from .alignment import normalized
 
 # YouTube draws its buttons over the right strip and its texts over the bottom 15% of a Short.
@@ -80,25 +80,25 @@ def draw(image, caption, style):
     pen = ImageDraw.Draw(image)
     for size in range(round(setting['font_size']), 23, -2):
         face = google_fonts.face(style.get('google_font') or 'Roboto', size)
-        space = pen.textlength(' ', font=face)
+        space = typeset.length(' ', face)
         lines, line = [], []
         for word in caption['words']:
-            if line and sum(pen.textlength(w, font=face) for w in line+[word]) + space*len(line) > width:
+            if line and sum(typeset.length(w, face) for w in line+[word]) + space*len(line) > width:
                 lines.append(line)
                 line = []
             line.append(word)
         lines.append(line)
-        if len(lines) <= 2 and all(pen.textlength(w, font=face) <= width for w in caption['words']):
+        if len(lines) <= 2 and all(typeset.length(w, face) <= width for w in caption['words']):
             break
     stroke = max(2, round(size * .09))
     ascent, descent = face.getmetrics()
     leading = max(size * 1.2, ascent + descent)
     top = min(CENTERS[setting['position']] - len(lines)*leading/2, SAFE_BOTTOM - stroke - len(lines)*leading)
     for number, line in enumerate(lines):
-        x = LEFT + (width - sum(pen.textlength(w, font=face) for w in line) - space*(len(line)-1)) / 2
+        x = LEFT + (width - sum(typeset.length(w, face) for w in line) - space*(len(line)-1)) / 2
         for word in line:
             color = style['accent'] if normalized(word) in keywords else style['text_color']
             # Every word of a line shares its baseline.
-            pen.text((x, top + number*leading + ascent), word, font=face, fill=color, anchor='ls',
-                     stroke_width=stroke, stroke_fill=style['background'])
-            x += pen.textlength(word, font=face) + space
+            typeset.text(pen, (x, top + number*leading + ascent), word, face, color, 'ls',
+                         stroke_width=stroke, stroke_fill=style['background'])
+            x += typeset.length(word, face) + space

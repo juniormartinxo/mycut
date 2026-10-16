@@ -4,6 +4,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps, PngImagePlugin
+from . import typeset
 from .media import data_path, digest
 
 FORMATS = json.loads(Path(__file__).with_name('short_formats.json').read_text())
@@ -54,13 +55,13 @@ def text_box(draw, text, box, style, size=56, color=None, align='left', max_line
         # Break long tokens too: URLs/model IDs must never escape the canvas.
         for word in str(text).split():
             pieces = ['']
-            for char in word:
-                if pieces[-1] and draw.textlength(pieces[-1] + char, font=face) > width:
+            for char in typeset.clusters(word):
+                if pieces[-1] and typeset.length(pieces[-1] + char, face) > width:
                     pieces.append('')
                 pieces[-1] += char
             for piece in pieces:
                 candidate = (line + ' ' + piece).strip()
-                if line and draw.textlength(candidate, font=face) > width:
+                if line and typeset.length(candidate, face) > width:
                     lines.append(line)
                     line = piece
                 else:
@@ -71,8 +72,8 @@ def text_box(draw, text, box, style, size=56, color=None, align='left', max_line
         if len(lines) <= max_lines and len(lines) * leading <= height:
             break
     for index, line in enumerate(lines):
-        dx = (width - draw.textlength(line, font=face)) / 2 if align == 'center' else 0
-        draw.text((round(x + dx), round(y + index * leading)), line, fill=color, font=face, anchor='lt')
+        dx = (width - typeset.length(line, face)) / 2 if align == 'center' else 0
+        typeset.text(draw, (round(x + dx), round(y + index * leading)), line, face, color, 'lt')
 
 
 class Composition:

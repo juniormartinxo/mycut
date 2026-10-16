@@ -8,7 +8,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 from . import store
-from . import visuals, endings, block_render, graphics, alignment, flow, captions
+from . import visuals, endings, block_render, graphics, alignment, flow, captions, typeset
 from .config import DATA, MODEL, MODEL_DIR
 from .media import data_path, digest
 
@@ -19,11 +19,11 @@ def wrapped(draw, value, y, size=68, color='#29231f', width=890, gap=1.22, cente
         face = graphics.font(size, True)
         lines, line = [], ''
         for word in value.split():
-            if draw.textlength(word, font=face) > width and size > 20:
+            if typeset.length(word, face) > width and size > 20:
                 lines = [''] * 10
                 break
             candidate = (line + ' ' + word).strip()
-            if draw.textlength(candidate, font=face) > width and line:
+            if typeset.length(candidate, face) > width and line:
                 lines.append(line)
                 line = word
             else:
@@ -36,7 +36,7 @@ def wrapped(draw, value, y, size=68, color='#29231f', width=890, gap=1.22, cente
     if centered:
         y -= len(lines) * size * gap / 2
     for index, line in enumerate(lines):
-        draw.text((540, y + index * size * gap), line, font=face, fill=color, anchor='mt')
+        typeset.text(draw, (540, y + index * size * gap), line, face, color, 'mt')
     return y + len(lines) * size * gap
 
 

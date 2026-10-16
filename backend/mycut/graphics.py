@@ -1,6 +1,7 @@
 """Drawing helpers and subtitle output shared by the video renderer."""
 import math
 from PIL import ImageDraw, ImageFont
+from . import typeset
 
 BG = '#FBF8F1'
 INK = '#29231F'
@@ -16,10 +17,10 @@ def font(size, bold=False, mono=False):
 
 def text(draw, xy, value, size=40, color=INK, bold=False, anchor='mm', max_width=900):
     face = font(size, bold)
-    while draw.textbbox((0, 0), value, font=face)[2] > max_width:
+    while typeset.bbox(value, face)[2] > max_width:
         size -= 1
         face = font(size, bold)
-    draw.text(xy, value, font=face, fill=color, anchor=anchor)
+    typeset.text(draw, xy, value, face, color, anchor)
 
 
 def arrow(draw, start, end, color=LINE, width=6):
@@ -36,7 +37,7 @@ def add_caption(image, value, scale):
     words, lines, line = value.split(), [], ''
     for word in words:
         candidate = f'{line} {word}'.strip()
-        if draw.textbbox((0, 0), candidate, font=face)[2] > 845*scale and line:
+        if typeset.bbox(candidate, face)[2] > 845*scale and line:
             lines.append(line)
             line = word
         else:
@@ -49,7 +50,7 @@ def add_caption(image, value, scale):
     top = 1610*scale - height/2
     draw.rounded_rectangle((72*scale, top, 1008*scale, top+height), radius=17*scale, fill='#29231F')
     for i, line in enumerate(lines):
-        draw.text((540*scale, top+(25+i*68+30)*scale), line, font=face, fill=BG, anchor='mm')
+        typeset.text(draw, (540*scale, top+(25+i*68+30)*scale), line, face, BG, 'mm')
 
 
 def write_subtitles(timing, folder):
