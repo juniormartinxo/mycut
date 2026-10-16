@@ -104,6 +104,23 @@ class StudioTests(unittest.TestCase):
         data=self.client.get(response.json()['cover']['url']).content
         self.assertEqual(Image.open(io.BytesIO(data)).size,(1080,1920))
 
+    def test_small_vertical_cover_fills_the_frame(self):
+        from PIL import Image
+        # Image generators deliver 9:16 covers smaller than the frame, such as 572×1024.
+        image=io.BytesIO(); Image.new('RGB',(572,1024),'#202020').save(image,'JPEG')
+        response=self.client.post(f'/api/projects/{self.project["id"]}/assets/cover?revision=1',files={'file':('capa.jpg',image.getvalue(),'image/jpeg')})
+        self.assertEqual(response.status_code,200,response.text)
+        cover=Image.open(io.BytesIO(self.client.get(response.json()['cover']['url']).content)).convert('RGB')
+        self.assertEqual(cover.size,(1080,1920))
+        for point in ((2,2),(1077,960),(540,1917)):
+            self.assertTrue(all(value<60 for value in cover.getpixel(point)),point)
+        # A square image is not cropped into a strip: it keeps bars above and below.
+        square=io.BytesIO(); Image.new('RGB',(800,800),'#202020').save(square,'PNG')
+        response=self.client.post(f'/api/projects/{self.project["id"]}/assets/cover?revision={response.json()["revision"]}',files={'file':('quadrada.png',square.getvalue(),'image/png')})
+        cover=Image.open(io.BytesIO(self.client.get(response.json()['cover']['url']).content)).convert('RGB')
+        self.assertEqual(cover.getpixel((540,960)),(32,32,32))
+        self.assertGreater(min(cover.getpixel((540,5))),200)
+
     def test_comparison_preserves_both_sides_and_rejects_hidden_options(self):
         scenes = self.project['scenes']
         scenes[0].update(layout='comparison', items=['Remote Control\nComputador ativo', 'Cloud Sessions\nExecução na nuvem'])

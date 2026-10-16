@@ -28,12 +28,23 @@ def probe(path):
     return duration
 
 
+COVER = (1080, 1920)
+# A cover this close to 9:16 fills the frame, cropping at most this share of one side; others keep bars.
+COVER_CROP = .12
+
+
 def cover(source, target):
+    """The cover fills the 1080×1920 frame, scaled up when the source is smaller (generators often
+    deliver 576×1024 or 720×1280). Only an image far from 9:16 is letterboxed instead of cropped."""
     with Image.open(source) as image:
         image = ImageOps.exif_transpose(image).convert('RGB')
-        image.thumbnail((1080, 1920), Image.Resampling.LANCZOS)
-        canvas = Image.new('RGB', (1080, 1920), '#f7f3eb')
-        canvas.paste(image, ((1080-image.width)//2, (1920-image.height)//2))
+        ratio = image.width/image.height / (COVER[0]/COVER[1])
+        if 1-COVER_CROP <= ratio <= 1/(1-COVER_CROP):
+            canvas = ImageOps.fit(image, COVER, Image.Resampling.LANCZOS)
+        else:
+            canvas = Image.new('RGB', COVER, '#f7f3eb')
+            image = ImageOps.contain(image, COVER, Image.Resampling.LANCZOS)
+            canvas.paste(image, ((COVER[0]-image.width)//2, (COVER[1]-image.height)//2))
         canvas.save(target)
 
 
