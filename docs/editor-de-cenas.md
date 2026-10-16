@@ -166,7 +166,9 @@ Na aba **Plano**:
 - **Mostrar a marca do canal** pode ser desligado, por exemplo para B-rolls em
   tela cheia.
 - **Duplicar plano**, **Mover plano para antes/depois** e **Excluir plano**.
-  Mover outro plano para a primeira posição faz dele o início da cena.
+  Mover troca a composição (blocos, fundo e marca) de lugar. O início na fala
+  e a transição ficam com a posição, para os trechos seguirem a ordem da
+  narração; mover e voltar restaura a cena como estava.
 
 Na aba **Objeto**, título e parágrafo têm **Entrada do texto**: **Fixo durante
 o plano**, **Linha a linha** (cada linha do texto entra ao longo do plano) ou

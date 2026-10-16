@@ -22,8 +22,10 @@ nem sobreposição de blocos.
 O primeiro plano é a composição da própria cena (`blocks`, `background`,
 `brand`), e os planos seguintes ficam em `shots`, cada um com identificação
 própria. Assim, toda cena existente já é uma cena de um plano só, sem
-migração. O primeiro plano tem a identidade da cena, e reordenar planos
-preserva essa identidade.
+migração. O primeiro plano tem a identidade da cena. Reordenar planos troca
+só as composições de lugar: identidade, âncora e transição ficam com a
+posição. Assim as âncoras continuam na ordem da narração, e mover e voltar
+restaura a cena como estava.
 
 Um plano começa numa **âncora**: um trecho copiado da narração da cena,
 procurado em ordem, como nas etapas do Fluxo animado. Sem âncora, ou quando o

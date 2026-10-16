@@ -427,7 +427,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
         </div>
         {issues.some(issue => issue.object_id !== obj?.id) && <p className="notice">Há pendências em outros blocos ou planos. Revise cada um antes de exportar.</p>}
         <div className="block-panel" role="tabpanel" id={`${tabId}-agent-panel`} aria-labelledby={`${tabId}-agent-tab`} hidden={!conversation} tabIndex={0}>
-          <SceneConversation project={project} scene={shotView(scene, current)} shotId={shot.id} shots={planos.length} blockId={block.id} objectId={obj?.id} disabled={locked} save={save} onBusy={onBusy} onThreads={setThreads} autoRequest={agentRequest} onAccepted={updated => {
+          <SceneConversation project={project} scene={shotView(scene, current)} whole={scene} shotId={shot.id} shots={planos.length} blockId={block.id} objectId={obj?.id} disabled={locked} save={save} onBusy={onBusy} onThreads={setThreads} autoRequest={agentRequest} onAccepted={updated => {
             setPast(old => [...old, structuredClone(scene)]); setFuture([]); onProject(updated);
           }} />
         </div>

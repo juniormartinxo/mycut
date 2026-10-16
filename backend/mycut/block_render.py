@@ -6,6 +6,7 @@ from . import visuals, google_fonts, flow
 from .scene_layout import geometry, validate_assets, shots
 from .scene_media import VideoFrames
 from .media import data_path, digest
+from .alignment import normalized
 
 # A plano never lasts less than this, unless the scene itself is too short for its planos (ADR 0004).
 MIN_SHOT = 1.0
@@ -100,8 +101,13 @@ def inspect(scene, project, clock=None):
             issues.append({'shot_id': shot['id'], 'object_id': None, 'kind': 'missing_media',
                            'message': f'Plano {index+1}: selecione o arquivo do fundo ou troque o tipo de fundo.'})
         if index and shot.get('anchor') and anchors[index-1] is None:
+            # Anchors are searched in order, so a passage may exist but come before the previous plano's.
+            spoken = ' '.join(n for n in (normalized(w) for w in narration.split()) if n)
+            needle = ' '.join(n for n in (normalized(w) for w in shot['anchor'].split()) if n)
+            where = ('aparece antes do início do plano anterior' if needle and f' {needle} ' in f' {spoken} '
+                     else 'não está na narração')
             warnings.append({'shot_id': shot['id'], 'object_id': None, 'kind': 'shot_anchor',
-                             'message': f'Plano {index+1}: o trecho “{shot["anchor"]}” não está na narração; o plano entra no tempo automático.'})
+                             'message': f'Plano {index+1}: o trecho “{shot["anchor"]}” {where}; o plano entra no tempo automático.'})
         if windows and windows[index][1]-windows[index][0] < MIN_SHOT-1e-6:
             warnings.append({'shot_id': shot['id'], 'object_id': None, 'kind': 'shot_short',
                              'message': f'Plano {index+1}: a cena é curta demais para {len(planos)} planos de pelo menos 1 s.'})
@@ -356,8 +362,10 @@ class ShotComposition:
         return image
 
     def close(self):
+        # A closed plano can still be drawn again: its decoders reopen on demand.
         for reader in self.readers.values():
             reader.close()
+        self.readers.clear()
 
 
 class BlockComposition:
@@ -387,8 +395,13 @@ class BlockComposition:
         else:
             index = self.active(elapsed)
             start = self.windows[index][0]
+            fading = index and self.transitions[index] == 'fade' and elapsed-start < FADE
+            # Planos already over release their video decoders, the previous one after its fade.
+            for shot in self.shots[:index-1 if fading else index]:
+                if shot.readers:
+                    shot.close()
             image = self.shots[index].frame(elapsed-start, videos)
-            if index and self.transitions[index] == 'fade' and elapsed-start < FADE:
+            if fading:
                 previous = self.shots[index-1].frame(elapsed-self.windows[index-1][0], videos)
                 image = Image.blend(previous, image, max(0.0, elapsed-start)/FADE)
         if caption:

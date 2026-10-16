@@ -160,6 +160,13 @@ class SceneShotTests(unittest.TestCase):
         self.assertAlmostEqual(windows[2][0], clock['duration']*2/3)
         report = block_render.inspect(scene, self.project, clock)
         self.assertEqual([w['kind'] for w in report['warnings']], ['shot_anchor'])
+        self.assertIn('não está na narração', report['warnings'][0]['message'])
+        # A passage that exists but comes before the previous plano's start says so.
+        out_of_order = copy.deepcopy(scene)
+        out_of_order['shots'][0]['anchor'], out_of_order['shots'][1]['anchor'] = 'cenário', 'ficha'
+        message = block_render.inspect(out_of_order, self.project, clock)['warnings'][0]['message']
+        self.assertIn('Plano 3', message)
+        self.assertIn('antes do início do plano anterior', message)
         self.assertEqual(len(report['shots']), 3)
         # Late anchors still leave every plano its minimum time.
         scene['shots'][0]['anchor'] = scene['shots'][1]['anchor'] = 'mundo inteiro'
@@ -248,7 +255,7 @@ class SceneShotTests(unittest.TestCase):
         self.assertAlmostEqual(x1, 100)
         composition.close()
 
-    def test_background_video_plays_from_the_plano_start_behind_the_blocks(self):
+    def upload_video(self):
         with tempfile.TemporaryDirectory() as staging:
             path = os.path.join(staging, 'fundo.mp4')
             subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'color=c=red:s=180x320:d=0.5:r=30',
@@ -260,7 +267,10 @@ class SceneShotTests(unittest.TestCase):
                                             files={'file': ('fundo.mp4', stream, 'video/mp4')})
             self.assertEqual(uploaded.status_code, 200, uploaded.text)
             self.project = uploaded.json()
-        video_id = self.project['videos'][0]['id']
+        return self.project['videos'][-1]['id']
+
+    def test_background_video_plays_from_the_plano_start_behind_the_blocks(self):
+        video_id = self.upload_video()
         scene = self.three_shots()
         scene['shots'][1]['background'] = {'kind': 'video', 'asset_id': video_id}
         self.assertEqual(self.edit(scenes=[scene]).status_code, 200, self.project)
@@ -277,6 +287,66 @@ class SceneShotTests(unittest.TestCase):
         # The static view shows the poster, never a decoded frame.
         self.assertGreater(composition.shots[2].frame(None, videos=False).getpixel((40, 1000))[0], 150)
         composition.close()
+
+    def test_finished_planos_release_their_video_decoders(self):
+        video_id = self.upload_video()
+        scene = self.three_shots(background={'kind': 'video', 'asset_id': video_id})
+        scene['shots'][0]['background'] = {'kind': 'video', 'asset_id': video_id}
+        scene['shots'][1]['background'] = {'kind': 'video', 'asset_id': video_id}
+        self.assertEqual(self.edit(scenes=[scene]).status_code, 200, self.project)
+        clock = flow.estimate_clock(NARRATION)
+        composition = block_render.BlockComposition(scene, store.get_project(self.project['id']), 540, fps=24, clock=clock)
+        (_, first_end), (second, _), (third, _) = composition.windows
+        first = second_reader = None
+        try:
+            for step in range(0, int(third*24)+int(block_render.FADE*24)+6):
+                now = step/24
+                composition.frame(now)
+                if now < second:
+                    first = composition.shots[0].readers['background']
+                elif now < third:
+                    self.assertEqual(composition.shots[0].readers, {}, now)
+                    self.assertIsNotNone(first.process.poll())
+                    second_reader = composition.shots[1].readers['background']
+                elif now < third+block_render.FADE:
+                    # The previous plano still plays during the fade into the next one.
+                    self.assertIsNone(second_reader.process.poll(), now)
+                else:
+                    self.assertEqual(composition.shots[1].readers, {}, now)
+                    self.assertIsNotNone(second_reader.process.poll())
+            self.assertIn('background', composition.shots[2].readers)
+            # A plano drawn again after closing reopens its decoder at the right time.
+            self.assertGreater(composition.frame(second+.75).getpixel((20, 500))[2], 150)
+        finally:
+            composition.close()
+
+    def test_export_closes_each_scene_before_the_next_one_plays(self):
+        first, second = self.three_shots(), copy.deepcopy(self.three_shots())
+        second['id'] = scene_layout.new_id()
+        for item in (second, *second['shots']):
+            for block in item['blocks']:
+                block['id'] = scene_layout.new_id()
+                if block['object']:
+                    block['object']['id'] = scene_layout.new_id()
+        for shot in second['shots']:
+            shot['id'] = scene_layout.new_id()
+        self.assertEqual(self.edit(scenes=[first, second]).status_code, 200, self.project)
+        events = []
+        original_close, original_frame = block_render.BlockComposition.close, block_render.BlockComposition.frame
+
+        def close(composition):
+            events.append(('close', composition.scene['id']))
+            return original_close(composition)
+
+        def frame(composition, elapsed=None, *args, **kwargs):
+            if elapsed is not None and (not events or events[-1] != ('frame', composition.scene['id'])):
+                events.append(('frame', composition.scene['id']))
+            return original_frame(composition, elapsed, *args, **kwargs)
+        store.enqueue(self.project['id'], 'preview', self.project['revision'])
+        with patch.object(block_render.BlockComposition, 'close', close), patch.object(block_render.BlockComposition, 'frame', frame):
+            make_video(store.claim())
+        ids = [s['id'] for s in self.project['scenes']]
+        self.assertEqual(events[:3], [('frame', ids[0]), ('close', ids[0]), ('frame', ids[1])])
 
     def test_preview_matches_exported_mp4_in_planos_reveal_motion_and_fade(self):
         image_id = self.upload_image()

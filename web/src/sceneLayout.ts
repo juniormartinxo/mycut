@@ -83,11 +83,16 @@ export function removeShot(scene: Scene, index: number): Scene {
   const planos = shotsOf(scene);
   return planos.length === 1 ? scene : fromShots(scene, planos.filter((_, i) => i !== index));
 }
+/** Moves a plano's composition to the neighbouring slot. Start, transition and identity stay with the
+ * position, so anchors keep their order in the narration and a round trip restores the scene exactly. */
 export function moveShot(scene: Scene, index: number, offset: -1 | 1): Scene {
   const planos = shotsOf(scene);
   const target = index + offset;
   if (target < 0 || target >= planos.length) return scene;
-  [planos[index], planos[target]] = [planos[target], planos[index]];
+  const composition = ({ blocks, background, brand }: Shot) => ({ blocks, background, brand });
+  const [from, to] = [composition(planos[index]), composition(planos[target])];
+  planos[index] = { ...planos[index], ...to };
+  planos[target] = { ...planos[target], ...from };
   return fromShots(scene, planos);
 }
 export const shotCount = (scenes: Scene[]) => scenes.reduce((sum, s) => sum + 1 + (s.shots?.length ?? 0), 0);

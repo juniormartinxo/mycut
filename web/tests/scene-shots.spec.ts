@@ -58,6 +58,16 @@ test("planos com fundo, revelação e transição são criados, salvos e reorden
   expect(saved.background).toMatchObject({ kind: "gradient" });
   expect(saved.brand).toBe(false);
   expect(saved.shots[0].blocks[0].object).toMatchObject({ text: "ETAPA 1: TOM" });
+  // Start and transition stay with the position: moving back restores the plano exactly.
+  expect(saved.shots[0]).toMatchObject({ anchor: "ficha", transition: "fade" });
+  const shotId = saved.shots[0].id;
+  await dialog.getByRole("button", { name: "Mover plano para depois", exact: true }).click();
+  await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(dialog.getByText("Salvo", { exact: true })).toBeVisible();
+  saved = (await (await page.request.get(`/api/projects/${project.id}`)).json()).scenes[0];
+  expect(saved.blocks[0].object).toMatchObject({ text: "ETAPA 1: TOM" });
+  expect(saved.shots[0]).toMatchObject({ id: shotId, anchor: "ficha", transition: "fade", brand: false, background: { kind: "gradient" } });
+  await expect(dialog.getByLabel("Começa na fala", { exact: true })).toHaveValue("ficha");
 
   await strip.getByRole("button", { name: /^Plano 2/ }).click();
   await expect(strip.getByRole("button", { name: /^Plano 2/ })).toHaveAttribute("aria-current", "step");
