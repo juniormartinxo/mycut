@@ -44,7 +44,7 @@ class VisualObject(BaseModel):
     # Behaviour in time (ADR 0004), omitted while unused so older objects keep their stored shape.
     reveal: Literal['none', 'lines', 'typing'] = Field(default='none', exclude_if=lambda value: value == 'none')
     motion: Motion = Field(default='none', exclude_if=lambda value: value == 'none')
-    # An animated GIF plays once and holds its last frame, or loops until the plano ends.
+    # An animated GIF or WebP plays once and holds its last frame, or loops until the plano ends.
     playback: Playback = Field(default='once', exclude_if=lambda value: value == 'once')
 
     @model_validator(mode='after')
@@ -56,7 +56,7 @@ class VisualObject(BaseModel):
         if self.motion != 'none' and self.type != 'image':
             raise ValueError('O movimento de câmera vale para imagens; vídeos já têm o próprio movimento.')
         if self.playback != 'once' and self.type != 'image':
-            raise ValueError('A repetição em loop vale para GIFs animados.')
+            raise ValueError('A repetição em loop vale para imagens animadas.')
         return self
 
 
@@ -95,7 +95,7 @@ class Background(BaseModel):
         if self.motion != 'none' and self.kind != 'image':
             raise ValueError('O movimento de câmera vale para fundos de imagem.')
         if self.playback != 'once' and self.kind != 'image':
-            raise ValueError('A repetição em loop vale para fundos com GIF animado.')
+            raise ValueError('A repetição em loop vale para fundos com imagem animada.')
         return self
 
 

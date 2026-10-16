@@ -155,9 +155,10 @@ def project_image(project_id: str, image_id: str):
     record = next((item for item in store.get_project(project_id).get('images', []) if item['id'] == image_id), None)
     if record is None:
         raise HTTPException(404, 'Imagem não encontrada.')
-    # An animated GIF plays in the editor as it will in the video.
+    # An animated GIF or WebP plays in the editor as it will in the video.
     if record.get('animation'):
-        return FileResponse(media.data_path(record['animation']['path']), media_type='image/gif')
+        path = media.data_path(record['animation']['path'])
+        return FileResponse(path, media_type='image/webp' if path.suffix == '.webp' else 'image/gif')
     return FileResponse(media.data_path(record['path']), media_type='image/png')
 
 

@@ -56,7 +56,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   const [formats, setFormats] = useState<ShortFormat[]>([]);
   useEffect(() => {
     const controller = new AbortController();
-    request<{ formats: ShortFormat[] }>("/formats", { signal: controller.signal }).then(data => setFormats(data.formats)).catch(() => {});
+    request<{ formats: ShortFormat[] }>("/short-formats", { signal: controller.signal }).then(data => setFormats(data.formats)).catch(() => {});
     return () => controller.abort();
   }, []);
   const mediaBackground = project.visual_style?.background || formats.find(format => format.id === (project.visual_style?.format_id || "editorial"))?.background;
@@ -97,12 +97,12 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
     return () => { clearTimeout(timer); controller.abort(); };
   }, [inspectBody, scene.blocks]);
   // Anything that changes over the scene's time is played with frames from the server (ADR 0003, ADR 0004).
-  const gifs = new Set(project.images?.filter(image => image.animated).map(image => image.id));
-  const isGif = (id?: string | null) => !!id && gifs.has(id);
+  const animations = new Set(project.images?.filter(image => image.animated).map(image => image.id));
+  const isAnimated = (id?: string | null) => !!id && animations.has(id);
   const animated = planos.length > 1 || planos.some(s => (s.background?.motion ?? "none") !== "none" || s.background?.kind === "video"
-    || s.background?.kind === "image" && isGif(s.background.asset_id)
+    || s.background?.kind === "image" && isAnimated(s.background.asset_id)
     || s.blocks.some(b => b.object && (b.object.type === "flow" && b.object.flow || (b.object.reveal ?? "none") !== "none" || (b.object.motion ?? "none") !== "none"
-      || b.object.type === "image" && isGif(b.object.asset_id))));
+      || b.object.type === "image" && isAnimated(b.object.asset_id))));
   const player = useFlowPlayer(inspectBody, animated ? clock : null);
   const askAgent = (text = FLOW_REQUEST) => { setActiveTab("agent"); setAgentRequest({ key: Date.now(), text }); };
   const nodeName = (id: string | null) => obj?.flow?.nodes.find(n => n.id === id)?.label ?? id;
@@ -336,7 +336,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
                 accept={background.kind === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
                 onChange={e => { uploadBackground(e.target.files?.[0]); e.target.value = ""; }} />
             </div>
-            {background.kind === "image" && isGif(background.asset_id) && <PlaybackField value={background.playback} onChange={playback => patchBackground({ playback })} />}
+            {background.kind === "image" && isAnimated(background.asset_id) && <PlaybackField value={background.playback} onChange={playback => patchBackground({ playback })} />}
             {background.kind === "image" && <label>Movimento de câmera<select value={background.motion ?? "none"} onChange={e => patchBackground({ motion: e.target.value as Motion })}>
               {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
             <label>Escurecer o fundo · {Math.round(background.dim ?? 0)}%
@@ -405,7 +405,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
               <button type="button" className="button secondary" disabled={locked} onClick={() => mediaInput.current?.click()}>
                 <Upload size={16} /> Importar {obj.type === "image" ? "imagem" : "vídeo"}
               </button>
-              <small>{obj.type === "image" ? "PNG, JPG, WebP ou GIF animado · até 15 MB" : "MP4, MOV ou WebM · até 100 MB"}</small>
+              <small>{obj.type === "image" ? "PNG, JPG, WebP ou GIF, animados ou não · até 15 MB" : "MP4, MOV ou WebM · até 100 MB"}</small>
               <input ref={mediaInput} type="file" hidden aria-label={`Importar ${obj.type === "image" ? "imagem" : "vídeo"}`} disabled={locked}
                 accept={obj.type === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
                 onChange={e => { upload(e.target.files?.[0]); e.target.value = ""; }} />
@@ -421,7 +421,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             </>}
             {obj.type === "image" && <label>Movimento de câmera<select value={obj.motion ?? "none"} onChange={e => patchObject({ motion: e.target.value as Motion })}>
               {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
-            {obj.type === "image" && isGif(obj.asset_id) && <PlaybackField value={obj.playback} onChange={playback => patchObject({ playback })} />}
+            {obj.type === "image" && isAnimated(obj.asset_id) && <PlaybackField value={obj.playback} onChange={playback => patchObject({ playback })} />}
             {obj.type === "video" && <><p className="block-hint">Sem áudio original. Repete ou termina junto com a cena. MP4, MOV ou WebM · até 100 MB e 180 s.</p>{obj.asset_id && <video className="object-video" controls muted loop playsInline src={project.videos?.find(v => v.id === obj.asset_id)?.url} aria-label="Reproduzir vídeo do objeto" />}</>}
           </>}
           {issues.filter(issue => issue.object_id === obj.id).map(issue => <div key={issue.kind} className="notice danger" role="alert">{issue.message}
@@ -442,9 +442,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
   </section>;
 }
 
-/** An animated GIF plays once and holds its last frame, or loops until the plano ends. */
+/** An animated GIF or WebP plays once and holds its last frame, or loops until the plano ends. */
 function PlaybackField({ value, onChange }: { value?: Playback; onChange: (value: Playback) => void }) {
-  return <label>Animação do GIF<select value={value ?? "once"} onChange={e => onChange(e.target.value as Playback)}>
+  return <label>Animação da imagem<select value={value ?? "once"} onChange={e => onChange(e.target.value as Playback)}>
     <option value="once">Tocar uma vez e parar no último quadro</option>
     <option value="loop">Repetir em loop até o fim do plano</option>
   </select></label>;

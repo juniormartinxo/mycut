@@ -251,7 +251,7 @@ class ShotComposition:
         self.style, self.fps, self.duration = style, fps, max(.1, duration)
         self.background = shot.get('background') or None
         self.videos, self.readers, self.flows, self.moving, self.reveals = [], {}, [], [], []
-        # Animated GIFs: drawn per frame, with the fitted frame kept until the GIF advances.
+        # Animated GIFs and WebPs: drawn per frame, with the fitted frame kept until the animation advances.
         self.animations, self.fitted = [], {}
         self.backdrop_video = self.backdrop_animation = None
         self.backdrop = self.paint_background(project)
@@ -389,7 +389,7 @@ class ShotComposition:
         return image
 
     def animated(self, key, record, size, mode, zoom, crop_x, crop_y, elapsed, loop):
-        """The GIF frame shown at this time, fitted to its box; refitted only when the GIF advances."""
+        """The animation frame shown at this time, fitted to its box; refitted only when the animation advances."""
         if key not in self.readers:
             self.readers[key] = AnimatedImage(record)
         index, source = self.readers[key].frame(elapsed, loop)

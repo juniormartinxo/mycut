@@ -1,4 +1,4 @@
-"""Project-owned images; decode to bounded PNGs (animated GIFs also keep their file) and keep source provenance."""
+"""Project-owned images; decode to bounded PNGs (animated GIFs and WebPs also keep their file) and keep source provenance."""
 import bisect
 import io
 import itertools
@@ -88,26 +88,29 @@ def collect(research, project):
     return images, notes
 
 
-# Bounds for an animated GIF: it is decoded frame by frame at render time, never held whole.
-GIF_FRAMES, GIF_SIDE = 1000, 1920
+# Bounds for an animated GIF or WebP: it is decoded frame by frame at render time, never held whole.
+ANIMATION_FRAMES, ANIMATION_SIDE = 1000, 1920
 # Browsers play frame delays under 20 ms at 100 ms; the video follows what the person saw.
-GIF_MIN_DELAY, GIF_DEFAULT_DELAY = 20, 100
+MIN_DELAY, DEFAULT_DELAY = 20, 100
 
 
 def frame_delays(image):
-    """Seconds each GIF frame stays on screen."""
+    """Seconds each frame of an animated GIF or WebP stays on screen."""
     delays = []
     for index in range(image.n_frames):
         image.seek(index)
+        if image.format == 'WEBP':
+            # WebP reports a frame's duration only once the frame is decoded.
+            image.load()
         delay = image.info.get('duration') or 0
-        delays.append((delay if delay >= GIF_MIN_DELAY else GIF_DEFAULT_DELAY)/1000)
+        delays.append((delay if delay >= MIN_DELAY else DEFAULT_DELAY)/1000)
     image.seek(0)
     return delays
 
 
 def import_image(content, project_id, name, source_url='', page_url=''):
-    """A still image becomes a bounded PNG. An animated GIF keeps its file to play in loop; its first
-    frame is the PNG every still consumer (library, agents, covers) reads."""
+    """A still image becomes a bounded PNG, transparent where the source is. An animated GIF or WebP
+    keeps its file to play; its first frame is the PNG every still consumer (library, agents, covers) reads."""
     if len(content) > 15 * 1024 * 1024:
         raise ValueError('Use uma imagem de até 15 MB.')
     image_id = uuid.uuid4().hex
@@ -118,14 +121,16 @@ def import_image(content, project_id, name, source_url='', page_url=''):
         with Image.open(io.BytesIO(content)) as image:
             if image.format not in ('PNG', 'JPEG', 'WEBP', 'GIF'):
                 raise ValueError('Use uma imagem PNG, JPG, WebP ou GIF.')
-            if image.format == 'GIF' and getattr(image, 'n_frames', 1) > 1:
-                if image.n_frames > GIF_FRAMES or max(image.size) > GIF_SIDE:
-                    raise ValueError(f'Use um GIF de até {GIF_FRAMES} quadros e {GIF_SIDE} px no maior lado.')
+            if image.format in ('GIF', 'WEBP') and getattr(image, 'n_frames', 1) > 1:
+                if image.n_frames > ANIMATION_FRAMES or max(image.size) > ANIMATION_SIDE:
+                    raise ValueError(f'Use uma animação de até {ANIMATION_FRAMES} quadros e {ANIMATION_SIDE} px no maior lado.')
                 delays = frame_delays(image)
+                suffix = '.gif' if image.format == 'GIF' else '.webp'
                 image = image.convert('RGBA')
-                animation = {'path': folder / f'{image_id}.gif', 'frames': len(delays), 'duration': round(sum(delays), 3)}
+                animation = {'path': folder / f'{image_id}{suffix}', 'frames': len(delays), 'duration': round(sum(delays), 3)}
             else:
-                image = ImageOps.exif_transpose(image).convert('RGB')
+                # A logo or sticker keeps its transparent areas instead of turning them black.
+                image = ImageOps.exif_transpose(image).convert('RGBA' if image.has_transparency_data else 'RGB')
                 image.thumbnail((1920, 1920), Image.Resampling.LANCZOS)
             width, height = image.size
             folder.mkdir(parents=True, exist_ok=True)
@@ -153,7 +158,7 @@ def public(record):
 
 
 class AnimatedImage:
-    """An imported GIF on its own frame timing, decoded sequentially like a video."""
+    """An imported animated GIF or WebP on its own frame timing, decoded sequentially like a video."""
     def __init__(self, record):
         animation = record['animation']
         source = data_path(animation['path'])

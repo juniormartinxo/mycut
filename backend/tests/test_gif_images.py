@@ -31,6 +31,16 @@ def gif(colors=(RED, BLUE), delays=(200, 300), size=(120, 80), transparent=False
     return stream.getvalue()
 
 
+def webp(frames=((*RED, 255), (*BLUE, 255)), size=(120, 80)):
+    images = [Image.new('RGBA', size, color) for color in frames]
+    stream = io.BytesIO()
+    if len(images) > 1:
+        images[0].save(stream, 'WEBP', save_all=True, append_images=images[1:], duration=[200, 300], loop=0, lossless=True)
+    else:
+        images[0].save(stream, 'WEBP', lossless=True)
+    return stream.getvalue()
+
+
 def center(image, box):
     x, y, w, h = map(round, box)
     return image.convert('RGB').getpixel((x+w//4, y+h//2))
@@ -89,10 +99,10 @@ class GifImageTests(unittest.TestCase):
         self.assertEqual(self.client.get(image['url']).headers['content-type'], 'image/png')
 
     def test_too_many_frames_are_rejected(self):
-        with patch.object(scene_images, 'GIF_FRAMES', 1):
+        with patch.object(scene_images, 'ANIMATION_FRAMES', 1):
             response = self.upload(gif())
         self.assertEqual(response.status_code, 422)
-        self.assertIn('GIF', response.text)
+        self.assertIn('animação', response.text)
 
     def test_frames_follow_the_gif_timing_and_loop(self):
         record = scene_images.import_image(gif(delays=(200, 300)), self.project['id'], 'animado.gif')
@@ -136,6 +146,38 @@ class GifImageTests(unittest.TestCase):
         self.assertTrue(near(first.getpixel((100, 960)), RED))
         self.assertTrue(near(later.getpixel((100, 960)), BLUE))
         composition.close()
+
+    def test_animated_webp_plays_like_a_gif(self):
+        response = self.upload(webp(), 'animado.webp')
+        self.assertEqual(response.status_code, 200, response.text)
+        image = response.json()['images'][-1]
+        self.assertTrue(image['animated'])
+        self.assertEqual(self.client.get(image['url']).headers['content-type'], 'image/webp')
+        record = store.get_project(self.project['id'])['images'][-1]
+        self.assertAlmostEqual(record['animation']['duration'], .5)
+        reader = scene_images.AnimatedImage(record)
+        frames = [reader.frame(t)[1].convert('RGB').getpixel((10, 10)) for t in (0, .3, 2)]
+        reader.close()
+        self.assertEqual([near(color, target) for color, target in zip(frames, (RED, BLUE, BLUE))], [True]*3)
+
+    def test_transparent_still_images_keep_their_transparency(self):
+        for name, content in (('logo.webp', webp(frames=((*RED, 0),))), ('logo.png', None)):
+            if content is None:
+                stream = io.BytesIO()
+                Image.new('RGBA', (120, 80), (*RED, 0)).save(stream, 'PNG')
+                content = stream.getvalue()
+            response = self.upload(content, name)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.project = response.json()
+            record = store.get_project(self.project['id'])['images'][-1]
+            self.assertFalse(self.project['images'][-1]['animated'])
+            with Image.open(data_path(record['path'])) as poster:
+                self.assertEqual(poster.mode, 'RGBA')
+                self.assertEqual(poster.getpixel((10, 10))[3], 0)
+        # An opaque WebP stays RGB, as before.
+        record = scene_images.import_image(webp(frames=((*RED, 255),)), self.project['id'], 'foto.webp')
+        with Image.open(data_path(record['path'])) as poster:
+            self.assertEqual(poster.mode, 'RGB')
 
     def test_loop_is_chosen_per_object_and_background(self):
         response = self.upload(gif())
