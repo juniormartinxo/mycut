@@ -87,8 +87,8 @@ def present(project):
     project['videos'] = [scene_media.public(project['id'], item) for item in project.get('videos', [])]
     project['usage_total'] = costs.project(project['id'], integrations.read()['pricing'])['total']
     project['audio_matches_script'] = bool(project.get('audio') and project['audio']['script_hash'] == store.script_hash(project))
-    project['images'] = [{k: v for k, v in item.items() if k != 'path'} |
-                         {'url': f'/api/projects/{project["id"]}/images/{item["id"]}'}
+    from .scene_images import public
+    project['images'] = [public(item) | {'url': f'/api/projects/{project["id"]}/images/{item["id"]}'}
                          for item in project.get('images', [])]
     return project
 
@@ -133,7 +133,7 @@ def scene_preview(body: ScenePreview):
 
 @app.post('/api/projects/{project_id}/images')
 def upload_scene_image(project_id: str, file: UploadFile, revision: int = Query(ge=1)):
-    from .scene_images import import_image
+    from .scene_images import import_image, files
     project = store.get_project(project_id)
     if len(project.get('images', [])) >= 24:
         raise ValueError('Use até 24 imagens por produção.')
@@ -143,7 +143,8 @@ def upload_scene_image(project_id: str, file: UploadFile, revision: int = Query(
         try:
             return present(store.update_project(project_id, {'images': [*project.get('images', []), record]}, revision))
         except BaseException:
-            media.data_path(record['path']).unlink(missing_ok=True)
+            for path in files(record):
+                path.unlink(missing_ok=True)
             raise
     finally:
         file.file.close()
@@ -154,6 +155,9 @@ def project_image(project_id: str, image_id: str):
     record = next((item for item in store.get_project(project_id).get('images', []) if item['id'] == image_id), None)
     if record is None:
         raise HTTPException(404, 'Imagem não encontrada.')
+    # An animated GIF plays in the editor as it will in the video.
+    if record.get('animation'):
+        return FileResponse(media.data_path(record['animation']['path']), media_type='image/gif')
     return FileResponse(media.data_path(record['path']), media_type='image/png')
 
 

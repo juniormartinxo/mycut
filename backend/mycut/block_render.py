@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw, ImageOps
 from . import visuals, google_fonts, flow, captions, typeset
 from .scene_layout import geometry, validate_assets, shots
 from .scene_media import VideoFrames
+from .scene_images import AnimatedImage
 from .media import data_path, digest
 from .alignment import normalized
 
@@ -250,7 +251,9 @@ class ShotComposition:
         self.style, self.fps, self.duration = style, fps, max(.1, duration)
         self.background = shot.get('background') or None
         self.videos, self.readers, self.flows, self.moving, self.reveals = [], {}, [], [], []
-        self.backdrop_video = None
+        # Animated GIFs: drawn per frame, with the fitted frame kept until the GIF advances.
+        self.animations, self.fitted = [], {}
+        self.backdrop_video = self.backdrop_animation = None
         self.backdrop = self.paint_background(project)
         overlay = Image.new('RGBA', (1080, 1920))
         if shot.get('brand', True):
@@ -279,6 +282,9 @@ class ShotComposition:
             elif obj.get('asset_id'):
                 records = project.get('images' if obj['type'] == 'image' else 'videos', [])
                 record = next(r for r in records if r['id'] == obj['asset_id'])
+                if obj['type'] == 'image' and record.get('animation'):
+                    self.animations.append((obj, record, position, size))
+                    continue
                 path = data_path(record['path'] if obj['type'] == 'image' else record['poster_path'])
                 if obj['type'] == 'image' and digest(path) != record['sha256']:
                     raise ValueError('A imagem mudou no disco. Importe-a novamente.')
@@ -293,7 +299,8 @@ class ShotComposition:
         self.overlay = overlay
         # Without anything moving behind the blocks, the still part is composed once.
         self.still = None
-        if not self.backdrop_video and not (self.background and self.background.get('motion', 'none') != 'none'):
+        if not self.backdrop_video and not self.backdrop_animation and \
+                not (self.background and self.background.get('motion', 'none') != 'none'):
             # Dimming applies to the background only, never to the blocks over it.
             self.still = self.darken(self.backdrop)
             self.still.paste(overlay, (0, 0), overlay)
@@ -320,6 +327,8 @@ class ShotComposition:
                 image.paste(layer, (0, 0), layer)
                 if kind == 'video':
                     self.backdrop_video = record
+                elif record.get('animation'):
+                    self.backdrop_animation = record
         return image
 
     def darken(self, image):
@@ -338,6 +347,14 @@ class ShotComposition:
                     self.readers['background'] = VideoFrames(record, (1080, 1920), self.fps, 'cover', self.background.get('zoom', 1),
                                                              self.background.get('crop_x', 50), self.background.get('crop_y', 50))
                 image = self.readers['background'].frame(elapsed).copy()
+            elif self.backdrop_animation:
+                background = self.background
+                layer = self.animated('background', self.backdrop_animation, (1080, 1920), 'cover', background.get('zoom', 1),
+                                      background.get('crop_x', 50), background.get('crop_y', 50), elapsed)
+                image = Image.new('RGB', (1080, 1920), self.style['background'])
+                image.paste(layer, (0, 0), layer)
+                if background.get('motion', 'none') != 'none':
+                    image = moved(image, background['motion'], progress)
             elif self.background.get('motion', 'none') != 'none':
                 image = moved(self.backdrop, self.background['motion'], progress)
             else:
@@ -347,6 +364,11 @@ class ShotComposition:
         for layer, motion, position in self.moving:
             current = moved(layer, motion, progress)
             image.paste(current, position, current)
+        for obj, record, position, size in self.animations:
+            layer = self.animated(obj['id'], record, size, obj['fit'], obj.get('zoom', 1), obj.get('crop_x', 50), obj.get('crop_y', 50), elapsed)
+            if obj.get('motion', 'none') != 'none':
+                layer = moved(layer, obj['motion'], progress)
+            image.paste(layer, position, layer)
         for obj, record, (x, y, w, h) in self.videos if elapsed is not None and videos else []:
             if obj['id'] not in self.readers:
                 ratio = min(w/record['width'], h/record['height'])
@@ -364,11 +386,23 @@ class ShotComposition:
             image.paste(layer, position, layer)
         return image
 
+    def animated(self, key, record, size, mode, zoom, crop_x, crop_y, elapsed):
+        """The GIF frame shown at this time, fitted to its box; refitted only when the GIF advances."""
+        if key not in self.readers:
+            self.readers[key] = AnimatedImage(record)
+        index, source = self.readers[key].frame(elapsed)
+        if self.fitted.get(key, (None,))[0] != index:
+            layer = Image.new('RGBA', size)
+            fit(layer, source, mode, zoom, crop_x, crop_y)
+            self.fitted[key] = (index, layer)
+        return self.fitted[key][1]
+
     def close(self):
         # A closed plano can still be drawn again: its decoders reopen on demand.
         for reader in self.readers.values():
             reader.close()
         self.readers.clear()
+        self.fitted.clear()
 
 
 def loops(project):

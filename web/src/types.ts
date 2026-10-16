@@ -76,6 +76,7 @@ export type ProjectImage = {
   height: number;
   source_url: string;
   page_url: string;
+  animated?: boolean;
 };
 export type Job = {
   id: string;

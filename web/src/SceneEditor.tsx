@@ -327,9 +327,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             <label>Arquivo da biblioteca<select value={background.asset_id || ""} onChange={e => patchBackground({ asset_id: e.target.value || null })}><option value="">Selecionar arquivo…</option>{(background.kind === "image" ? project.images : project.videos)?.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
             <div className="block-media-import">
               <button type="button" className="button secondary" disabled={locked} onClick={() => backgroundInput.current?.click()}><Upload size={16} /> Importar {background.kind === "image" ? "imagem" : "vídeo"}</button>
-              <small>Ocupa o quadro inteiro, atrás dos blocos. {background.kind === "video" ? "Sem áudio; repete até o fim do plano." : "Preenche com corte."}</small>
+              <small>Ocupa o quadro inteiro, atrás dos blocos. {background.kind === "video" ? "Sem áudio; repete até o fim do plano." : "Preenche com corte. GIF animado repete até o fim do plano."}</small>
               <input ref={backgroundInput} type="file" hidden aria-label={`Importar ${background.kind === "image" ? "imagem" : "vídeo"} do fundo`} disabled={locked}
-                accept={background.kind === "image" ? "image/png,image/jpeg,image/webp" : "video/mp4,video/quicktime,video/webm"}
+                accept={background.kind === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
                 onChange={e => { uploadBackground(e.target.files?.[0]); e.target.value = ""; }} />
             </div>
             {background.kind === "image" && <label>Movimento de câmera<select value={background.motion ?? "none"} onChange={e => patchBackground({ motion: e.target.value as Motion })}>
@@ -400,9 +400,9 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
               <button type="button" className="button secondary" disabled={locked} onClick={() => mediaInput.current?.click()}>
                 <Upload size={16} /> Importar {obj.type === "image" ? "imagem" : "vídeo"}
               </button>
-              <small>{obj.type === "image" ? "PNG, JPG ou WebP · até 15 MB" : "MP4, MOV ou WebM · até 100 MB"}</small>
+              <small>{obj.type === "image" ? "PNG, JPG, WebP ou GIF animado · até 15 MB" : "MP4, MOV ou WebM · até 100 MB"}</small>
               <input ref={mediaInput} type="file" hidden aria-label={`Importar ${obj.type === "image" ? "imagem" : "vídeo"}`} disabled={locked}
-                accept={obj.type === "image" ? "image/png,image/jpeg,image/webp" : "video/mp4,video/quicktime,video/webm"}
+                accept={obj.type === "image" ? "image/png,image/jpeg,image/webp,image/gif" : "video/mp4,video/quicktime,video/webm"}
                 onChange={e => { upload(e.target.files?.[0]); e.target.value = ""; }} />
             </div>
             <label>Enquadramento<select value={obj.fit} onChange={e => patchObject({ fit: e.target.value as VisualObject["fit"] })}><option value="contain">Mostrar inteiro</option><option value="cover">Preencher com corte</option></select></label>
@@ -416,6 +416,7 @@ export function SceneEditor({ project, scene, disabled, onChange, save, onProjec
             </>}
             {obj.type === "image" && <label>Movimento de câmera<select value={obj.motion ?? "none"} onChange={e => patchObject({ motion: e.target.value as Motion })}>
               {Object.entries(motions).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+            {obj.type === "image" && media && "animated" in media && media.animated && <p className="block-hint">GIF animado: repete no próprio ritmo durante o plano. A prévia parada mostra o primeiro quadro.</p>}
             {obj.type === "video" && <><p className="block-hint">Sem áudio original. Repete ou termina junto com a cena. MP4, MOV ou WebM · até 100 MB e 180 s.</p>{obj.asset_id && <video className="object-video" controls muted loop playsInline src={project.videos?.find(v => v.id === obj.asset_id)?.url} aria-label="Reproduzir vídeo do objeto" />}</>}
           </>}
           {issues.filter(issue => issue.object_id === obj.id).map(issue => <div key={issue.kind} className="notice danger" role="alert">{issue.message}

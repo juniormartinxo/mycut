@@ -6,7 +6,7 @@ import sys
 import time
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
-from . import store, bridge, integrations, agent_models
+from . import store, bridge, integrations, agent_models, scene_images
 from .config import DATA
 from .scene_layout import Id, SceneBlock, scoped_blocks, target, validate_assets, shot_of, shot_view, with_shot_blocks, shots
 from .models import Scene, ProjectInput
@@ -187,7 +187,7 @@ def run(job):
              'shot': {'number': position+1, 'count': len(planos), 'anchor': planos[position].get('anchor')},
              'message': request['text'], 'history': request['history'], 'style': project.get('visual_style'),
              'flow_icons': flow.icon_names(), 'issues_to_fix': corrections,
-             'images': [{k: v for k, v in r.items() if k != 'path'} for r in project.get('images', [])],
+             'images': [scene_images.public(r) for r in project.get('images', [])],
              'videos': [{k: v for k, v in r.items() if k not in ('path', 'poster_path')} for r in project.get('videos', [])]},
             Proposal, attempt=attempt)
         output = proposal.model_dump()

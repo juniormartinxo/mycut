@@ -1,5 +1,7 @@
-"""Project-owned images; decode to bounded PNGs and keep source provenance."""
+"""Project-owned images; decode to bounded PNGs (animated GIFs also keep their file) and keep source provenance."""
+import bisect
 import io
+import itertools
 import uuid
 import http.client
 import ipaddress
@@ -8,7 +10,7 @@ import ssl
 from urllib.parse import urlsplit, urljoin
 from PIL import Image, ImageOps, UnidentifiedImageError
 from .config import DATA
-from .media import digest
+from .media import data_path, digest
 
 
 def public_target(url):
@@ -86,22 +88,90 @@ def collect(research, project):
     return images, notes
 
 
+# Bounds for an animated GIF: it is decoded frame by frame at render time, never held whole.
+GIF_FRAMES, GIF_SIDE = 1000, 1920
+# Browsers play frame delays under 20 ms at 100 ms; the video follows what the person saw.
+GIF_MIN_DELAY, GIF_DEFAULT_DELAY = 20, 100
+
+
+def frame_delays(image):
+    """Seconds each GIF frame stays on screen."""
+    delays = []
+    for index in range(image.n_frames):
+        image.seek(index)
+        delay = image.info.get('duration') or 0
+        delays.append((delay if delay >= GIF_MIN_DELAY else GIF_DEFAULT_DELAY)/1000)
+    image.seek(0)
+    return delays
+
+
 def import_image(content, project_id, name, source_url='', page_url=''):
+    """A still image becomes a bounded PNG. An animated GIF keeps its file to play in loop; its first
+    frame is the PNG every still consumer (library, agents, covers) reads."""
     if len(content) > 15 * 1024 * 1024:
         raise ValueError('Use uma imagem de até 15 MB.')
+    image_id = uuid.uuid4().hex
+    folder = DATA / 'projects' / project_id / 'images'
+    target = folder / f'{image_id}.png'
+    animation = None
     try:
         with Image.open(io.BytesIO(content)) as image:
-            if image.format not in ('PNG', 'JPEG', 'WEBP'):
-                raise ValueError('Use uma imagem PNG, JPG ou WebP.')
-            image = ImageOps.exif_transpose(image).convert('RGB')
-            image.thumbnail((1920, 1920), Image.Resampling.LANCZOS)
+            if image.format not in ('PNG', 'JPEG', 'WEBP', 'GIF'):
+                raise ValueError('Use uma imagem PNG, JPG, WebP ou GIF.')
+            if image.format == 'GIF' and getattr(image, 'n_frames', 1) > 1:
+                if image.n_frames > GIF_FRAMES or max(image.size) > GIF_SIDE:
+                    raise ValueError(f'Use um GIF de até {GIF_FRAMES} quadros e {GIF_SIDE} px no maior lado.')
+                delays = frame_delays(image)
+                image = image.convert('RGBA')
+                animation = {'path': folder / f'{image_id}.gif', 'frames': len(delays), 'duration': round(sum(delays), 3)}
+            else:
+                image = ImageOps.exif_transpose(image).convert('RGB')
+                image.thumbnail((1920, 1920), Image.Resampling.LANCZOS)
             width, height = image.size
-            image_id = uuid.uuid4().hex
-            target = DATA / 'projects' / project_id / 'images' / f'{image_id}.png'
-            target.parent.mkdir(parents=True, exist_ok=True)
+            folder.mkdir(parents=True, exist_ok=True)
             image.save(target, format='PNG')
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
-        raise ValueError('Não foi possível ler a imagem. Use PNG, JPG ou WebP válido.') from exc
-    return {'id': image_id, 'name': name[:200], 'path': str(target.relative_to(DATA)),
-            'sha256': digest(target), 'width': width, 'height': height,
-            'source_url': source_url, 'page_url': page_url}
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, EOFError) as exc:
+        raise ValueError('Não foi possível ler a imagem. Use PNG, JPG, WebP ou GIF válido.') from exc
+    record = {'id': image_id, 'name': name[:200], 'path': str(target.relative_to(DATA)),
+              'sha256': digest(target), 'width': width, 'height': height,
+              'source_url': source_url, 'page_url': page_url}
+    if animation:
+        animation['path'].write_bytes(content)
+        record['animation'] = {**animation, 'path': str(animation['path'].relative_to(DATA)),
+                               'sha256': digest(animation['path'])}
+    return record
+
+
+def files(record):
+    """Every file an image record owns on disk."""
+    return [data_path(record['path'])] + ([data_path(record['animation']['path'])] if record.get('animation') else [])
+
+
+def public(record):
+    """The record as the browser and the agents see it: no disk paths."""
+    return {k: v for k, v in record.items() if k not in ('path', 'animation')} | {'animated': bool(record.get('animation'))}
+
+
+class AnimatedImage:
+    """An imported GIF looping on its own frame timing, decoded sequentially like a video."""
+    def __init__(self, record):
+        animation = record['animation']
+        source = data_path(animation['path'])
+        if digest(source) != animation['sha256']:
+            raise ValueError('A imagem mudou no disco. Importe-a novamente.')
+        self.image = Image.open(source)
+        self.starts = list(itertools.accumulate(frame_delays(self.image), initial=0.0))
+        self.duration = self.starts.pop()
+        self.index, self.current = -1, None
+
+    def frame(self, elapsed):
+        """(frame index, RGBA frame) shown at this time; no time is the first frame."""
+        moment = 0.0 if elapsed is None else elapsed % self.duration
+        index = max(0, bisect.bisect_right(self.starts, moment)-1)
+        if index != self.index:
+            self.image.seek(index)
+            self.index, self.current = index, self.image.convert('RGBA')
+        return self.index, self.current
+
+    def close(self):
+        self.image.close()
