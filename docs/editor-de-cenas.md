@@ -263,6 +263,9 @@ O cenário de proposta requer API e worker isolados, além de
 `MYCUT_BLOCK_TEST_DATA` apontando para o mesmo diretório temporário sob `/tmp`.
 A fixture `web/tests/fixtures/scene_agent_runner.py` simula exclusivamente a
 resposta do provedor; persistência, fila, worker, validação e aceitação são reais.
+Ela também responde ao roteirista, ao diretor, à conferência e à Arte de um Short
+livre com o prompt de referência (`backend/tests/reference_agents.py`), usado
+pelo cenário ponta a ponta `web/tests/reference-short.spec.ts`.
 Sem essa variável, esse cenário é explicitamente ignorado. O teste não qualifica
 a qualidade nem a disponibilidade de um provedor real de IA.
 

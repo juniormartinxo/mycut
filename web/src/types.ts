@@ -175,16 +175,17 @@ export type ArtRequest = {
   /** Made with a previous version of one of its bases. */
   outdated: boolean;
 };
+/** A new Short livre keeps only the mode until the director composes the scenes; the rest comes with the direction. */
 export type Art = {
   mode: ArtMode;
-  bible: {
+  bible?: {
     tone: string;
     sheets: { kind: "character" | "setting"; name: string; description: string }[];
   } | null;
-  requests: ArtRequest[];
-  estimate: { images: number; provider: string; usd_per_image: number | null; usd: number | null } | null;
+  requests?: ArtRequest[];
+  estimate?: { images: number; provider: string; usd_per_image: number | null; usd: number | null } | null;
   /** The production that stopped for the bases and goes on once the remaining images exist. */
-  then: "pipeline" | "plan" | null;
+  then?: "pipeline" | "plan" | null;
 };
 
 /** A B-roll of the lista de materiais and the planos it fills, numbered from 1 as the editor shows them. */
