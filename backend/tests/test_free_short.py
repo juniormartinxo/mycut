@@ -218,6 +218,23 @@ class FreeShortTests(unittest.TestCase):
                                              'e foi removida.'])
         self.assertIn('"pauses": [{"after": "Resultado: isso.", "seconds": 0.8}]', invoke.call_args_list[2].args[1])
 
+    def test_a_pause_after_a_spaced_dash_is_kept_and_delays_what_follows(self):
+        # "—" between spaces is a word of the narration that is never spoken; a passage copied with it still matches.
+        project, job = self.start_free()
+        script = json.loads(json.dumps(FREE_SCRIPT))
+        script['scenes'][-1]['narration'] = 'Resultado — isso. O prompt completo está no comentário fixado.'
+        script['scenes'][-1]['pauses'] = [{'after': 'Resultado — isso.', 'seconds': .8}]
+        with patch.object(bridge, 'invoke', side_effect=[script, free_direction(), APPROVED]):
+            pipeline.produce(job)
+        saved = store.get_project(project['id'])
+        self.assertEqual((saved['scenes'][-1]['pauses'], saved['warnings']), (script['scenes'][-1]['pauses'], []))
+        store.finish(job['id'], 'succeeded', 'Pronto')
+        self.project = saved
+        _, timing = self.export()
+        captions = timing['captions']
+        before = next(c for c in captions if c['text'].endswith('isso.'))
+        self.assertGreaterEqual(captions[captions.index(before)+1]['start'], before['end'] + .8 - .15)
+
     def test_a_pause_is_silence_between_synthesized_passages_and_shifts_the_word_times(self):
         pause = {'after': 'Resultado: isso.', 'seconds': .8}
         project = {'scenes': [{'narration': 'Primeiro, o tom.'},

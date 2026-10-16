@@ -157,32 +157,37 @@ def scene_clock(project, scene):
     return estimate_clock(scene['narration'], pause_points(scene))
 
 
-def resolve_anchors(flow, narration):
-    """Word index of each step anchor, searched in order; None when absent or not found."""
-    words = [normalized(w) for w in narration.split()]
+def anchor_spans(anchors, narration):
+    """First and last narration word index of each anchor passage, searched in order; None when absent or not found.
+    Words with nothing to say, like a spaced "—", are skipped on both sides but keep their place in the narration."""
+    spoken = [(i, n) for i, n in enumerate(normalized(w) for w in narration.split()) if n]
+    words = [n for _, n in spoken]
     cursor, found = 0, []
-    for step in flow['steps']:
-        index = None
-        needle = [n for n in (normalized(w) for w in (step.get('anchor') or '').split()) if n]
+    for anchor in anchors:
+        span = None
+        needle = [n for n in (normalized(w) for w in (anchor or '').split()) if n]
         if needle:
             for i in range(cursor, len(words)-len(needle)+1):
                 if words[i:i+len(needle)] == needle:
-                    index = i
+                    span = (spoken[i][0], spoken[i+len(needle)-1][0])
                     cursor = i+1
                     break
-        found.append(index)
+        found.append(span)
     return found
+
+
+def resolve_anchors(flow, narration):
+    """Word index of each step anchor, searched in order; None when absent or not found."""
+    return [span and span[0] for span in anchor_spans([step.get('anchor') for step in flow['steps']], narration)]
 
 
 def pause_points(scene):
     """Seconds of silence after each word index, for the pauses whose passage is found in the narration, in order."""
     pauses = scene.get('pauses') or []
-    starts = resolve_anchors({'steps': [{'anchor': pause['after']} for pause in pauses]}, scene.get('narration', ''))
     points = {}
-    for pause, start in zip(pauses, starts):
-        if start is not None:
-            last = start + len([n for n in (normalized(w) for w in pause['after'].split()) if n]) - 1
-            points[last] = points.get(last, 0) + pause['seconds']
+    for pause, span in zip(pauses, anchor_spans([pause['after'] for pause in pauses], scene.get('narration', ''))):
+        if span is not None:
+            points[span[1]] = points.get(span[1], 0) + pause['seconds']
     return points
 
 
