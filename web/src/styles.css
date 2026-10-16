@@ -2169,6 +2169,10 @@ progress::-moz-progress-bar {
   background: var(--accent);
   border-color: var(--accent);
 }
+.agent-steps .skipped .step-dot {
+  background: transparent;
+  border: 2px dashed var(--line);
+}
 .agent-steps .failed .step-dot {
   background: #aa302c;
   border-color: #aa302c;
@@ -2223,4 +2227,71 @@ progress::-moz-progress-bar {
   margin: 12px 0;
   font-size: 12px;
   color: var(--accent);
+}
+
+.free-prompt {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 320px;
+}
+.free-attachments {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 22px;
+}
+.free-attachments > label {
+  justify-self: start;
+  cursor: pointer;
+}
+.free-attachments > label input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.free-attachments > label:has(input:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.free-attachments small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.free-attachments ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.free-attachments li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 6px 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.free-attachments li button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 2px;
+}
+.agent-warnings {
+  display: block;
+  margin-top: 18px;
+}
+.agent-warnings ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
 }

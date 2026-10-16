@@ -120,6 +120,10 @@ export type Project = {
   images?: ProjectImage[];
   videos?: ProjectVideo[];
   image_notes?: string[];
+  /** Short livre (ADR 0005): the brief is the prompt; no format applies. */
+  free?: boolean;
+  /** Unverified claims and conference problems the agents left for review. */
+  warnings?: string[];
   scenes: Scene[];
   revision: number;
   created_at: number;

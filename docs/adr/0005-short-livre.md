@@ -35,6 +35,18 @@ verificada vira aviso no roteiro completo, ou é suavizada se o roteiro foi
 criado pelo agente, e nunca recusa a produção. A regra de não inventar fatos
 continua valendo.
 
+## Conferência e degradação
+
+Implementado no MYC-4. A conferência pede uma correção ao roteiro e à direção.
+Se reprovar de novo, o roteiro e as cenas já pagos ficam salvos no projeto, com
+os problemas como avisos, e a produção para antes da voz, para não gastar
+créditos ElevenLabs num roteiro infiel (decisão do usuário em 16/10/2026). A
+direção tem uma correção; depois disso, alturas, mídias inexistentes, textos
+que não cabem e âncoras fora da fala são reparados, e uma saída inutilizável
+vira uma composição simples com o texto na tela do roteiro. Os anexos de
+imagem entram na biblioteca da produção; os de texto são acrescentados ao
+prompt.
+
 ## Personagens e avatares
 
 No modo Livre, personagens fictícios realistas são permitidos em imagens e

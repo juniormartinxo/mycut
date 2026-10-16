@@ -112,6 +112,10 @@ Nunca invente acesso a uma página, notícias, preços, funcionalidades, fontes,
 Português brasileiro natural; animações e diagramas explicativos, nunca apresentadores humanos realistas.
 Mantenha marcas com grafia correta, narração de leitura natural, sem tags teatrais ou canto.
 '''
+# Short livre (ADR 0005): fictional realistic characters and avatars are allowed; identifiable real people never are.
+FREE_RULES = RULES.replace('animações e diagramas explicativos, nunca apresentadores humanos realistas.',
+    'no Short livre, personagens fictícios realistas e avatares são permitidos quando o prompt e o contexto justificam; '
+    'nunca retrate pessoas reais identificáveis. Conteúdo autoral ou fictício pedido no prompt não é afirmação factual.')
 
 
 def agent(job, role, instructions, payload, model, web=False, attempt=1):
@@ -119,7 +123,7 @@ def agent(job, role, instructions, payload, model, web=False, attempt=1):
     label = {'research': 'Pesquisa', 'writer': 'Roteiro', 'director': 'Cenas', 'reviewer': 'Conferência'}[role]
     store.step(job['id'], role, 'running', f'{label} · {config["provider"]}')
     store.progress(job['id'], {'research': 5, 'writer': 15, 'director': 25, 'reviewer': 35}[role], f'{label}: agente {config["provider"]} trabalhando')
-    prompt = RULES + '\n' + instructions + '\nDADOS:\n' + json.dumps(payload, ensure_ascii=False)
+    prompt = (FREE_RULES if job['snapshot'].get('free') else RULES) + '\n' + instructions + '\nDADOS:\n' + json.dumps(payload, ensure_ascii=False)
     bridge.require([config['provider']])
     usage_id = uuid.uuid4().hex
     store.usage_start(usage_id, job['id'], role, attempt, config['provider'], config['model'])
@@ -288,7 +292,10 @@ def produce(job):
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
     kind = job['kind']
-    if kind in ('pipeline', 'plan'):
+    if kind in ('pipeline', 'plan') and job['snapshot'].get('free'):
+        from . import free
+        job = free.produce(job, folder)
+    elif kind in ('pipeline', 'plan'):
         research = agent(job, 'research',
             'Pesquise a pauta usando WebSearch/WebFetch. Abra o link informado e procure fontes primárias. '
                 'Registre somente fatos que conseguiu verificar e pequenos trechos de evidência. Se não acessar, accessible=false. '

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ImagePlus, RotateCcw } from "lucide-react";
+import { Check, ImagePlus, PenLine, RotateCcw } from "lucide-react";
 import { request } from "./api";
 import type { Scene, ShortFormat, VisualStyle } from "./types";
 import "./FormatPicker.css";
@@ -133,11 +133,16 @@ export function FormatPicker({
   accent,
   onChange,
   disabled = false,
+  free,
+  onFreeChange,
 }: {
   value: VisualStyle | null;
   accent: string;
   onChange: (style: VisualStyle, accent: string) => void;
   disabled?: boolean;
+  /** With onFreeChange, the gallery offers Livre (Short livre, ADR 0005) next to the four formats. */
+  free?: boolean;
+  onFreeChange?: (free: boolean) => void;
 }) {
   const [catalog, setCatalog] = useState<{
     formats: ShortFormat[];
@@ -162,8 +167,11 @@ export function FormatPicker({
       live = false;
     };
   }, [retry]);
-  const selected = catalog?.formats.find((item) => item.id === style.format_id);
-  const apply = (format: ShortFormat) =>
+  const selected = free
+    ? undefined
+    : catalog?.formats.find((item) => item.id === style.format_id);
+  const apply = (format: ShortFormat) => {
+    onFreeChange?.(false);
     onChange(
       {
         ...style,
@@ -174,6 +182,7 @@ export function FormatPicker({
       },
       format.accent,
     );
+  };
   const change = (delta: Partial<VisualStyle>) =>
     onChange({ ...style, ...delta }, accent);
   return (
@@ -182,7 +191,7 @@ export function FormatPicker({
         <legend>Formato do Short</legend>
         <p>
           Escolha um ponto de partida. Depois, ajuste as cores e a fonte do seu
-          jeito.
+          jeito.{onFreeChange && " Ou escolha Livre e deixe o prompt definir tudo."}
         </p>
         {error ? (
           <div className="notice danger" role="alert">
@@ -198,22 +207,22 @@ export function FormatPicker({
         ) : !catalog ? (
           <p role="status">Carregando formatos…</p>
         ) : (
-          <div className="format-gallery">
+          <div className={`format-gallery ${onFreeChange ? "with-free" : ""}`}>
             {catalog.formats.map((format) => (
               <label
                 key={format.id}
-                className={`format-option ${style.format_id === format.id ? "selected" : ""}`}
+                className={`format-option ${!free && style.format_id === format.id ? "selected" : ""}`}
               >
                 <input
                   type="radio"
                   name="short-format"
                   value={format.id}
-                  checked={style.format_id === format.id}
+                  checked={!free && style.format_id === format.id}
                   onChange={() => apply(format)}
                   aria-label={format.name}
                 />
                 <div className="format-thumbnail">
-                  {style.format_id === format.id ? (
+                  {!free && style.format_id === format.id ? (
                     <RenderedScene
                       scene={sample}
                       style={style}
@@ -230,16 +239,48 @@ export function FormatPicker({
                 </div>
                 <span className="format-name">
                   {format.name}
-                  {style.format_id === format.id && (
+                  {!free && style.format_id === format.id && (
                     <Check size={14} aria-hidden="true" />
                   )}
                 </span>
                 <span className="format-purpose">{format.use_case}</span>
               </label>
             ))}
+            {onFreeChange && (
+              <label className={`format-option ${free ? "selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="short-format"
+                  value="free"
+                  checked={!!free}
+                  onChange={() => onFreeChange(true)}
+                  aria-label="Livre"
+                />
+                <div className="format-thumbnail">
+                  <div className="free-thumbnail" aria-hidden="true">
+                    <PenLine size={22} />
+                    <span>Seu prompt</span>
+                    <small>roteiro, ritmo e composição</small>
+                  </div>
+                </div>
+                <span className="format-name">
+                  Livre
+                  {free && <Check size={14} aria-hidden="true" />}
+                </span>
+                <span className="format-purpose">Ideia ou roteiro completo</span>
+              </label>
+            )}
           </div>
         )}
       </fieldset>
+      {free && (
+        <p className="format-description">
+          Sem formato, arco ou esqueleto de cena: o prompt é a especificação. Se
+          ele trouxer um roteiro completo, narração, texto na tela e ordem são
+          seguidos ao pé da letra. A pesquisa só roda para afirmações factuais
+          externas.
+        </p>
+      )}
       {selected && (
         <>
           <p className="format-description">
@@ -311,51 +352,53 @@ export function FormatPicker({
           </details>
         </>
       )}
-      <fieldset className="format-media" disabled={disabled}>
-        <label>
-          Conteúdo visual
-          <select
-            value={style.media_mode}
-            onChange={(e) =>
-              change({
-                media_mode: e.target.value as VisualStyle["media_mode"],
-              })
-            }
-          >
-            <option value="animations">Só animações e diagramas</option>
-            <option value="mixed">Animações com imagens</option>
-          </select>
-        </label>
-        {style.media_mode === "mixed" && (
+      {!free && (
+        <fieldset className="format-media" disabled={disabled}>
           <label>
-            Origem das imagens
+            Conteúdo visual
             <select
-              value={style.image_source}
+              value={style.media_mode}
               onChange={(e) =>
                 change({
-                  image_source: e.target.value as VisualStyle["image_source"],
+                  media_mode: e.target.value as VisualStyle["media_mode"],
                 })
               }
             >
-              <option value="both">Fontes da pauta e minha biblioteca</option>
-              <option value="sources">Buscar nas fontes da pauta</option>
-              <option value="library">Usar minha biblioteca</option>
+              <option value="animations">Só animações e diagramas</option>
+              <option value="mixed">Animações com imagens</option>
             </select>
           </label>
-        )}
-        <p>
-          <ImagePlus size={15} aria-hidden="true" />
-          {style.media_mode === "mixed"
-            ? "Os agentes escolhem imagens pertinentes para algumas cenas. Você pode trocar a imagem ou voltar à animação em cada cena."
-            : "Todas as cenas usam animações, textos e fluxos. Nenhuma imagem externa será buscada."}
-        </p>
-        {style.media_mode === "mixed" && style.image_source === "library" && (
+          {style.media_mode === "mixed" && (
+            <label>
+              Origem das imagens
+              <select
+                value={style.image_source}
+                onChange={(e) =>
+                  change({
+                    image_source: e.target.value as VisualStyle["image_source"],
+                  })
+                }
+              >
+                <option value="both">Fontes da pauta e minha biblioteca</option>
+                <option value="sources">Buscar nas fontes da pauta</option>
+                <option value="library">Usar minha biblioteca</option>
+              </select>
+            </label>
+          )}
           <p>
-            Importe suas imagens na aba Cenas antes de pedir aos agentes para
-            recriar os visuais.
+            <ImagePlus size={15} aria-hidden="true" />
+            {style.media_mode === "mixed"
+              ? "Os agentes escolhem imagens pertinentes para algumas cenas. Você pode trocar a imagem ou voltar à animação em cada cena."
+              : "Todas as cenas usam animações, textos e fluxos. Nenhuma imagem externa será buscada."}
           </p>
-        )}
-      </fieldset>
+          {style.media_mode === "mixed" && style.image_source === "library" && (
+            <p>
+              Importe suas imagens na aba Cenas antes de pedir aos agentes para
+              recriar os visuais.
+            </p>
+          )}
+        </fieldset>
+      )}
     </section>
   );
 }
