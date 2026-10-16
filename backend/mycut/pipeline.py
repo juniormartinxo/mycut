@@ -296,9 +296,17 @@ def produce(job):
     folder = DATA / 'projects' / job['project_id'] / 'renders' / job['id']
     folder.mkdir(parents=True, exist_ok=True)
     kind = job['kind']
-    if kind in ('pipeline', 'plan') and job['snapshot'].get('free'):
-        from . import free
+    if kind == 'art':
+        from . import art
+        job, proceed = art.produce(job)
+        # The images a production stopped for are ready: it goes on to the voice and the video.
+        kind = 'pipeline' if proceed else 'art'
+    elif kind in ('pipeline', 'plan') and job['snapshot'].get('free'):
+        from . import free, art
         job = free.produce(job, folder)
+        job, complete = art.after_production(job, kind)
+        if not complete:
+            kind = 'art'  # Bases to review first: no voice nor video until the scene images exist.
     elif kind in ('pipeline', 'plan'):
         research = agent(job, 'research',
             'Pesquise a pauta usando WebSearch/WebFetch. Abra o link informado e procure fontes primárias. '

@@ -83,6 +83,23 @@ máquina da capa. O diretor extrai do prompt a **bíblia visual** (tom, fichas d
 personagem e cenário). A Arte gera primeiro as imagens-base e as anexa como
 referência às seguintes, com estimativa de custo antes.
 
+Implementado no MYC-6. Para não pagar imagens que seriam descartadas, a Arte
+roda só depois de a conferência aprovar, e o padrão é conferir as bases antes
+das demais (decisão do usuário em 16/10/2026): a produção gera as fichas e os
+cenários vazios e para antes da voz. Cada imagem aceita uma orientação do autor,
+com imagens de exemplo, e é refeita a partir da versão anterior; as cenas feitas
+com uma base anterior ficam marcadas, sem serem refeitas sozinhas. Gerar o que
+falta produz o restante com as bases anexadas e retoma a voz e o vídeo de um
+Short completo. Em **Novo** também dá para gerar tudo de uma vez ou nenhuma
+imagem. São até 12 imagens por Short, até 4 delas bases, uma por chamada. As
+cenas nunca apontam para uma imagem inexistente: o pedido guarda o bloco ou o
+fundo do plano onde ela entra, e a imagem só ocupa esse lugar se o autor não o
+preencheu nesse meio-tempo. Uma imagem que falha vira aviso dos agentes. A
+estimativa (imagens × preço por imagem, editável) é gravada antes da primeira
+chamada, e cada chamada registra as imagens recebidas em Custos. Como os CLIs
+não informam o custo de uma imagem, o preço serve só como referência (decisão do
+usuário em 16/10/2026).
+
 Os B-rolls em vídeo não têm integração nesta versão. O agente entrega a
 **lista de materiais**, com prompt, ferramenta sugerida, referências e duração
 de cada clipe, e diz com clareza o que está faltando. Enquanto o clipe não

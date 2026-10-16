@@ -11,6 +11,7 @@ test("selecionar IDs, testar o rascunho, recarregar e distinguir outro modelo", 
       writer: { provider: "claude", model: "" },
       director: { provider: "codex", model: "" },
       reviewer: { provider: "codex", model: "" },
+      art: { provider: "codex", model: "" },
     },
     commands: { codex: "codex", claude: "claude", grok: "grok" },
     runner: {
@@ -137,6 +138,7 @@ test("personalizar e restaurar o comando de um CLI", async ({ page }) => {
       writer: { provider: "claude", model: "" },
       director: { provider: "codex", model: "" },
       reviewer: { provider: "codex", model: "" },
+      art: { provider: "codex", model: "" },
     },
     commands: { codex: "codex", claude: "claude", grok: "grok-ausente" },
     runner: {
@@ -214,6 +216,7 @@ test("configurar e testar o navegador da pesquisa", async ({ page }) => {
       writer: { provider: "claude", model: "" },
       director: { provider: "codex", model: "" },
       reviewer: { provider: "codex", model: "" },
+      art: { provider: "codex", model: "" },
     },
     commands: { codex: "codex", claude: "claude", grok: "grok" },
     browser: { enabled: true, chrome_path: "", port: 9222 },

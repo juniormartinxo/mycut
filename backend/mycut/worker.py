@@ -14,7 +14,7 @@ from .config import DATA, configure
 
 MODULES = {'render': 'mycut.production', 'cover': 'mycut.covers', 'scene_edit': 'mycut.scene_chat'}
 MESSAGES = {'plan': 'Roteiro e cenas prontos', 'scenes': 'Cenas recriadas pelos agentes',
-            'voice': 'Narração gerada pela ElevenLabs', 'cover': 'Imagem pronta', 'scene_edit': 'Proposta pronta para revisar'}
+            'voice': 'Narração gerada pela ElevenLabs', 'cover': 'Imagem pronta', 'art': 'Imagens da Arte prontas', 'scene_edit': 'Proposta pronta para revisar'}
 
 
 def run_once(covers=False):

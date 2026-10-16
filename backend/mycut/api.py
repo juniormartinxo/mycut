@@ -14,9 +14,9 @@ from fastapi.exceptions import RequestValidationError
 from PIL import UnidentifiedImageError, Image
 from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
-from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice
+from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice, ArtRun
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
-from . import voice_tests, covers, endings, flow
+from . import voice_tests, covers, endings, flow, art
 from . import visuals, scene_layout, scene_media, google_fonts, block_render
 from .scene_api import router as scene_router
 from .models import ScenePreview
@@ -210,7 +210,7 @@ def create_free(project: str = Form(max_length=200_000), files: list[UploadFile]
         raise ValueError('Escreva o prompt do Short livre para os agentes.')
     if len(files) > MAX_FREE_ATTACHMENTS:
         raise ValueError(f'Anexe até {MAX_FREE_ATTACHMENTS} imagens de referência.')
-    settings = ready_for(body.automation)
+    settings = ready_for(body.automation, art=body.art != 'none')
     project_id = store.uid()
     images = []
     try:
@@ -224,7 +224,7 @@ def create_free(project: str = Form(max_length=200_000), files: list[UploadFile]
                 file.file.close()
         document = blank(body.title)
         document.update(title=body.title.strip() or 'Short livre', brief=body.brief, free=True,
-                        accent_locked=False, images=images)
+                        accent_locked=False, images=images, art={'mode': body.art})
         result = store.create_project(document, project_id)
     except BaseException:
         shutil.rmtree(DATA / 'projects' / project_id, ignore_errors=True)
@@ -243,10 +243,12 @@ def check_free_only(body, free):
         raise ValueError('Pausas na narração só valem para um Short livre.')
 
 
-def ready_for(kind):
+def ready_for(kind, art=False):
     settings = integrations.read()
     if kind in ('pipeline', 'plan'):
-        bridge.require(v['provider'] for v in settings['agents'].values())
+        bridge.require(settings['agents'][role]['provider'] for role in integrations.TEXT_ROLES)
+    if art:
+        bridge.require([settings['agents']['art']['provider']])
     if kind == 'scenes':
         bridge.require(settings['agents'][role]['provider'] for role in ('director', 'reviewer'))
     if kind in ('pipeline', 'voice'):
@@ -393,8 +395,51 @@ def voice_test_audio(test_id: str):
 def run_agents(project_id: str, body: AgentRunRequest):
     if body.kind == 'scenes' and any(s.get('blocks') is not None for s in store.get_project(project_id)['scenes']):
         raise store.Conflict('Use a conversa da cena para revisar e aceitar alterações nos blocos.')
-    settings = ready_for(body.kind)
+    current = store.get_project(project_id)
+    settings = ready_for(body.kind, art=bool(current.get('free')) and body.kind in ('pipeline', 'plan')
+                         and art.mode(current) != 'none')
     return store.enqueue(project_id, body.mode, body.revision, body.kind, settings)
+
+
+@app.post('/api/projects/{project_id}/art', status_code=202)
+def run_art(project_id: str, body: ArtRun):
+    """The Arte's remaining images; a production that stopped for the bases then goes on to the voice and video."""
+    current = store.get_project(project_id)
+    art.pending(current)
+    settings = ready_for('voice' if current['art'].get('then') == 'pipeline' else 'art', art=True)
+    return store.enqueue(project_id, 'final', body.revision, 'art', settings, {'action': 'pending'})
+
+
+@app.post('/api/projects/{project_id}/art/{key}', status_code=202)
+def redo_art(project_id: str, key: str, text: str = Form(max_length=2000), revision: int = Form(ge=1),
+             files: list[UploadFile] | None = File(None)):
+    """One image again, following the author's message and examples, before the remaining ones are paid for."""
+    files = files or []
+    current = store.get_project(project_id)
+    if not current.get('free') or not any(item['key'] == key for item in (current.get('art') or {}).get('requests', [])):
+        raise ValueError('Essa imagem não está na bíblia visual deste Short.')
+    if not text.strip():
+        raise ValueError('Escreva o que a Arte deve mudar nesta imagem.')
+    if len(files) > covers.MAX_ATTACHMENTS:
+        raise ValueError(f'Envie até {covers.MAX_ATTACHMENTS} imagens de exemplo.')
+    settings = ready_for('art', art=True)
+    bridge.require_images()
+    paths = []
+    try:
+        for upload in files:
+            path = DATA / 'projects' / project_id / 'art-inputs' / f'{store.uid()}.png'
+            try:
+                covers.import_attachment(upload.file.read(15 * 1024 * 1024 + 1), path)
+            finally:
+                upload.file.close()
+            paths.append(path)
+        return store.enqueue(project_id, 'final', revision, 'art', settings,
+                             {'action': 'redo', 'key': key, 'message': text.strip(),
+                              'attachments': [str(path.relative_to(DATA)) for path in paths]})
+    except BaseException:
+        for path in paths:
+            path.unlink(missing_ok=True)
+        raise
 
 
 @app.get('/api/projects/{project_id}')

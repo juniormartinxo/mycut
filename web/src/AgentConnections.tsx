@@ -30,7 +30,18 @@ const roles: { id: AgentRole; title: string; detail: string }[] = [
     title: "Conferência",
     detail: "Confere afirmações e pede correções antes da voz.",
   },
+  {
+    id: "art",
+    title: "Arte",
+    detail:
+      "Gera as imagens das cenas do Short livre a partir da bíblia visual. Só Codex e Grok geram imagens.",
+  },
 ];
+// Claude Code only draws SVG: the Arte needs a CLI with an image generation tool.
+const providersFor = (role: AgentRole) =>
+  role === "art"
+    ? (["codex", "grok"] as const)
+    : (["codex", "claude", "grok"] as const);
 const active = (test?: AgentTest) =>
   test && ["queued", "running", "cancelling"].includes(test.state);
 const labels = { codex: "Codex", claude: "Claude Code", grok: "Grok" };
@@ -186,7 +197,7 @@ export function AgentConnections({
                   })
                 }
               >
-                {(["codex", "claude", "grok"] as const).map((provider) => (
+                {providersFor(role.id).map((provider) => (
                   <option value={provider} key={provider}>
                     {labels[provider]}
                     {settings.runner.online &&

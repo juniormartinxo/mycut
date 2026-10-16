@@ -62,6 +62,7 @@ async function setup(page: Page, brokenPreview = false) {
       writer: { provider: "claude", model: "" },
       director: { provider: "codex", model: "" },
       reviewer: { provider: "codex", model: "" },
+      art: { provider: "codex", model: "" },
     },
     commands: { codex: "codex", claude: "claude", grok: "grok" },
     runner: {

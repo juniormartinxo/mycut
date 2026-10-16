@@ -11,6 +11,7 @@ const steps: Record<UsageCall["step"], string> = {
   reviewer: "Conferência",
   voice: "Narração",
   cover: "Capa",
+  art: "Arte",
 };
 const providers: Record<UsageCall["provider"], string> = {
   codex: "Codex",
@@ -26,6 +27,7 @@ const kinds: Record<ProjectUsage["versions"][number]["kind"], string> = {
   cover: "Capa",
   voice: "Narração",
   render: "Renderização",
+  art: "Arte",
 };
 const states: Partial<Record<UsageCall["state"], string>> = {
   running: "em andamento",
@@ -36,6 +38,7 @@ const sources = {
   cli: "informado pelo CLI",
   tabela: "tabela de preços",
   plano: "preço do seu plano",
+  imagem: "preço por imagem",
 };
 const numbers = new Intl.NumberFormat("pt-BR");
 
@@ -146,8 +149,9 @@ export function ProjectCosts({ project }: { project: Project }) {
         que você paga.
         {total.unpriced > 0 &&
           ` ${total.unpriced} ${total.unpriced === 1 ? "chamada ficou" : "chamadas ficaram"} sem preço e fora do total.`}{" "}
-        Claude Code e Grok informam o valor. O Codex usa a tabela de preços e a
-        ElevenLabs, o preço por 1.000 créditos, ambos em Configurações › Custos.
+        Claude Code e Grok informam o valor. O Codex usa a tabela de preços, a
+        ElevenLabs, o preço por 1.000 créditos, e as imagens da Arte, o preço por
+        imagem, todos em Configurações › Custos.
         {rate !== null &&
           ` Reais pela cotação de ${rate.toLocaleString("pt-BR")}.`}
       </p>
@@ -235,6 +239,11 @@ export function ProjectCosts({ project }: { project: Project }) {
                         )}
                         <td>
                           <Value usd={call.usd} rate={rate} />
+                          {!!call.images && (
+                            <small>
+                              {call.images} {call.images === 1 ? "imagem" : "imagens"}
+                            </small>
+                          )}
                           {call.cost_source && (
                             <small>{sources[call.cost_source]}</small>
                           )}
