@@ -2,7 +2,7 @@
 
 Consolidação de 2026-10-17, aguardando confirmação final de entendimento.
 **Somente definição: este plano não autoriza implementar, executar provas técnicas
-ou gerar conteúdo pago.** As decisões de produto foram aceitas nas Q1–Q65 da
+ou gerar conteúdo pago.** As decisões de produto foram aceitas nas Q1–Q69 da
 [entrevista](planejamento-video-horizontal.md); os contratos e a sequência abaixo
 organizam sua implementação futura. Capacidades ainda não demonstradas aparecem
 como critérios de qualificação, sem serem tratadas como disponíveis.
@@ -276,6 +276,15 @@ geração paga de narração.
 | Passagem contínua | Depois de cada resposta, atualizar o resumo e gravar a nota de passagem ligada às operações e ao alvo. Troca de papel ou de provedor, reabertura da página e retomada após falha usam o mesmo mecanismo. Resposta interrompida fica marcada, sem apagar o último estado |
 | Limite do CLI | Avisar pela central e por notificação e oferecer o outro provedor, sem troca automática. Etapas automáticas pausam só o papel afetado |
 
+## Canal
+
+Decisões Q67–Q69 e [ADR 0018](adr/0018-canal-como-dono-dos-padroes-e-das-orientacoes.md).
+Cada projeto pertence a um canal, que guarda nome e marca, template padrão de cada formato,
+voz e configurações padrão e orientações do canal. O canal (MYC-33) é o primeiro card a ser
+executado, antes da fase 0. Os Shorts existentes vão para um canal padrão sem mudar o resultado.
+As orientações aprendem só com o que o autor aceita e descarta (MYC-30), e um card próprio (MYC-34)
+propõe orientações a partir dos ajustes que o autor refaz.
+
 ## Fases futuras e evidência de saída
 
 As fases descrevem trabalho a executar apenas após um pedido posterior de
@@ -336,3 +345,4 @@ de qualificação. O plano não declara esses pontos aprovados por documentaçã
 - [ADR 0015 — Recursos por conteúdo](adr/0015-recursos-por-conteudo-fora-do-git.md).
 - [ADR 0016 — Contexto dos agentes e passagem contínua](adr/0016-contexto-dos-agentes-no-mycut-e-passagem-continua.md).
 - [ADR 0017 — Base comum com os Shorts com motion](adr/0017-base-comum-para-shorts-com-motion-e-videos-horizontais.md).
+- [ADR 0018 — Canal](adr/0018-canal-como-dono-dos-padroes-e-das-orientacoes.md).

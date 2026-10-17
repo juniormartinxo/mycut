@@ -89,6 +89,11 @@ _Evitar_: Movimento de câmera, que é a aproximação ou panorâmica aplicada a
 Estado de um item que perdeu o foco: continua no mapa, com menos destaque, enquanto
 a câmera e a narração seguem adiante.
 
+**Canal**:
+Destino de publicação ao qual cada projeto pertence, que guarda nome, marca, template
+padrão de cada formato, voz padrão e orientações próprias, sem misturá-los com os de
+outro canal.
+
 **Marca do canal**:
 Item comum que o autor decide inserir numa cena para identificar o canal, sem um
 tipo de objeto próprio.
@@ -230,8 +235,8 @@ sóbrio (ritmo, câmera e ênfase), criativo (novos objetos e outra composição
 ousado (quebra a composição naquele trecho).
 
 **Orientações do canal**:
-Preferências aprendidas com o que o autor aceita e descarta, entregues aos agentes
-para evitar repetir estruturas e escolhas rejeitadas.
+Preferências de um canal aprendidas com o que o autor aceita e descarta, entregues
+aos agentes para evitar repetir estruturas e escolhas rejeitadas naquele canal.
 
 **Operação de edição**:
 Alteração delimitada do vídeo solicitada pelo humano ou por um agente, com

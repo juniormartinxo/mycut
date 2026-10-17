@@ -606,6 +606,18 @@ Os cards foram atualizados com autorização do usuário (Q66): MYC-23 criado (c
 MYC-21 enxugado (coerência), MYC-14 com as reservas, MYC-16 com o início e as suposições, e MYC-10
 com as decisões Q51–Q65.
 
+## Canal — Q67–Q69 confirmadas
+
+Ao discutir de onde as orientações do canal aprendem, ficou claro que o MyCut não tem canal como
+entidade, só o texto `channel_name` no estilo visual. A
+[ADR 0018](adr/0018-canal-como-dono-dos-padroes-e-das-orientacoes.md) registra as decisões.
+
+| Pergunta | Decisão confirmada |
+| --- | --- |
+| Q67 — Canal como entidade | Cada projeto pertence a um canal. O canal guarda nome e marca, template padrão de cada formato, voz e configurações padrão e orientações do canal; mais tarde, a publicação. Tetos de consumo continuam por produção e provedor |
+| Q68 — Quando entra | Por decisão do usuário, antes de tudo: o MYC-33 é o primeiro card a ser executado e bloqueia MYC-11, MYC-12, MYC-13 e MYC-14. Exceção explícita à Q61: os Shorts existentes vão para um canal padrão, mantendo o próprio `channel_name` e o mesmo resultado |
+| Q69 — Fonte das orientações | O MYC-30 aprende só com o que o autor aceita e descarta, por canal. Por pedido do usuário, um card próprio (MYC-34) detecta padrões nos ajustes que o autor refaz e propõe orientações para aprovação |
+
 ## Pesquisa para escolher o motor e medir a mixagem
 
 Consulta a fontes primárias, sem instalar dependências, executar renderizações
