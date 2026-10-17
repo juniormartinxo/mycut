@@ -70,3 +70,6 @@ dist/
 /web/playwright.*-tmp.config.ts
 /.impeccable/review/
 /.impeccable/mocks/
+
+# Saídas da qualificação do motor (MYC-11): vídeos, quadros e relatórios locais
+/qualificacao/render/.saida/

@@ -1,0 +1,123 @@
+Este é um ensaio de escala do MyCut. O texto que você vai ouvir existe só para testar a exportação de um vídeo longo, com narração local, mídias baratas e esboços. Nada aqui é uma entrega final. A ideia é simples: montar um vídeo de cerca de vinte e cinco minutos, medir quanto tempo o computador leva para exportá-lo, quanta memória ele usa e como a prévia responde quando tocamos e pulamos para outros pontos.
+
+Para começar, vale lembrar o que é uma montagem. Montar é escolher o que entra, em que ordem e por quanto tempo. Um corte seco muda de uma imagem para outra sem aviso. Uma fusão deixa as duas imagens se misturarem por um instante. Um zoom aproxima o olhar de um detalhe, e uma panorâmica conduz o olhar de um lado para o outro. Cada uma dessas escolhas conta uma parte da história, mesmo quando ninguém percebe.
+
+Nos primeiros filmes, a câmera ficava parada e a cena acontecia diante dela, como num palco. Com o tempo, os montadores descobriram que juntar planos diferentes criava sentido. Um rosto seguido de um prato de comida parecia fome. O mesmo rosto seguido de uma criança parecia ternura. O espectador completava o significado sozinho, e a montagem passou a ser uma linguagem própria, com regras, exceções e muita intuição.
+
+Hoje, quase todo vídeo passa por uma linha do tempo. Nela, as faixas ficam empilhadas: a narração embaixo, a música ao lado, as imagens e os textos por cima. Cada item tem um começo, um fim e um conjunto de efeitos. O trabalho do editor é ajustar esses tempos até que tudo pareça natural. Quando a voz diz uma palavra importante, a imagem certa precisa estar na tela, nem antes, nem depois.
+
+Esse cuidado com o tempo é o centro deste teste. Em vez de animações que dependem do relógio do computador, cada quadro do vídeo é calculado a partir do instante em que ele acontece. Se pedirmos o quadro do segundo trinta e dois, o resultado tem que ser sempre o mesmo, não importa se chegamos ali tocando o vídeo do começo ou pulando direto. É isso que permite que a prévia e o arquivo exportado mostrem exatamente a mesma coisa.
+
+Pense numa câmera que viaja por um mapa maior do que a tela. O mapa guarda todas as ideias do vídeo, cada uma numa região. A câmera começa perto do título, desce até o primeiro exemplo, se afasta para mostrar o caminho percorrido e depois se aproxima de um detalhe novo. O que já foi dito continua no mapa, um pouco esmaecido, para que o espectador não perca o fio da explicação.
+
+Os cartões que aparecem pelo caminho entram com uma pequena mola. Eles crescem um pouco além do tamanho final e voltam, como se tivessem peso. Por trás de alguns cartões existe um vidro fosco, que desfoca o fundo e deixa o texto legível. Em volta deles, um brilho suave marca o que está em foco. Quando a narração passa para a próxima ideia, o brilho se apaga e o cartão perde um pouco de nitidez.
+
+A música também tem o seu papel. Ela começa mais presente, antes da primeira frase, e abaixa quando a voz entra. Durante a fala, fica bem atrás, quinze a vinte unidades de volume abaixo da narração. Nas pausas maiores, ela pode subir um pouco, para dar respiro. No final, o arquivo inteiro passa por uma medição de volume, para ficar perto do que as plataformas de vídeo esperam.
+
+Medir volume parece simples, mas exige cuidado. O ouvido humano não percebe todas as frequências da mesma forma, então a medida usada leva isso em conta. O objetivo deste projeto é chegar a menos quatorze unidades de volume integrado, com uma margem de uma unidade para mais ou para menos, e sem que nenhum pico passe de menos um. Para não esmagar a dinâmica, o ajuste é feito em duas passagens: primeiro medimos, depois aplicamos um ganho único.
+
+Agora, imagine um clipe de vídeo curto no meio de tudo isso. Às vezes queremos acelerar o clipe, para que uma ação demorada caiba em poucos segundos. Outras vezes queremos congelar um quadro, para que o espectador tenha tempo de ler uma informação. Nos dois casos, a regra do tempo continua valendo: a posição dentro do clipe sai do instante do quadro, multiplicada pela velocidade escolhida, até o ponto em que a imagem para.
+
+As imagens paradas também se movem. Uma fotografia pode ganhar uma aproximação lenta, que começa no conjunto e termina num detalhe. Pode também deslizar de um lado para o outro, revelando o que estava fora do quadro. Esse movimento, que muita gente conhece por um nome próprio, dá vida a materiais que, de outra forma, ficariam estáticos demais para um vídeo longo.
+
+Para que o texto apareça igual em qualquer computador, as fontes ficam embutidas no projeto. Nada é baixado da internet na hora de gravar. Se uma fonte faltasse, o navegador escolheria outra parecida, e o vídeo exportado ficaria diferente da prévia. Por isso, o teste verifica, quadro a quadro, se a prévia e o arquivo final mostram as mesmas letras, no mesmo lugar, com o mesmo peso.
+
+Um vídeo de vinte e cinco minutos tem quarenta e cinco mil quadros, se usarmos trinta quadros por segundo. Cada um precisa ser desenhado, capturado e codificado. Se cada quadro levasse um décimo de segundo, a exportação inteira levaria mais de uma hora. Por isso, o teste também mede o que acontece quando dividimos o trabalho entre várias abas do navegador, cada uma desenhando um trecho do vídeo ao mesmo tempo.
+
+A codificação é a etapa que transforma as imagens em um arquivo de vídeo compacto. Ela pode ser feita pelo processador ou pela placa de vídeo. A placa costuma ser muito mais rápida, mas nem sempre está disponível, principalmente quando o programa roda dentro de um sistema virtualizado. Este ensaio confere se a placa de vídeo está mesmo sendo usada, olhando para o uso real do codificador durante a exportação, e não apenas para a lista de recursos disponíveis.
+
+Também é importante observar a memória. Um vídeo longo tem muitas imagens, muitos clipes e muitos textos. Se o programa carregasse tudo de uma vez, a memória acabaria antes do fim. O caminho certo é carregar só o que aparece perto do instante atual e liberar o resto. Durante o ensaio, medimos o pico de memória de todos os processos envolvidos: o navegador, o codificador e o próprio programa que coordena a gravação.
+
+A prévia, por sua vez, precisa responder rápido. Quem edita um vídeo longo pula de um ponto para outro o tempo todo. Se cada pulo demorasse vários segundos, a edição ficaria cansativa. Por isso, medimos quanto tempo a prévia leva para mostrar o quadro certo depois de um pulo, perto do início, no meio e no fim do vídeo. Medimos também se ela consegue tocar sem perder quadros por um bom tempo.
+
+Vale repetir: este vídeo é um teste. Ele não tem roteiro aprovado, nem voz final, nem mídias definitivas. As imagens são esboços gerados no próprio computador, sem custo. A voz é um ensaio local, que existe para marcar o ritmo da fala. O arquivo exportado leva a palavra teste no nome e na própria imagem, para que ninguém o confunda com uma entrega.
+
+Voltando à montagem, há uma ideia que vale para qualquer formato. O espectador sente o ritmo antes de entender o conteúdo. Cortes muito rápidos cansam, cortes muito lentos entediam. A narração ajuda a encontrar o meio-termo, porque a própria fala tem pausas, ênfases e respirações. Quando a imagem acompanha essa respiração, o vídeo parece mais leve, mesmo quando o assunto é difícil.
+
+Por isso, neste projeto, os tempos ficam presos à fala. Um cartão não entra no segundo quarenta e três; ele entra na palavra exata em que a ideia aparece. Se a narração mudar, e a palavra passar a acontecer dois segundos depois, o cartão vai junto. A câmera, os efeitos e as legendas seguem a mesma regra. Assim, uma alteração no texto não exige refazer a montagem inteira à mão.
+
+As legendas merecem um capítulo à parte. Elas aparecem em pequenos grupos de palavras, seguindo a voz. Algumas palavras ganham destaque, com outra cor, quando carregam o sentido principal da frase. A posição da legenda é definida em cada cena, para não cobrir o que importa, e o estilo vem do modelo visual do vídeo. Em vídeos verticais, ela também precisa fugir da área onde ficam os botões da plataforma.
+
+Um vídeo horizontal tem outras necessidades. A tela é mais larga, então cabem duas ideias lado a lado. O mapa pode crescer para os lados, em vez de crescer para baixo. As fontes podem ser um pouco menores, porque o vídeo costuma ser visto numa tela maior. Mesmo assim, o motor de composição é o mesmo: só mudam as proporções e as escolhas de enquadramento.
+
+Esse é um dos objetivos da qualificação: provar que um único motor atende aos dois formatos. Se o vertical e o horizontal usassem motores diferentes, cada melhoria precisaria ser feita duas vezes, e as diferenças entre eles cresceriam com o tempo. Com uma base comum, um efeito novo, como uma conexão que se desenha entre dois cartões, fica disponível para os dois formatos de uma vez.
+
+A comparação entre os candidatos leva em conta várias coisas. A primeira é a fidelidade: o arquivo exportado precisa ser igual à prévia, quadro a quadro, descontadas as perdas naturais da compressão. A segunda é a velocidade: quanto tempo leva para exportar um vídeo curto e um vídeo longo. A terceira é a licença: o projeto é público, então cada peça usada precisa permitir esse tipo de distribuição.
+
+Há também uma comparação com o motor atual, que desenha os quadros em Python e entrega as imagens para o codificador. Ele é simples e confiável, mas cada efeito novo precisa ser escrito à mão, pixel a pixel. Desfoque, brilho e vidro fosco, por exemplo, são caros de reproduzir assim. Os motores baseados em navegador já trazem esses efeitos prontos, e o desafio passa a ser outro: garantir que o navegador desenhe sempre o mesmo quadro para o mesmo instante.
+
+Para garantir isso, o teste proíbe tudo o que depende do relógio. Nada de animações de folha de estilo, nada de temporizadores, nada de perguntar ao sistema que horas são. Se alguma parte da composição tentar fazer isso durante a gravação, o teste registra a tentativa e falha. O único relógio que vale é o tempo do quadro, que avança um trinta avos de segundo por vez.
+
+Chegamos à metade do ensaio. Até aqui, a câmera já percorreu várias regiões do mapa, alguns clipes foram acelerados e congelados, e a música subiu e desceu acompanhando as pausas. Daqui para frente, o vídeo repete esses recursos em outras combinações, para que o teste cubra bastante tempo de exportação e bastante variedade de quadros.
+
+Uma boa forma de pensar em um vídeo longo é dividi-lo em capítulos. Cada capítulo tem uma pergunta, um desenvolvimento e uma conclusão. No mapa, cada capítulo ocupa uma região, e a câmera faz uma viagem maior quando passa de um para o outro. Essa viagem funciona como um respiro visual, que avisa ao espectador que um assunto terminou e outro vai começar.
+
+Dentro de cada capítulo, os cartões se organizam em pequenos grupos. Um cartão de título, alguns cartões de apoio e, às vezes, uma imagem ou um clipe. As conexões entre eles se desenham no momento em que a narração faz a ligação entre as ideias. Quando o capítulo termina, todo o grupo esmaece junto, mas continua visível quando a câmera se afasta para mostrar o caminho completo.
+
+Os materiais deste ensaio são propositalmente simples. Os clipes mostram padrões coloridos e um contador de quadros, que ajuda a conferir a velocidade e o congelamento. As imagens são degradês e formas geométricas. Isso não reduz o valor do teste, porque o custo de desenhar um quadro depende muito mais da quantidade de camadas e efeitos do que do conteúdo das imagens.
+
+Ainda assim, o teste não esconde as suas limitações. Uma prévia aberta num navegador sem janela não é exatamente igual à prévia que o autor vai usar no dia a dia, com a placa de vídeo do computador ligada à tela. As medições de resposta servem como referência e precisam ser confirmadas, mais tarde, no editor de verdade. Tudo isso fica registrado junto com os números.
+
+Outra limitação é o próprio áudio de ensaio. A voz gerada localmente não tem a mesma duração nem as mesmas pausas da narração final. Quando a voz final for gerada, os tempos serão ajustados, e as palavras em que cada efeito começa passarão a acontecer em outros instantes. Como os tempos estão presos à fala, esse reajuste é automático, mas precisa ser conferido.
+
+Também é preciso lembrar que a exportação de um vídeo longo pode ser interrompida. Uma queda de energia, um erro no navegador ou uma falta de espaço em disco podem parar o processo no meio. Um bom motor permite retomar de onde parou, em vez de recomeçar do zero. Este ensaio mede o tempo das etapas, o que ajuda a decidir onde vale a pena guardar pontos de retomada no futuro.
+
+Se o vídeo tem quarenta e cinco mil quadros, e cada aba do navegador desenha alguns quadros por segundo, a soma das abas define a velocidade total. Mas mais abas também usam mais memória e mais processador. Existe um ponto de equilíbrio, que depende do computador. O ensaio registra quantas abas foram usadas e qual foi o resultado, para que a escolha possa ser revista em outras máquinas.
+
+A ordem dos quadros também importa. As abas terminam os seus quadros em momentos diferentes, mas o codificador precisa recebê-los em sequência. O programa que coordena a gravação guarda os quadros que chegaram adiantados e só os entrega quando o anterior já foi enviado. Esse cuidado evita que o vídeo final tenha saltos ou quadros trocados, mesmo quando uma aba demora mais que as outras.
+
+Depois que todos os quadros são codificados, o áudio entra em cena. A narração e a música são misturadas, com a música abaixando durante a fala. Em seguida, o volume da mistura é medido e corrigido com um ganho único. Por fim, o vídeo e o áudio são juntados num único arquivo. Cada uma dessas etapas tem o seu tempo medido separadamente.
+
+Ao final, o arquivo é aberto de novo e medido como se fosse um arquivo qualquer, recebido de outra pessoa. O volume integrado, os picos e a taxa de amostragem são conferidos no arquivo decodificado, e não nos números que o programa acha que aplicou. Essa conferência independente é o que dá confiança ao resultado.
+
+Falta pouco para o fim. Se você está ouvindo esta frase numa prévia, experimente pular para o começo e voltar para cá. O quadro que aparece aqui precisa ser sempre o mesmo, com a mesma legenda, a mesma posição da câmera e o mesmo estado de cada cartão. Se algo mudar, o teste encontrou um problema, e isso também é um resultado útil.
+
+Em resumo, este ensaio verifica cinco coisas. Que a prévia e o arquivo exportado são iguais. Que nada depende do relógio do computador. Que a placa de vídeo codifica de verdade. Que um vídeo de vinte e cinco minutos pode ser exportado num tempo razoável, sem esgotar a memória. E que o volume final fica dentro do alvo combinado. Cada resposta fica registrada junto com a evidência que a sustenta.
+
+Antes de terminar, uma última observação sobre o tamanho do arquivo. Um vídeo longo em alta resolução pode ocupar alguns gigabytes. A taxa de bits escolhida define esse tamanho e a qualidade da imagem. Taxas muito baixas deixam blocos visíveis nas áreas com degradê e desfoque, que são justamente as mais comuns neste estilo visual. Taxas muito altas desperdiçam espaço sem ganho perceptível. O ensaio registra a taxa usada e o tamanho final, para que a escolha possa ser ajustada depois.
+
+E uma observação sobre o futuro. Quando o editor completo existir, o autor vai pedir mudanças ao agente, que vai propor versões diferentes de um mesmo trecho. Cada versão precisa aparecer na prévia quase na hora, para ser comparada com as outras. Isso só funciona se o motor desenhar qualquer instante sem precisar tocar o vídeo desde o começo. Em outras palavras, a mesma propriedade que garante a exportação fiel também garante uma edição rápida. É por isso que o tempo do quadro é a regra central de toda esta qualificação.
+
+Obrigado por acompanhar até aqui. Lembre-se de que tudo isso foi um teste, gerado sem nenhum custo de serviços pagos, com voz local e materiais de esboço. O próximo passo é usar o motor escolhido para construir o documento de edição, a prévia e a exportação de verdade. Até lá, este arquivo serve apenas como medida, e pode ser apagado sem nenhuma perda.
+
+Esta é a segunda parte do ensaio. Ela existe para que o vídeo chegue aos vinte e cinco minutos e para que o teste tenha mais variedade de quadros. Os assuntos continuam os mesmos: tempo, montagem, prévia e exportação. A diferença é que agora vamos olhar para cada etapa com um pouco mais de calma, como quem revisa um trabalho antes de entregá-lo.
+
+Comecemos pela organização do material. Antes de qualquer corte, o editor precisa saber o que tem em mãos. Quantos clipes, quantas imagens, quantas versões da narração. Num projeto pequeno, isso cabe na memória. Num projeto de vinte e cinco minutos, não cabe. Por isso, cada material ganha um nome, uma origem e um lugar no acervo, e o documento de edição guarda apenas referências a eles.
+
+Essa separação tem uma consequência importante. Se um clipe for substituído por uma versão melhor, o documento não precisa mudar. A referência continua a mesma, e o novo arquivo entra no lugar do antigo. A prévia mostra a troca na hora, e a próxima exportação já sai com o material novo. O autor não precisa refazer cortes nem reposicionar nada.
+
+Outra etapa que merece atenção é a preparação das mídias. Um clipe gravado no celular pode ter uma taxa de quadros diferente da do projeto, uma orientação errada ou um tamanho enorme. Antes de entrar na composição, ele é convertido para um formato próprio para edição, em que cada quadro pode ser encontrado rapidamente. Esse formato ocupa mais espaço, mas deixa a busca na prévia instantânea.
+
+A busca é um bom exemplo de como uma decisão técnica muda a experiência de quem edita. Num formato comprimido comum, para mostrar um quadro no meio do clipe, o computador precisa decodificar todos os quadros desde o último ponto de referência. Isso pode levar meio segundo ou mais. Num formato em que todo quadro é um ponto de referência, o quadro aparece quase na hora.
+
+Falando em prévia, existe uma diferença entre tocar e pular. Quando o vídeo toca, o navegador pode preparar os próximos quadros com antecedência. Quando o autor pula para outro ponto, nada foi preparado, e o quadro precisa ser montado do zero. Por isso, as medições deste ensaio separam as duas situações: o tempo de resposta depois de um pulo e a regularidade dos quadros durante a reprodução.
+
+Uma reprodução regular entrega um quadro a cada trinta avos de segundo, sem atrasos perceptíveis. Se um quadro atrasa, o olho percebe um tranco. Se vários atrasam, o vídeo parece engasgar. Em uma prévia, pequenos trancos são aceitáveis, porque o objetivo é conferir a montagem, e não assistir ao resultado final. Mas trancos frequentes atrapalham a avaliação do ritmo, que é justamente o que mais importa.
+
+O ritmo, aliás, depende muito do som. Uma fala bem pausada dá tempo para que as imagens respirem. Uma fala apressada obriga a montagem a correr junto. No ensaio, a voz é gerada localmente e tem o seu próprio ritmo, que pode ser diferente do ritmo da voz final. Por isso, os tempos de cada efeito são definidos pelas palavras, e não por segundos fixos.
+
+Vamos imaginar uma mudança concreta. O autor decide reescrever uma frase do segundo capítulo, deixando-a mais curta. A voz daquele trecho é gerada de novo, e o capítulo inteiro passa a durar três segundos a menos. Tudo o que vem depois precisa se deslocar. Os cartões, a câmera, as legendas e a música acompanham a nova duração, porque estão presos às palavras.
+
+Esse reajuste precisa ser conferido. Às vezes, um cartão que entrava numa palavra deixa de fazer sentido porque a palavra mudou. Outras vezes, a nova frase tem uma pausa que não existia, e a música sobe num momento inesperado. O editor mostra essas mudanças como pendências, para que o autor decida o que fazer. Nada é descartado em silêncio.
+
+Agora, um pouco sobre a exportação em partes. Dividir o vídeo entre várias abas do navegador é uma forma de usar melhor o processador. Cada aba recebe uma faixa de quadros e desenha apenas aquela faixa. As abas não conversam entre si, e cada quadro depende só do instante em que acontece. Por isso, o resultado é o mesmo, não importa quantas abas sejam usadas.
+
+Essa propriedade também ajuda a retomar uma exportação interrompida. Se o processo parar no quadro trinta mil, basta pedir os quadros a partir dali. Não é preciso refazer os anteriores, nem reproduzir o vídeo desde o começo para chegar ao mesmo estado. O estado de cada quadro é sempre calculado de novo, a partir dos dados do documento e do instante pedido.
+
+A codificação na placa de vídeo tem as suas próprias regras. Ela trabalha com uma taxa de bits e com um modo de qualidade, que não são exatamente os mesmos do codificador do processador. Para que a comparação seja justa, o ensaio usa configurações equivalentes nos dois casos e compara a qualidade do resultado com uma medida objetiva, que compara cada quadro codificado com o quadro original.
+
+Essa medida de semelhança vai de zero a um. Um valor próximo de um indica que os quadros são praticamente iguais. Ela é usada também para comparar a prévia com o arquivo exportado. Como a prévia tem resolução menor, o quadro exportado é reduzido antes da comparação. E, para mostrar que a medida funciona, o teste também compara quadros de instantes diferentes, que precisam dar um valor claramente menor.
+
+Esse cuidado com a prova é importante. Seria fácil dizer que a prévia e a exportação são iguais porque usam o mesmo código. Mas o mesmo código, rodando em situações diferentes, pode dar resultados diferentes. Uma fonte que ainda não carregou, uma imagem que demorou a decodificar ou um clipe que não chegou ao quadro certo bastam para criar uma diferença. Só a comparação quadro a quadro mostra que isso não aconteceu.
+
+O som tem uma prova parecida. A prévia toca a mistura em tempo real, e o teste grava o que ela produziu. Depois, compara essa gravação com o áudio do arquivo final. Se a música abaixou nos mesmos instantes e com a mesma intensidade, as duas curvas de volume coincidem. Se a prévia estivesse atrasada em relação ao vídeo, a diferença apareceria como um deslocamento entre as curvas.
+
+Há ainda a questão das licenças. Um projeto público pode ser copiado, estudado e adaptado por qualquer pessoa. Cada biblioteca usada precisa permitir isso, e algumas impõem condições. Algumas são livres para pessoas e pequenas empresas, mas exigem uma licença paga para empresas maiores. Outras são totalmente livres. O ensaio registra essas condições, para que a escolha do motor leve em conta não só o desempenho, mas também quem vai poder usar o projeto.
+
+Também vale registrar o que acontece quando algo dá errado. Se uma imagem não existir, o motor precisa avisar antes de começar a gravar, e não no meio da exportação. Se uma fonte faltar, o mesmo. O teste verifica que nenhuma requisição à internet acontece durante a gravação. Qualquer tentativa é bloqueada e registrada, e a gravação falha, para que o problema seja corrigido na origem.
+
+Com tudo isso, o motor escolhido sai desta qualificação com números, limitações e uma lista do que ainda precisa ser feito. Nenhum desses números é definitivo. Eles mudam com o computador, com a complexidade das cenas e com as escolhas de qualidade. Mas eles mostram se o caminho é viável e onde estão os gargalos, que é o que uma qualificação técnica precisa mostrar.
+
+Para encerrar esta segunda parte, voltemos à ideia de mapa. Ao longo destes minutos, a câmera passou por dezenas de regiões, cada uma com os seus cartões, a sua imagem e o seu clipe. Se você recuar a câmera até o fim, vai ver todo o caminho de uma vez, com as ideias antigas esmaecidas e a mais recente em destaque. É uma forma visual de resumir o que foi dito.
+
+Este ensaio termina aqui. Mais uma vez: foi um teste, feito com voz local, mídias de esboço e nenhum serviço pago. O arquivo pode ser apagado sem nenhuma perda. O que fica são os números, as limitações registradas e a escolha do motor que vai servir de base para o documento de edição, para a prévia e para a exportação dos próximos vídeos.

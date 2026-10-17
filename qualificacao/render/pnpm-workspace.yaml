@@ -1,0 +1,4 @@
+# O esbuild e o compositor do Remotion trazem executáveis nativos.
+allowBuilds:
+  esbuild: true
+  "@remotion/compositor-linux-x64-gnu": true
