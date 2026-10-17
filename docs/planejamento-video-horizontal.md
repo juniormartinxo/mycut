@@ -807,14 +807,16 @@ final de entendimento, sem nova rodada de decisões de produto identificada.
 
 A escolha concreta do motor, a equivalência prévia/exportação e o NVENC no WSL foram
 qualificados depois, no MYC-11: ver [Qualificação da renderização](qualificacao-renderizacao.md)
-e a [ADR 0019](adr/0019-motor-de-composicao-html-deterministico.md). Continuam dependendo de
-qualificação futura a ponte de notificações e as capacidades dos acessos aos provedores. O alinhador
-PT-BR e a rota da ElevenLabs foram qualificados no MYC-12, que também reprovou o Qwen como voz de ensaio: ver
-[Qualificação da voz](qualificacao-voz.md) e a [ADR 0020](adr/0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md),
-que torna o OmniVoice local a voz principal e a ElevenLabs a segunda via. A prova também precisa confirmar
-controle dos envios/contadores: um CLI que esconda gerações internas não comprova
-o contrato de registro e limites. Não se presume desempenho, acesso ou contagem
-exata apenas pela documentação ou pela presença de um binário.
+e a [ADR 0019](adr/0019-motor-de-composicao-html-deterministico.md). A ponte de notificações e os
+acessos de vídeo pelos CLIs Grok e Gemini foram qualificados no MYC-13: ver
+[Qualificação das integrações locais](qualificacao-integracoes.md). O Grok Build gerou um clipe,
+mas esconde a requisição remota e ficou registrado como não auditável para automação; o Gemini CLI
+não gera vídeo. O alinhador PT-BR e a rota da ElevenLabs foram qualificados no MYC-12, que também
+reprovou o Qwen como voz de ensaio: ver [Qualificação da voz](qualificacao-voz.md) e a
+[ADR 0020](adr/0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md), que torna o OmniVoice
+local a voz principal e a ElevenLabs a segunda via. Um CLI que esconda
+gerações internas não comprova o contrato de registro e limites, e não se presume desempenho,
+acesso ou contagem exata apenas pela documentação ou pela presença de um binário.
 
 O fluxo definido termina com MP4, SRT e projeto editável. Publicação na plataforma
 não integra a entrega solicitada nesta sessão. Qwen, ferramentas de geração e

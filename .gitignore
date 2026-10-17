@@ -76,3 +76,6 @@ dist/
 
 # Saídas da qualificação da voz (MYC-12): áudios, respostas da API e relatórios locais
 /qualificacao/voz/.saida/
+
+# Saídas da qualificação das integrações locais (MYC-13): clipes, sessões e respostas dos CLIs
+/qualificacao/integracoes/.saida/

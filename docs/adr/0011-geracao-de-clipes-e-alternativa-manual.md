@@ -57,3 +57,9 @@ clipe gerado automaticamente e exercício da alternativa manual.
 Esta decisão amplia o fluxo de materiais descrito para os Shorts na
 [ADR 0005](0005-short-livre.md), sem alterar seu comportamento atual. É um registro
 de planejamento, sem autorização para implementar ou gerar mídias nesta sessão.
+
+Em 2026-10-17, a [qualificação do MYC-13](../qualificacao-integracoes.md) verificou os CLIs. O Grok Build
+gerou um clipe com imagem-base pelo acesso existente, com o ZDR da conta desligado, mas esconde a requisição
+remota (sem identificador, consumo, consulta ou recuperação) e ficou registrado como não auditável para
+automação. O Gemini CLI não tem ferramenta de vídeo. Até que um controle por pedido seja comprovado, vale a
+alternativa manual desta decisão.
