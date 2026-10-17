@@ -4,6 +4,10 @@ status: accepted
 
 # Geração de clipes no fluxo inicial com alternativa manual
 
+> Atualização (MYC-12): onde esta decisão supõe a voz final da API anteceder as mídias finais, vale a
+> [ADR 0020](0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md): o OmniVoice local é a voz principal,
+> inclusive na narração final, e a ElevenLabs é a segunda via.
+
 A geração automática de clipes por IA faz parte da primeira versão, conforme
 a Q11. Na Q17, o usuário definiu a preferência por acionar Grok ou Gemini a partir
 do ambiente local. Quando esse caminho não for possível, o agente deve entregar

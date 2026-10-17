@@ -16,7 +16,8 @@ deficiência, e com sotaque". O Qwen também errou moedas, unidades, siglas e s�
 rápido que a voz final. O autor já tinha testado e aprovado o
 [OmniVoice](https://github.com/k2-fsa/OmniVoice) no MyVoice, seu estúdio local de clonagem de voz. O OmniVoice
 roda na mesma GPU, gera por parágrafo com o mesmo prompt de voz e prepara a leitura em PT-BR, guardando o texto
-original separado do falado. Onde a ADR 0010 e o plano dizem "Qwen", vale o motor local de ensaio. A troca
+original separado do falado. Onde a ADR 0010 e o plano dizem "Qwen", vale o OmniVoice, que além do ensaio passa a gerar a narração
+final (última seção). A troca
 é uma escolha do autor feita de ouvido, ainda sem as medições desta qualificação sobre o OmniVoice. A
 referência continua sendo a da Q16, uma amostra da voz Junior da ElevenLabs em PT-BR, até que se decida outra.
 
@@ -63,3 +64,16 @@ Ficam condições conhecidas desta escolha:
 - **as medições desta prova ainda não foram repetidas no OmniVoice** dentro do MyCut: emendas em texto longo,
   alinhamento MMS sobre o áudio dele e mapeamento da leitura preparada. A aprovação veio da escuta do autor no
   MyVoice.
+
+## Em aberto
+
+A mudança deixa perguntas que são decisões do autor. Até que sejam respondidas, os trechos das ADRs e do plano
+que tratam delas continuam como estão:
+
+- **Voz final.** O áudio do OmniVoice aprovado no storyboard já vale como narração final, ou ainda há uma
+  geração final própria? A resposta afeta a etapa de autorização da
+  [ADR 0008](0008-storyboard-antes-da-producao-de-midias.md) e os estados de ensaio e final da Q29 e da
+  [ADR 0012](0012-reajuste-da-montagem-apos-mudancas-na-fala.md).
+- **Primeira exportação.** A voz final que a Q47 exige passa a ser atendida pelo OmniVoice?
+- **Legendas.** O SRT e as legendas da narração final passam a sair do alinhamento local (MMS), sem os tempos da
+  API?

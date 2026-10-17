@@ -4,6 +4,10 @@ status: accepted
 
 # Storyboard antes da produção de mídias
 
+> Atualização (MYC-12): onde esta decisão supõe a voz final vir sempre da API, vale a
+> [ADR 0020](0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md): o OmniVoice local é a voz principal,
+> inclusive na narração final, e a ElevenLabs é a segunda via.
+
 A primeira entrega dos agentes será um storyboard numa linha do tempo:
 a fala orienta a sequência e as imagens e vídeos
 planejados aparecem como esboços com ícones e descrições. O objetivo é revisar
