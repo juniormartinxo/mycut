@@ -61,7 +61,9 @@ export async function gravarRemotion({ cena, pastaMidia, saida, concorrencia = 4
   relatorio.carga = { antes: cargaAntes, depois: loadavg().map(v => Number(v.toFixed(1))) };
   relatorio.etapas = etapas;
   relatorio.tempoTotal = Number(Object.values(etapas).reduce((a, b) => a + b, 0).toFixed(2));
-  relatorio.velocidade = Number((relatorio.duracaoVideo / etapas.quadros_e_codificacao).toFixed(3));
+  // Segundos de vídeo por segundo de exportação: no total (como na referência Python) e só nos quadros.
+  relatorio.velocidade = Number((relatorio.duracaoVideo / relatorio.tempoTotal).toFixed(3));
+  relatorio.velocidadeDosQuadros = Number((relatorio.duracaoVideo / etapas.quadros_e_codificacao).toFixed(3));
   return relatorio;
 }
 

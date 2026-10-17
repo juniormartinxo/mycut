@@ -63,9 +63,9 @@ export async function paridade({ motor, cena, pastaMidia, exportado, pasta, ganh
       }
     }
     await esperar(Math.max(0, janela * 1000 - (performance.now() - inicio)));
-    const registro = motor === 'html' ? await pagina.evaluate(() => motor.prevista.registro) : null;
+    const registro = motor === 'html' ? await pagina.evaluate(() => motor.estadoDaPrevia.registro) : null;
     const captura = await pagina.evaluate(() => motor.capturaDeAudio());
-    const atrasosDoClipe = motor === 'html' ? await pagina.evaluate(() => motor.prevista.atrasosDoClipe ?? 0) : null;
+    const atrasosDoClipe = motor === 'html' ? await pagina.evaluate(() => motor.estadoDaPrevia.atrasosDoClipe ?? 0) : null;
     await pagina.evaluate(() => motor.pausar());
     if (motor === 'remotion' && captura) {
       // Relógio do áudio → tempo do vídeo pelo quadro que o Player mostrava em cada marca (mediana).

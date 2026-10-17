@@ -21,9 +21,9 @@ export const CODIFICADORES = {
 };
 const COR = ['-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709'];
 
-function codificador(saida, nome, captura, log) {
+function codificador(saida, nome, captura, log, fps) {
   const args = ['-hide_banner', '-nostdin', '-y', '-loglevel', 'verbose', '-f', 'image2pipe', '-c:v', captura === 'png' ? 'png' : 'mjpeg',
-                '-framerate', '30', '-i', '-', ...COR, ...CODIFICADORES[nome], '-movflags', '+faststart', saida];
+                '-framerate', String(fps), '-i', '-', ...COR, ...CODIFICADORES[nome], '-movflags', '+faststart', saida];
   const ff = spawn('ffmpeg', args, { stdio: ['pipe', 'ignore', 'pipe'] });
   ff.stderr.pipe(createWriteStream(log));
   const fim = new Promise((ok, erro) => ff.on('close', c => (c === 0 ? ok() : erro(new Error(`ffmpeg saiu com ${c}; veja ${log}`)))));
@@ -56,7 +56,7 @@ export async function gravarHtml({ cena, pastaMidia, saida, abas = 4, nomeDoCodi
     relatorio.transicoesNaCarga = paginas[0].carga.transicoes;
 
     const arquivoVideo = comAudio ? saida.replace(/\.mp4$/, '.video.mp4') : saida;
-    const enc = codificador(arquivoVideo, nomeDoCodificador, captura, saida.replace(/\.mp4$/, '.ffmpeg.log'));
+    const enc = codificador(arquivoVideo, nomeDoCodificador, captura, saida.replace(/\.mp4$/, '.ffmpeg.log'), cena.formato.fps);
     relatorio.argsFfmpeg = enc.args.join(' ');
     // Quadros prontos fora de ordem esperam aqui; um único laço os escreve em sequência.
     const prontos = new Map(), esperando = [];
@@ -107,8 +107,9 @@ export async function gravarHtml({ cena, pastaMidia, saida, abas = 4, nomeDoCodi
       await marcar('audio_mixagem', async () => {
         const fluxo = createWriteStream(cru);
         const passo = 60;
-        for (let t0 = primeiro / 30; t0 < ultimo / 30; t0 += passo) {
-          const b64 = await paginas[0].pagina.evaluate(([a, d]) => motor.mixar(a, d), [t0, Math.min(passo, ultimo / 30 - t0)]);
+        const fps = cena.formato.fps;
+        for (let t0 = primeiro / fps; t0 < ultimo / fps; t0 += passo) {
+          const b64 = await paginas[0].pagina.evaluate(([a, d]) => motor.mixar(a, d), [t0, Math.min(passo, ultimo / fps - t0)]);
           await escrever(fluxo, Buffer.from(b64, 'base64'));
         }
         await new Promise(ok => fluxo.end(ok));
@@ -133,7 +134,9 @@ export async function gravarHtml({ cena, pastaMidia, saida, abas = 4, nomeDoCodi
   relatorio.carga = { antes: cargaAntes, depois: loadavg().map(v => Number(v.toFixed(1))) };
   relatorio.etapas = etapas;
   relatorio.tempoTotal = Number(Object.values(etapas).reduce((a, b) => a + b, 0).toFixed(2));
-  relatorio.velocidade = Number((relatorio.duracaoVideo / etapas.quadros_e_codificacao).toFixed(3));
+  // Segundos de vídeo por segundo de exportação: no total (como na referência Python) e só nos quadros.
+  relatorio.velocidade = Number((relatorio.duracaoVideo / relatorio.tempoTotal).toFixed(3));
+  relatorio.velocidadeDosQuadros = Number((relatorio.duracaoVideo / etapas.quadros_e_codificacao).toFixed(3));
   return relatorio;
 }
 

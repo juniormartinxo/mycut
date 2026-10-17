@@ -45,10 +45,10 @@ export async function respostaDaPrevia({ cena, pastaMidia }) {
       t0 = performance.now();
       await pagina.evaluate(t => motor.tocar(t), desde);
       await esperar(12000);
-      const registro = await pagina.evaluate(() => motor.prevista.registro);
-      const pedidoEm = await pagina.evaluate(() => motor.prevista.pedidoEm);
-      const atrasos = await pagina.evaluate(() => motor.prevista.atrasosDoClipe ?? 0);
-      await pagina.evaluate(() => { motor.pausar(); motor.prevista.atrasosDoClipe = 0; });
+      const registro = await pagina.evaluate(() => motor.estadoDaPrevia.registro);
+      const pedidoEm = await pagina.evaluate(() => motor.estadoDaPrevia.pedidoEm);
+      const atrasos = await pagina.evaluate(() => motor.estadoDaPrevia.atrasosDoClipe ?? 0);
+      await pagina.evaluate(() => { motor.pausar(); motor.estadoDaPrevia.atrasosDoClipe = 0; });
       const intervalos = registro.slice(1).map(([a], i) => a - registro[i][0]);
       r.reproducao.push({ desde: Number(desde.toFixed(1)), primeiroQuadroMs: Math.round(registro[0][0] - pedidoEm),
                           segundosDeVideo: Number((registro.at(-1)[1] - registro[0][1]).toFixed(2)), quadrosDesenhados: registro.length,

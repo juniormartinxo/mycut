@@ -28,19 +28,24 @@ foi descartada para tempos (o Remotion levou 222 s ali e 125 s com a máquina ca
 
 ## O que foi montado
 
-A mesma composição, descrita como dados por `montarCena` e com o estado de cada quadro calculado por
-`quadroEm(cena, t)`, foi desenhada pelos candidatos em 1080×1920 e 1920×1080, a 30 qps:
+A mesma composição, com o vídeo descrito como dados por `montarCena` e o estado de cada quadro calculado por
+`quadroEm(cena, t)`, foi desenhada pelos candidatos em 1080×1920 e 1920×1080, a 30 qps. Cada cena ocupa uma
+região do mapa e repete o mesmo roteiro visual:
 
-- mapa maior que o quadro (1,3 vez o quadro por capítulo) com câmera que viaja, aproxima e recua;
+- mapa maior que o quadro (1,3 vez o quadro por cena) com a câmera que viaja, aproxima e recua;
 - camadas sobrepostas, texto em Inter e JetBrains Mono embutidas;
-- cartões com entrada por mola, esmaecimento com desfoque, brilho e um cartão de vidro fosco (`backdrop-filter`);
-- corte seco do mapa para uma imagem com zoom e panorâmica, fusão para um clipe acelerado 2× que congela,
-  com um cartão de vidro por cima, e corte de volta ao mapa;
+- itens com entrada por mola, esmaecimento com desfoque, brilho e um item de vidro fosco (`backdrop-filter`);
+- corte seco do mapa para uma imagem com movimento de câmera (aproximação e panorâmica), fusão para um clipe
+  acelerado 2× que congela, com um item de vidro por cima, e corte de volta ao mapa;
 - legenda em grupos de três palavras presas à fala, com destaques;
 - narração de ensaio Qwen (local) e música sintetizada, com a música abaixando na fala e subindo nas pausas.
 
-Todos os tempos saem de inícios de palavras alinhadas pelo Whisper local. O Short tem 65,3 s (179 palavras);
-o ensaio de escala tem 26,4 min (4.210 palavras, 28 capítulos).
+Todos os tempos saem de inícios de palavras alinhadas pelo Whisper local. O Short tem 65,3 s (179 palavras,
+uma cena); o ensaio de escala tem 26,4 min (4.210 palavras, 28 cenas).
+
+O código da prova é anterior ao documento de edição (MYC-14) e usa nomes próprios: lá, `cena` é o vídeo
+inteiro, `capitulo` é a cena do glossário, `trecho` é um intervalo visual (mapa, imagem ou clipe) que entra por
+corte ou fusão, não um trecho de fala, e `item` é o item do mapa. O documento de edição vai seguir o glossário.
 
 Os candidatos:
 
@@ -114,10 +119,14 @@ Leitura:
 - **Remotion.** Depois das mitigações, as imagens casam nos tempos. O som do Player fica 20 a 28 ms atrás do
   quadro mostrado e, nas bordas de palavras e nas rampas da música, a loudness momentânea chega a desviar
   3 a 10 LU, porque o Player aplica o volume por quadro no elemento `<audio>` (o volume medido no Player
-  ficou, numa rampa, em 0,135 onde a curva pedia 0,151). Na média a mixagem casa.
+  ficou, numa rampa, em 0,135 onde a curva pedia 0,151). A diferença média é de 0,02 LU, mas nos transientes
+  a paridade da mixagem do Remotion **não fica demonstrada**: a prévia dele não toca a mesma mistura que o
+  arquivo nas rampas e bordas de palavra.
 - **Python (atual).** A "prévia" do app atual é outra exportação do mesmo desenho (540×960 a 24 qps), por isso
-  casa quase exatamente, mas leva 107,6 s para um Short de 55 s e não toca nem busca: não é uma prévia
-  interativa.
+  casa quase exatamente: o som das duas é o mesmo arquivo pelo mesmo AAC (resíduo nulo, deslocamento 0 ms em
+  20 s). A prova de tempos é fraca: o Short é quase estático entre quadros e só 8 das 47 amostras se distinguem
+  dos vizinhos (nenhuma incoerente). E essa prévia leva 107,6 s para um Short de 55 s e não toca nem busca:
+  não é uma prévia interativa. O motor atual só desenha 9:16 (1080×1920 fixo), por isso não há linha 16:9.
 
 ### 2. Nada depende de animação CSS, temporizador ou relógio; fontes e bibliotecas embutidas; sem rede
 
@@ -130,15 +139,19 @@ Leitura:
 - **HTML, mesmos pixels por qualquer caminho** (`medir/determinismo.mjs`). Os mesmos quadros foram capturados
   sem perda (PNG) em três navegadores novos, em ordem crescente, embaralhada e invertida. No ensaio 16:9, os
   40 quadros saíram idênticos bit a bit. No Short 9:16, 22 de 37 saíram idênticos; nos outros 15, a rodada
-  em ordem crescente, em que cada quadro vem logo depois do vizinho, diferiu em 33 a 1.303 pixels (no máximo
-  0,06% do quadro) por 1 ou 2 níveis de 255, e em quatro quadros do clipe em 9 pixels da borda do contorno de
-  uma letra da legenda. É o Chromium reaproveitando parte da rasterização do quadro anterior: o estado do
-  quadro é o mesmo, a diferença é invisível e menor que a perda do H.264, mas o arquivo pode variar nesses
-  pixels conforme o número de abas. `--disable-partial-raster` eliminou a diferença dos quadros do clipe, não
-  a dos quadros do mapa.
+  em ordem crescente, em que cada quadro vem logo depois do vizinho, diferiu das outras duas:
+  - em 11 quadros do mapa, 33 a 1.303 pixels (no máximo 0,06% do quadro) mudaram 1 ou 2 níveis de 255;
+  - em 4 quadros do clipe, 9 pixels mudaram até 217 níveis, na borda do contorno escuro de uma letra da
+    legenda (o contorno cobre ou não esses 9 pixels).
+
+  É o Chromium reaproveitando parte da rasterização do quadro anterior. O estado do quadro é o mesmo e as
+  diferenças são de borda, menores que a perda do H.264, mas o arquivo pode variar nesses pixels conforme o
+  número de abas. `--disable-partial-raster` eliminou a diferença dos quadros do clipe, não a dos quadros do
+  mapa. Resultados em `.saida/determinismo-short.json` e `.saida/determinismo-ensaio.json`.
 - **Remotion.** A composição usa o mesmo `quadroEm(t)` a partir de `useCurrentFrame()`, sem relógio no desenho;
-  as fontes vêm dos mesmos arquivos locais, com `delayRender`. O vigia não pôde ser instalado no navegador que
-  o próprio Remotion abre, então não há contagem equivalente para o runtime dele.
+  as seis faces vêm dos mesmos arquivos locais, com `delayRender`, e as seis aparecem carregadas no Player. O
+  vigia não pôde ser instalado no navegador que o próprio Remotion abre, então para ele o critério de relógio
+  fica sem demonstração: vale só pelo código da composição, não por medição.
 - **Rede.** Toda exportação e medição de paridade rodou em `unshare -rn`, um namespace de rede só com loopback:
   não existe rota para a internet durante a gravação. No HTML, o contexto do navegador ainda bloqueia e
   registra qualquer pedido fora do servidor local; nenhum aconteceu. O Remotion também exportou sem rede
@@ -188,8 +201,9 @@ e com `libx264` (veryfast, CRF 20), e verificou o caminho durante a execução:
 O NVENC também funcionou dentro do namespace sem rede e nas exportações dos dois motores (o log do Remotion
 mostra `Encoder: h264_nvenc, hardware accelerated: true` e o comando com `-c:v h264_nvenc`).
 
-Na exportação completa o codificador não é o gargalo: NVENC e x264 levaram praticamente o mesmo tempo, porque
-a captura de quadros satura a CPU. O ganho do NVENC é liberar CPU (59 s contra 12 s de processador para o
+Na exportação completa o codificador não é o gargalo: entre NVENC e x264 a diferença ficou entre −2% e +6%
+(seção 5), para um lado ou para o outro conforme o motor e o formato, dentro da variação de carga da máquina,
+porque a captura de quadros satura a CPU. O ganho do NVENC é liberar CPU (59 s contra 12 s de processador para o
 mesmo encode), o que pesa no vídeo longo e em máquinas com menos núcleos.
 
 O Chromium no WSL não usa a GPU para rasterizar ou compor. Com flags de GPU (ANGLE sobre GL/EGL, rasterização
@@ -200,22 +214,27 @@ por GPU, no headless shell e no Chromium completo) a captura caiu de 12,9 para 6
 
 | Motor | Vídeo | Quadros e codificação | Total com áudio | Velocidade | Pico de memória (PSS) |
 | --- | --- | --- | --- | --- | --- |
-| HTML, NVENC | 65,3 s, 9:16 | 122,9 s | 129,1 s | 0,53× | 2,0 GB |
-| HTML, x264 | 65,3 s, 9:16 | 120,4 s | 126,5 s | 0,54× | 2,2 GB |
-| Remotion, NVENC | 65,3 s, 9:16 | 125,0 s | 132,0 s (bundle em cache: 1,9 s) | 0,52× | 3,1 GB |
-| Remotion, x264 | 65,3 s, 9:16 | 124,2 s | 130,8 s | 0,53× | 3,3 GB |
-| HTML, NVENC | 65,3 s, 16:9 | 139,3 s | 145,5 s | 0,47× | 1,9 GB |
-| Remotion, NVENC | 65,3 s, 16:9 | 134,3 s | 141,5 s | 0,49× | 3,1 GB |
+| HTML, NVENC | 65,3 s, 9:16 | 122,9 s | 129,1 s | 0,51× | 2,0 GB |
+| HTML, x264 | 65,3 s, 9:16 | 120,4 s | 126,5 s | 0,52× | 2,2 GB |
+| Remotion, NVENC | 65,3 s, 9:16 | 125,0 s | 132,0 s (bundle em cache: 1,9 s) | 0,49× | 3,1 GB |
+| Remotion, x264 | 65,3 s, 9:16 | 124,2 s | 130,8 s | 0,50× | 3,3 GB |
+| HTML, NVENC | 65,3 s, 16:9 | 139,3 s | 145,5 s | 0,45× | 1,9 GB |
+| HTML, x264 | 65,3 s, 16:9 | 147,6 s | 153,7 s | 0,43× | 2,2 GB |
+| Remotion, NVENC | 65,3 s, 16:9 | 134,3 s | 141,5 s | 0,46× | 3,1 GB |
+| Remotion, x264 | 65,3 s, 16:9 | 131,2 s | 138,1 s | 0,47× | 3,3 GB |
 | **Python atual**, x264 | 55,4 s, 9:16 (Short real) | 102,2 s | 102,8 s | 0,54× | 0,6 GB |
 | **Python atual**, prévia 540p | 55,4 s, 9:16 | 106,8 s | 107,6 s | 0,51× | — |
 
-"Velocidade" é segundos de vídeo por segundo de exportação. HTML e Remotion usaram quatro abas; mais abas não
-ajudam, porque quatro já saturam as oito CPUs lógicas (300 quadros 1080p de mapa: 2 abas 11,9 qps, 4 abas
-13,0 qps, 6 abas 13,0 qps, 8 abas 12,8 qps).
+"Velocidade" é segundos de vídeo por segundo de exportação total, a mesma base para os três motores. HTML e
+Remotion usaram quatro abas; mais abas não ajudam, porque quatro já saturam as oito CPUs lógicas (300 quadros
+1080p de mapa: 2 abas 11,9 qps, 4 abas 13,0 qps, 6 abas 13,0 qps, 8 abas 12,8 qps). A carga da máquina variou
+entre as rodadas; diferenças de até ~6% entre linhas estão dentro desse ruído.
 
-O motor atual tem a mesma velocidade por segundo de vídeo usando um núcleo, mas desenha uma composição bem
-mais simples (sem desfoque, vidro, mola nem câmera). Os motores em navegador entregam esses efeitos pelo mesmo
-tempo de relógio usando a máquina inteira.
+No mesmo critério, o motor atual é cerca de 6% mais rápido que o HTML no 9:16 (0,54× contra 0,51×), usando um
+núcleo, mas desenha uma composição bem mais simples: sem desfoque, vidro, mola nem câmera, e sem 16:9. Os
+motores em navegador entregam esses efeitos em tempo de relógio parecido, usando a máquina inteira. Na
+qualidade de codificação os três usam H.264 em 1080p com ajustes equivalentes (CRF 20 no x264, CQ 20 no
+NVENC); a diferença visível entre eles é o que cada motor consegue desenhar, não a compressão.
 
 ### 6. Ensaio de escala de 25 min (16:9)
 
@@ -226,7 +245,7 @@ esboços), não é entrega") e a marca "ENSAIO DE ESCALA · TESTE" desenhada em 
 
 | Medida | Resultado |
 | --- | --- |
-| Vídeo | 1581,8 s (26 min 22 s), 47.454 quadros 1920×1080 a 30 qps; 28 capítulos, 112 trechos, 168 itens, 4.210 palavras |
+| Vídeo | 1581,8 s (26 min 22 s), 47.454 quadros 1920×1080 a 30 qps; 28 cenas, 112 trechos visuais, 168 itens, 4.210 palavras |
 | Exportação total | 4.001 s (66,7 min), ou 0,40× o tempo real |
 | Quadros e codificação (4 abas, NVENC) | 3.837 s (64,0 min), 12,4 qps, 292 ms por quadro em cada aba |
 | Mixagem (grafo WebAudio offline, blocos de 60 s) | 37,4 s |
@@ -234,7 +253,7 @@ esboços), não é entrega") e a marca "ENSAIO DE ESCALA · TESTE" desenhada em 
 | Juntar vídeo e áudio (AAC) | 69,5 s |
 | Medição da Q46 no arquivo final | 18,3 s |
 | Arquivo | 0,96 GB, 4,9 Mbit/s, H.264 (`h264_nvenc`) e AAC 48 kHz |
-| Pico de memória na exportação (PSS) | 3,9 GB no total: Chromium 3,6 GB (4 abas e o áudio decodificado), Node 0,3 GB, FFmpeg 0,3 GB |
+| Pico de memória na exportação (PSS) | 3,9 GB no momento de pico: Chromium 3,6 GB (4 abas e o áudio decodificado) e Node 0,3 GB. O FFmpeg chegou a 0,3 GB em outro momento, durante a codificação |
 | Relógio, animações, rede | 0 chamadas, 0 animações, 0 pedidos externos; gravação em namespace sem rede |
 
 Prévia do vídeo longo (1280×720, Chromium sem janela, `ensaio/previa.mjs`):
@@ -245,21 +264,27 @@ Prévia do vídeo longo (1280×720, Chromium sem janela, `ensaio/previa.mjs`):
 | Busca até a tela pintada, 60 posições aleatórias no vídeo inteiro | mediana 33 ms, p95 92 ms, máximo 100 ms (inclui dois quadros de pintura, ~33 ms) |
 | Busca até o quadro aplicado, 120 amostras da paridade | mediana 2 ms, p95 13 ms, máximo 16 ms |
 | Tocar | primeiro quadro no ciclo de pintura seguinte; o som entra 100 ms depois (margem de agendamento) |
-| Reprodução de 12 s no início, no meio e no fim | intervalo mediano de 16,7 ms nos três; 12, 7 e 4 intervalos acima de 50 ms; máximo 67, 67 e 100 ms; quadro do clipe atrasado 0, 0 e 13 vezes |
+| Reprodução de 12 s no início, no meio e no fim | intervalo mediano de 16,7 ms nos três; p95 de 50, 50 e 16,8 ms; 12, 7 e 4 intervalos acima de 50 ms; máximo 67, 67 e 100 ms; quadro do clipe atrasado 0, 0 e 13 vezes |
+
+No início e no meio, 5% dos intervalos entre quadros desenhados chegaram a 50 ms (três ciclos de pintura): a
+reprodução é fluida na maior parte, com engasgos curtos nos trechos de mapa, os mais caros. Nas medições de
+paridade aparece um intervalo máximo de 283 ms, mas ali é a própria medição que segura o quadro na tela durante
+a captura; não é engasgo da prévia.
 
 Paridade no vídeo longo: 120 amostras paradas espalhadas pelo vídeo, SSIM médio 0,901 (mínimo 0,832), 98
 distinguíveis dos vizinhos e nenhuma incoerente; prévia tocando com uma incoerência (o quadro do clipe um quadro
 atrás); clipe certo em 224 de 224 amostras; som sem deslocamento, resíduo de −32,2 dB e loudness momentânea a no
 máximo 0,2 LU. Os 40 quadros da prova de determinismo saíram idênticos, bit a bit, nas três ordens.
 
-A velocidade cai de 0,47–0,53× no Short para 0,40× no vídeo longo porque o vídeo longo tem mais tempo de mapa
-(o trecho mais caro) e porque mixagem, masterização e mux crescem com a duração.
+Na mesma base (tempo total), a velocidade cai de 0,45–0,52× no Short para 0,40× no vídeo longo, porque o vídeo
+longo tem mais tempo de mapa (o trecho mais caro) e porque mixagem, masterização e mux crescem com a duração.
 
 ### 7. Mixagem do arquivo final pela Q46
 
-A masterização mede a mixagem, aplica um ganho único (modo linear) e só usaria um limitador de pico se o
-ganho levasse o pico acima de −1,5 dBTP antes do AAC; em nenhuma rodada foi preciso. A conferência é feita no
-MP4 final decodificado, por `ebur128` com pico verdadeiro:
+A masterização mede a mixagem, aplica um ganho único (modo linear) e só usa um limitador de pico se o ganho
+levasse o pico acima de −1,5 dBTP antes do AAC. Nos Shorts não foi preciso; no ensaio, o pico de −0,8 dBTP o
+acionou (com compensação de latência, para não atrasar o som). A conferência é feita no MP4 final
+decodificado, por `ebur128` com pico verdadeiro:
 
 | Arquivo | LUFS integrado | Pico verdadeiro | Taxa | Q46 |
 | --- | --- | --- | --- | --- |
@@ -281,16 +306,16 @@ tempo equivalente ao Remotion, paridade medida sem desvios fora do controle do M
 
 Limitações no hardware alvo:
 
-- A exportação é limitada pela CPU: cerca de 13 quadros 1080p por segundo com efeitos, ou 0,45–0,55× o tempo
-  real. O Chromium não usa a GPU no WSL; o NVENC só alivia a codificação.
+- A exportação é limitada pela CPU: cerca de 12 a 13 quadros 1080p por segundo com efeitos, ou 0,40–0,52× o
+  tempo real no total. O Chromium não usa a GPU no WSL; o NVENC só alivia a codificação.
 - Na prévia tocando, o quadro do clipe pode ficar um quadro atrás quando ainda não foi decodificado; a
   pré-carga de 20 quadros reduz, não elimina. Parada, é exato.
 - A prévia foi medida num Chromium sem janela, com áudio sem dispositivo de saída. A resposta e a sincronia
   num navegador com janela e placa de som precisam ser conferidas no editor (MYC-15).
 - O clipe entra como sequência de quadros JPEG preparada antes. Isso ocupa disco e tempo de preparação
   proporcionais à duração das mídias.
-- O desenho final não é bit a bit idêntico por qualquer ordem em todos os quadros: até 0,06% dos pixels podem
-  variar 1 ou 2 níveis (seção 2). O modo de quadros controlados do Chromium (`HeadlessExperimental.beginFrame`)
+- O desenho final não é bit a bit idêntico por qualquer ordem em todos os quadros: até 0,06% dos pixels do mapa
+  podem variar 1 ou 2 níveis, e bordas de letras com contorno podem cobrir ou não alguns pixels (seção 2). O modo de quadros controlados do Chromium (`HeadlessExperimental.beginFrame`)
   fica como caminho a avaliar no MYC-15.
 - No vídeo longo, o áudio decodificado inteiro custa cerca de 1,2 GB na página da prévia e na aba que mixa; a
   prévia de vídeos mais longos vai precisar decodificar o áudio por trechos.

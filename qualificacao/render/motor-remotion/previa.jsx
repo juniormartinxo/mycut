@@ -34,7 +34,7 @@ window.motor = {
     ref.current.addEventListener('resume', () => { carregando = false; });
     await document.fonts.ready;
     await this.irPara(0);
-    return { fontes: [['Inter', 900], ['JetBrains Mono', 800]].map(([f, p]) => ({ fonte: `${p} ${f}`, carregada: document.fonts.check(`${p} 40px "${f}"`) })) };
+    return { fontes: [['Inter', 400], ['Inter', 600], ['Inter', 800], ['Inter', 900], ['JetBrains Mono', 500], ['JetBrains Mono', 800]].map(([f, p]) => ({ fonte: `${p} ${f}`, carregada: document.fonts.check(`${p} 40px "${f}"`) })) };
   },
   async irPara(t) {
     ref.current.pause();

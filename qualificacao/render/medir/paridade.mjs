@@ -72,11 +72,11 @@ export async function comparar(capturas, exportados) {
 
 // Áudio que a prévia tocou (blocos do worklet) recolocado na linha do tempo do vídeo.
 export function audioDaPrevia(blocos, { inicioCtx, t0, taxa }) {
-  blocos.sort((a, b) => a.quadro - b.quadro);
-  const primeiro = blocos[0].quadro, total = blocos.at(-1).quadro + blocos.at(-1).l.length - primeiro;
+  blocos.sort((a, b) => a.amostra - b.amostra);
+  const primeira = blocos[0].amostra, total = blocos.at(-1).amostra + blocos.at(-1).l.length - primeira;
   const l = new Float32Array(total), r = new Float32Array(total);
-  for (const b of blocos) { l.set(b.l, b.quadro - primeiro); r.set(b.r, b.quadro - primeiro); }
-  return { l, r, inicio: t0 + (primeiro / taxa - inicioCtx), taxa };
+  for (const b of blocos) { l.set(b.l, b.amostra - primeira); r.set(b.r, b.amostra - primeira); }
+  return { l, r, inicio: t0 + (primeira / taxa - inicioCtx), taxa };
 }
 
 // Lê um trecho do áudio do MP4 como float32 estéreo intercalado.

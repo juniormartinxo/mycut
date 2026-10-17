@@ -10,8 +10,8 @@ referência ([relatório](../qualificacao-renderizacao.md)). Pela Q49, a escolha
 técnica; pela [ADR 0017](0017-base-comum-para-shorts-com-motion-e-videos-horizontais.md), o motor
 serve aos dois formatos.
 
-**O motor escolhido é o HTML determinístico.** A cena é descrita como dados e o estado de cada
-quadro é uma função só do tempo (`quadroEm(cena, t)`). A mesma página desenha a prévia, tocando com
+**O motor de composição escolhido é o HTML determinístico.** O vídeo é descrito como dados e o estado de
+cada quadro é uma função só do tempo (`quadroEm(cena, t)`). A mesma página desenha a prévia, tocando com
 o relógio do áudio ou parada num instante, e a exportação, em que abas de um Chromium sem janela
 pedem cada quadro e o FFmpeg codifica (NVENC quando houver). O som é o mesmo grafo WebAudio nos dois
 casos: tocado em tempo real na prévia e renderizado offline na exportação, depois masterizado pela
@@ -23,9 +23,11 @@ Por que este e não o Remotion:
 - **Paridade sob controle do MyCut.** As diferenças entre prévia e exportação encontradas no Remotion
   vêm de caminhos que o MyCut não controla: o Player e o renderizador decodificam vídeo e misturam
   áudio por caminhos diferentes (cor de vídeo sem marcação, mono para estéreo), e o Player reduz a
-  composição com `transform`, que quebra o vidro fosco. No motor HTML os dois lados passam pelo
-  mesmo código e pelo mesmo navegador, e o único desvio encontrado (o mesmo `transform`) foi corrigido
-  no próprio motor.
+  composição com `transform`, que quebra o vidro fosco. Mesmo com as mitigações, a mistura que o Player toca
+  desvia até 10 LU da exportada nas rampas da música. No motor HTML os dois lados passam pelo
+  mesmo código e pelo mesmo navegador, e os desvios encontrados (o mesmo `transform`, o quadro do
+  `<video>` e um laço de desenho duplicado na prévia) foram corrigidos no próprio motor. Resta uma
+  variação de rasterização do Chromium em bordas, de poucos pixels, conforme a ordem dos quadros.
 - **Licença.** O MyCut é público. O Remotion exige licença paga de empresas com mais de três
   pessoas, condição que passaria a quem usa o MyCut. Com a chave `free-license`, o renderizador envia
   um evento de uso aos servidores do Remotion a cada render. O motor HTML usa só peças com licença

@@ -6,7 +6,7 @@ export const FUSAO = 0.6;
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const r4 = v => Math.round(v * 1e4) / 1e4;
 const lerp = (a, b, p) => a + (b - a) * p;
-const saida = p => 1 - (1 - p) ** 5;
+const desacelera = p => 1 - (1 - p) ** 5;
 const vaivem = p => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
 
 // Um trecho que entra por fusão cresce por cima do anterior, que segue inteiro até ser coberto.
@@ -41,7 +41,7 @@ function cameraEm(marcas, t) {
   let atual = { x: marcas[0].x, y: marcas[0].y, zoom: marcas[0].zoom };
   for (let i = 1; i < marcas.length && t >= marcas[i].t; i++) {
     const fim = Math.min(t, marcas[i + 1]?.t ?? Infinity);
-    const p = saida(clamp((fim - marcas[i].t) / (marcas[i].dur ?? 1)));
+    const p = desacelera(clamp((fim - marcas[i].t) / (marcas[i].dur ?? 1)));
     atual = { x: lerp(atual.x, marcas[i].x, p), y: lerp(atual.y, marcas[i].y, p), zoom: lerp(atual.zoom, marcas[i].zoom, p) };
   }
   return { x: r4(atual.x), y: r4(atual.y), zoom: r4(atual.zoom) };
@@ -69,7 +69,7 @@ function itemEm(item, t) {
     estado,
     opacidade: r4(clamp(tau / 0.25) * (1 - 0.68 * d)),
     escala: r4((0.85 + 0.15 * mola(tau)) * (1 - 0.04 * d)),
-    desloc: r4(40 * (1 - saida(clamp(tau / 0.7)))),
+    desloc: r4(40 * (1 - desacelera(clamp(tau / 0.7)))),
     desfoque: r4(3 * d),
     brilho: r4(1 - d),
   };

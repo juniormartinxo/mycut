@@ -1,7 +1,9 @@
 # Qualificação do motor de composição (MYC-11)
 
 Código da prova técnica registrada em [docs/qualificacao-renderizacao.md](../../docs/qualificacao-renderizacao.md).
-Não é código do produto: serve para repetir as medições. Vídeos, quadros e relatórios vão para `.saida/`,
+Não é código do produto: serve para repetir as medições. É anterior ao documento de edição e usa nomes
+próprios: `cena` é o vídeo inteiro, `capitulo` é a cena do glossário e `trecho` é um intervalo visual (mapa,
+imagem ou clipe) que entra por corte ou fusão, não um trecho de fala. Vídeos, quadros e relatórios vão para `.saida/`,
 ignorada pelo Git.
 
 ## Peças
@@ -37,9 +39,10 @@ PYTHONPATH=../../backend python midia/alinhar.py narracao.wav palavras.json [--c
 node midia/preparar.mjs .saida/short/midia --narracao narracao.wav --palavras palavras.json --duracao 65.3
 bash rodar-short.sh .saida/short
 
-# 3. NVENC com o caminho verificado, e voz × música
+# 3. NVENC com o caminho verificado, voz × música e determinismo (mesmos pixels em qualquer ordem)
 node medir/nvenc.mjs .saida/short/html-16x9-h264_nvenc.video.mp4 .saida/nvenc
 node medir/partes.mjs .saida/short/cena-9x16.json .saida/short/midia .saida/partes/short
+node medir/determinismo.mjs .saida/short/cena-9x16.json .saida/short/midia 40
 
 # 4. Motor atual como referência (cópia isolada dos dados; não toca o banco original)
 PYTHONPATH=../../backend python referencia-python/render.py <pasta .data> <id de um job final> .saida/referencia

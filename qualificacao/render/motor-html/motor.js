@@ -13,7 +13,7 @@ const db = v => Math.pow(10, v / 20);
 
 let cena, porId, palco, camadas, itensEl, caixas, legendaEl, progressoEl, ultimaLegenda = '';
 let audio = null;           // { ctx, buffers, inicioCtx, t0, captura }
-const prevista = { tocando: false, t: 0, segurar: false, registro: [], geracao: 0 };
+const estadoDaPrevia = { tocando: false, t: 0, segurar: false, registro: [], geracao: 0 };
 
 function el(tag, classe, pai) {
   const n = document.createElement(tag);
@@ -185,7 +185,7 @@ async function irPara(t) {
     if (img.getAttribute('src') !== url) { img.src = url; await img.decode(); }
   }
   aplicar(q);
-  prevista.t = t;
+  estadoDaPrevia.t = t;
   return { t, assinatura: assinatura(q) };
 }
 
@@ -236,7 +236,7 @@ async function mixar(t0, duracao, opcoes) {
 // ---------- Prévia tocando: o relógio é o do áudio, e cada quadro desenhado é quadroEm(t) ----------
 
 let fontesDeAudio = [];
-async function tocar(desde = prevista.t, { capturar = false } = {}) {
+async function tocar(desde = estadoDaPrevia.t, { capturar = false } = {}) {
   if (!audio) await carregarAudio();
   pausar();
   const ctx = audio.ctx ?? (audio.ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' }));
@@ -255,11 +255,11 @@ async function tocar(desde = prevista.t, { capturar = false } = {}) {
   const quando = ctx.currentTime + 0.1;
   fontesDeAudio = montarGrafo(ctx, desde, quando, saida);
   Object.assign(audio, { inicioCtx: quando, t0: desde });
-  prevista.tocando = true;
-  prevista.registro = [];
-  prevista.pedidoEm = performance.now();   // só na prévia: mede a espera até o primeiro quadro
+  estadoDaPrevia.tocando = true;
+  estadoDaPrevia.registro = [];
+  estadoDaPrevia.pedidoEm = performance.now();   // só na prévia: mede a espera até o primeiro quadro
   // Cada tocar() inicia um laço novo; um laço de antes de pausar, ainda agendado, para sozinho.
-  const geracao = ++prevista.geracao;
+  const geracao = ++estadoDaPrevia.geracao;
   requestAnimationFrame(agora => passo(agora, geracao));
 }
 
@@ -269,15 +269,15 @@ function tempoTocando() {
 }
 
 function passo(agora, geracao) {
-  if (!prevista.tocando || geracao !== prevista.geracao) return;
-  if (!prevista.segurar) {
+  if (!estadoDaPrevia.tocando || geracao !== estadoDaPrevia.geracao) return;
+  if (!estadoDaPrevia.segurar) {
     const t = Math.min(cena.duracao, tempoTocando());
     const q = quadroEm(cena, t);
     aplicar(q);
     mostrarQuadroDoClipe(q);
-    prevista.t = t;
-    prevista.registro.push([agora, t]);
-    if (prevista.pedidoDeSegurar) { prevista.segurar = true; prevista.pedidoDeSegurar(t); prevista.pedidoDeSegurar = null; }
+    estadoDaPrevia.t = t;
+    estadoDaPrevia.registro.push([agora, t]);
+    if (estadoDaPrevia.pedidoDeSegurar) { estadoDaPrevia.segurar = true; estadoDaPrevia.pedidoDeSegurar(t); estadoDaPrevia.pedidoDeSegurar = null; }
     if (t >= cena.duracao) { pausar(); return; }
   }
   requestAnimationFrame(proximo => passo(proximo, geracao));
@@ -292,19 +292,19 @@ function mostrarQuadroDoClipe(q) {
   for (let k = 1; k <= 20; k++) decodificado(urlDoQuadro(trecho, q.clipe.congelado ? q.clipe.tempo : q.clipe.tempo + k * trecho.clipe.velocidade / 30));
   if (img.getAttribute('src') === url) return;
   if (quadrosProntos.has(url)) img.src = url;
-  else { decodificado(url); prevista.atrasosDoClipe = (prevista.atrasosDoClipe ?? 0) + 1; }
+  else { decodificado(url); estadoDaPrevia.atrasosDoClipe = (estadoDaPrevia.atrasosDoClipe ?? 0) + 1; }
 }
 
 function pausar() {
-  prevista.tocando = false;
-  prevista.segurar = false;
+  estadoDaPrevia.tocando = false;
+  estadoDaPrevia.segurar = false;
   for (const f of fontesDeAudio) { try { f.stop(); } catch { /* já parou */ } }
   fontesDeAudio = [];
 }
 
 // Para medir a prévia tocando: o próximo quadro desenhado fica na tela até soltar(); o áudio segue.
-const segurarProximo = () => new Promise(ok => { prevista.pedidoDeSegurar = ok; });
-const soltar = () => { prevista.segurar = false; };
+const segurarProximo = () => new Promise(ok => { estadoDaPrevia.pedidoDeSegurar = ok; });
+const soltar = () => { estadoDaPrevia.segurar = false; };
 
 function capturaDeAudio() {
   const c = audio?.captura;
@@ -315,8 +315,8 @@ function capturaDeAudio() {
 // ---------- Página ----------
 
 const params = new URLSearchParams(location.search);
-window.motor = { carregar, irPara, tocar, pausar, mixar, segurarProximo, soltar, capturaDeAudio, prevista,
-                 get t() { return prevista.t; } };
+window.motor = { carregar, irPara, tocar, pausar, mixar, segurarProximo, soltar, capturaDeAudio, estadoDaPrevia,
+                 get t() { return estadoDaPrevia.t; } };
 
 if (params.get('cena')) {
   const dados = await (await fetch(params.get('cena'))).json();
@@ -327,7 +327,7 @@ if (params.get('cena')) {
   const posicao = document.getElementById('posicao'), relogio = document.getElementById('relogio');
   posicao.max = dados.duracao;
   posicao.oninput = () => { pausar(); irPara(Number(posicao.value)); };
-  document.getElementById('tocar').onclick = () => (prevista.tocando ? pausar() : tocar());
-  const mostrar = () => { relogio.textContent = `${prevista.t.toFixed(2)} s`; if (prevista.tocando) posicao.value = prevista.t; requestAnimationFrame(mostrar); };
+  document.getElementById('tocar').onclick = () => (estadoDaPrevia.tocando ? pausar() : tocar());
+  const mostrar = () => { relogio.textContent = `${estadoDaPrevia.t.toFixed(2)} s`; if (estadoDaPrevia.tocando) posicao.value = estadoDaPrevia.t; requestAnimationFrame(mostrar); };
   requestAnimationFrame(mostrar);
 }
