@@ -30,6 +30,8 @@ if ($Acao -eq 'enviar') {
   $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
   $toast.Tag = $dados.tag
   $toast.Group = $dados.grupo
+  # Um aviso antigo com a mesma tag na Central faria a conferência abaixo dar entregue sem o novo aparecer.
+  $gerenciador::History.Remove($dados.tag, $dados.grupo, $dados.aumid)
   $gerenciador::CreateToastNotifier($dados.aumid).Show($toast)
   # Show() não informa bloqueio; a entrega é conferida no histórico da Central de Notificações.
   Start-Sleep -Milliseconds 800

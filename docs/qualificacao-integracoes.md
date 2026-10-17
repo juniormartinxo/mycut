@@ -81,7 +81,8 @@ Pela documentação local (`~/.grok/docs`), pela skill embutida `imagine` e pelo
 `sondar_grok.sh` fez um pedido com uma imagem-base desenhada localmente (1280×720, barco de papel no terço
 esquerdo, sem `image_gen`), pedindo uma única chamada com `first_frame`, 16:9, 6 s e 480p. Restrições:
 `--tools reference_to_video`, `--disallowed-tools Agent`, `--no-subagents`, `--disable-web-search`,
-`--max-turns 3` e `GROK_MAX_PARALLEL_VIDEO_GEN_CALLS=1`.
+`--max-turns 3` e `GROK_MAX_PARALLEL_VIDEO_GEN_CALLS=1`. A rodada 2 também usou `--deny MCPTool`, acrescentado
+depois que a rodada 1 mostrou que `--tools` não remove os servidores MCP.
 
 | Rodada | Início | Duração | Resultado |
 | --- | --- | --- | --- |
@@ -151,7 +152,10 @@ O arquivo fica com permissão 0600 fora da pasta de trabalho; o adaptador copia 
 1. Registra o AUMID `MyCut` em `HKCU\Software\Classes\AppUserModelId\MyCut` com `DisplayName`. Assim o toast
    sai com o nome MyCut sem atalho no Menu Iniciar, e o MyCut aparece em Configurações > Sistema > Notificações
    depois do primeiro aviso.
-2. Mostra o toast pelo `ToastNotificationManager` (WinRT) com `Tag` e `Group`.
+2. Remove da Central um aviso anterior com a mesma `Tag`/`Group` e mostra o toast pelo `ToastNotificationManager`
+   (WinRT). Sem essa remoção, um aviso antigo com a tag repetida faria a conferência do passo 3 dar entregue
+   mesmo que o novo não aparecesse. A remoção entrou depois da revisão do PR e foi conferida reenviando a
+   mesma tag.
 3. Devolve o `ToastNotifier.Setting`, a chave global `PushNotifications\ToastEnabled` e as tags presentes na
    Central de Notificações (`History.GetHistory`). `Show()` não falha quando o app está bloqueado, então a
    entrega é conferida no histórico.

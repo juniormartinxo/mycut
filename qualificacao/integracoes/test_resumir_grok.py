@@ -37,7 +37,6 @@ class ResumirGrokTest(unittest.TestCase):
                           'arquivo': '/home/autor/.grok/sessions/x/sessao-1/videos/1.mp4', 'erro': None}],
         })
 
-
     def test_chamada_recusada_pelo_provedor_guarda_o_motivo(self):
         motivo = 'Video generation tools are unavailable under zero data retention (ZDR).'
         linhas = ndjson(
