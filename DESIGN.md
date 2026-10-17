@@ -305,6 +305,12 @@ O espaço 9:16 mostra o player nativo quando há resultado; antes disso, mostra 
 
 **The Revisão Explícita Rule.** Mantenha visíveis a atualidade do resultado, a presença de narração e a necessidade de revisão; a aparência de um player pronto não substitui esses estados.
 
+### Timeline dos vídeos horizontais
+
+Na biblioteca, depois das produções, “Vídeos horizontais” abre com um divisor fino, título de seção e “Novo vídeo horizontal” (botão secundário). O formulário ocupa um cartão de superfície (raio padrão, borda fina) com Título, Canal e Formato em três colunas, empilhadas até 760px; os projetos aparecem em linhas com divisor, título em cartão e canal, resolução, cenas e duração em metadado tabular.
+
+A timeline reaproveita o cabeçalho do editor (voltar, título, formato, canal, marca e voz com “(do canal)” quando herdados) e põe Desfazer e Refazer como botões secundários à direita, com o rótulo da operação no `title`. Abaixo, uma linha de status com revisão, duração e cursor, e “Adicionar cena” e “Importar recurso” como botões secundários. A timeline é uma superfície clara com rolagem horizontal própria: a coluna de nomes (150px, 104px no celular) fica fixa à esquerda em papel mais escuro, com **+** compacto por faixa. Cenas são blocos verdes acinzentados numerados; itens visuais em verde, de texto em pêssego e de áudio em azul acinzentado, com bordas de 7px que servem de alça. A seleção usa contorno terracota, e o cursor é uma linha terracota de 2px em todas as faixas. Item, Recursos, Espaço do projeto e Histórico vêm em duas colunas separadas por divisor fino, uma coluna até 900px. Cada estilo mostra “Herdado do template” ou “Voltar a herdar”. Apagar o histórico pede uma segunda confirmação na própria linha, nunca um diálogo do navegador, e diz antes quanto libera.
+
 ### Feedback
 
 Falhas usam `role="alert"`; mensagens comuns usam `role="status"`. Progresso possui nome acessível e valor da execução. Carregamento, vazio e erro têm mensagens específicas. A última falha de execução aparece acima das abas do editor, inclusive quando a falha foi na geração de voz, acompanhada de orientação para conferir conexões ou ajustar o conteúdo. A interface distingue API, worker, executor de CLIs e ElevenLabs. Publicação ainda é manual na implementação atual; a interface explicita que agendamento e envio ao YouTube não estão conectados.

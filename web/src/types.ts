@@ -479,3 +479,83 @@ export type CoverMessage = {
   reply: string;
   images: { id: string; url: string; width: number; height: number }[];
 };
+
+/** Editing document of a horizontal project (ADR 0014); it only changes through operations. */
+export type EditAuthor = { kind: "human" | "agent"; name: string };
+export type EditTrackKind = "visual" | "text" | "narration" | "music" | "effects";
+export type EditFormat = { width: number; height: number; fps: number };
+export type EditGeometry = { x: number; y: number; width: number; height: number };
+export type EditScene = { id: string; title: string; duration_ms: number; start_ms: number };
+export type EditTrack = { id: string; kind: EditTrackKind; name: string };
+export type StyleValue = string | number;
+export type EditItem = {
+  id: string;
+  track_id: string;
+  scene_id: string | null;
+  start_ms: number;
+  duration_ms: number;
+  source_start_ms: number;
+  layer: number;
+  geometry: EditGeometry | null;
+  text: string | null;
+  resource: string | null;
+  /** Only the choices of the author or of an agent; anything missing inherits from the template. */
+  style: Record<string, StyleValue>;
+  resolved_style: Record<string, { value: StyleValue; inherited: boolean }>;
+  in_frame: "inside" | "partial" | "outside" | null;
+  last_author: EditAuthor;
+  /** Fields the author chose that the agents keep until an explicit request replaces them. */
+  human: string[];
+};
+export type EditResource = { hash: string; name: string; media_type: string; size: number };
+type Inherited<T> = { value: T; inherited: boolean };
+export type EditProject = {
+  id: string;
+  schema_version: number;
+  revision: number;
+  title: string;
+  format: EditFormat;
+  aspect: string;
+  framing: EditGeometry;
+  channel: Pick<Channel, "id" | "name" | "brand" | "voice">;
+  inherited: {
+    channel_name: Inherited<string>;
+    brand: Inherited<string>;
+    voice: Inherited<ChannelVoice | null>;
+  };
+  scenes: EditScene[];
+  tracks: EditTrack[];
+  items: EditItem[];
+  resources: EditResource[];
+  duration_ms: number;
+  undo: { label: string; author: EditAuthor } | null;
+  redo: { label: string; author: EditAuthor } | null;
+  updated_at: number;
+};
+export type EditSummary = Pick<EditProject, "id" | "title" | "format" | "revision" | "duration_ms" | "updated_at"> & {
+  scenes: number;
+  channel: Pick<Channel, "id" | "name" | "brand">;
+};
+export type EditStorage = {
+  referenced_bytes: number;
+  shared_bytes: number;
+  resources: {
+    hash: string;
+    name: string | null;
+    size: number;
+    in_document: boolean;
+    in_history: boolean;
+    other_projects: number;
+  }[];
+  cleanups: { kind: "history"; label: string; entries: number; frees_bytes: number }[];
+};
+export type EditHistoryEntry = {
+  id: string;
+  revision: number;
+  kind: "create" | "apply" | "undo" | "redo" | "cleanup";
+  state: string;
+  author: EditAuthor;
+  label: string;
+  targets: string[];
+  created_at: number;
+};

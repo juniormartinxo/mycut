@@ -19,6 +19,7 @@ from . import integrations, elevenlabs, bridge, agent_models, agent_tests, comma
 from . import voice_tests, covers, endings, flow, art, materials
 from . import visuals, scene_layout, scene_media, google_fonts, block_render
 from .scene_api import router as scene_router
+from .edit_api import router as edit_router, archive_router
 from .models import ScenePreview
 from .seed import blank, initialize_example
 
@@ -778,6 +779,8 @@ def package(job_id: str):
 
 
 app.include_router(scene_router)
+app.include_router(edit_router)
+app.include_router(archive_router)
 
 # Production uses the same origin for frontend, API and range-enabled video files.
 web = Path(os.environ.get('MYCUT_WEB_DIR', ROOT / 'web/dist'))

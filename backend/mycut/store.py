@@ -99,6 +99,18 @@ def initialize():
             CREATE TABLE IF NOT EXISTS channels (
                 id TEXT PRIMARY KEY, document TEXT NOT NULL,
                 created_at REAL NOT NULL, updated_at REAL NOT NULL);
+            -- Horizontal projects keep their editing document apart from the Shorts (ADR 0014, Q42).
+            CREATE TABLE IF NOT EXISTS edit_projects (
+                id TEXT PRIMARY KEY, document TEXT NOT NULL,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS edit_history (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES edit_projects(id) ON DELETE CASCADE,
+                seq INTEGER NOT NULL, revision INTEGER NOT NULL, kind TEXT NOT NULL, state TEXT NOT NULL,
+                author TEXT NOT NULL, label TEXT NOT NULL, targets TEXT NOT NULL, changes TEXT NOT NULL,
+                resources TEXT NOT NULL, ref TEXT, created_at REAL NOT NULL, UNIQUE(project_id, seq));
+            -- Content-addressed files shared by every project (ADR 0015); references live in documents and history.
+            CREATE TABLE IF NOT EXISTS resources (
+                hash TEXT PRIMARY KEY, size INTEGER NOT NULL, media_type TEXT NOT NULL, created_at REAL NOT NULL);
         ''')
         now = time.time()
         db.execute('INSERT OR IGNORE INTO channels VALUES(?,?,?,?)',

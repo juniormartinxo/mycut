@@ -95,6 +95,13 @@ test("new production and every editor tab survive serializing the address", () =
   }
 });
 
+test("a horizontal project's timeline has its own persistent address", () => {
+  const route: Route = { page: "projects", projectId: null, editId: id };
+  assert.equal(routeHash(route), `#/edicao/${id}`);
+  assert.deepEqual(readRoute(routeHash(route)), route);
+  assert.deepEqual(readRoute(`#/edicao/${id}/extra`), { page: "projects", projectId: null });
+});
+
 test("legacy project links remain valid and unknown addresses recover to the library", () => {
   assert.deepEqual(readRoute(`#${id}`), { page: "projects", projectId: id });
   // The former combined "Voz e capa" tab now opens Áudio.
