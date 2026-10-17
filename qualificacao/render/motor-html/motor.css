@@ -1,0 +1,35 @@
+/* Sem transition nem animation em lugar nenhum: cada quadro sai só de quadroEm(t). */
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #05080e; color: #e6ebf1; font-family: Inter, sans-serif; overflow: hidden; }
+#moldura { position: relative; overflow: hidden; }
+#palco { position: absolute; left: 0; top: 0; overflow: hidden; transform-origin: 0 0; background: #05080e; }
+#controles { display: flex; gap: 12px; align-items: center; padding: 10px 14px; }
+#controles input { flex: 1; }
+
+.camada { position: absolute; inset: 0; overflow: hidden; visibility: hidden; }
+.fundo { position: absolute; inset: 0; background: radial-gradient(circle at 50% 30%, var(--cor1), var(--cor2) 75%); }
+.grade { position: absolute; inset: -20% -20% -20% -20%;
+         background-image: linear-gradient(to right, var(--grade) 2px, transparent 2px), linear-gradient(to bottom, var(--grade) 2px, transparent 2px);
+         background-size: 80px 80px; transform: perspective(1200px) rotateX(18deg); }
+.luz { position: absolute; width: 46%; aspect-ratio: 1; border-radius: 50%; filter: blur(90px); opacity: .3; transform: translate(-50%, -50%); }
+.mundo { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+
+.item { position: absolute; transform-origin: 50% 50%; padding: 34px 40px; border-radius: 30px; color: #f8fafc;
+        background: rgba(15, 23, 42, .88); border: 3px solid color-mix(in srgb, var(--tom) 60%, transparent);
+        box-shadow: 0 0 calc(48px * var(--brilho)) color-mix(in srgb, var(--tom) calc(45% * var(--brilho)), transparent); }
+.item.vidro { background: rgba(255, 255, 255, .10); backdrop-filter: blur(18px) saturate(140%); }
+.item .titulo { font-weight: 900; font-size: 64px; line-height: 1.04; letter-spacing: -.02em; }
+.item.cartao .titulo { font-size: 46px; font-weight: 800; }
+.item .texto { margin-top: 14px; font-size: 30px; font-weight: 400; color: #cbd5e1; }
+.item .selo { display: inline-block; margin-bottom: 14px; padding: 6px 18px; border-radius: 99px; font: 800 22px 'JetBrains Mono', monospace;
+              letter-spacing: .06em; text-transform: uppercase; color: var(--tom); border: 2px solid color-mix(in srgb, var(--tom) 50%, transparent); }
+.tom1 { --tom: #38bdf8; } .tom2 { --tom: #10b981; } .tom3 { --tom: #f59e0b; } .tom4 { --tom: #a78bfa; }
+
+.imagem img, .video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform-origin: 50% 50%; }
+.legenda { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; z-index: 100;
+           font: 900 64px/1.1 Inter, sans-serif; text-transform: uppercase; color: #fff;
+           -webkit-text-stroke: 12px #020617; paint-order: stroke fill; }
+.legenda .destaque { color: #34d399; }
+.marca-teste { position: absolute; right: 28px; top: 24px; z-index: 101; padding: 8px 18px; border-radius: 10px;
+               font: 800 26px 'JetBrains Mono', monospace; color: #fff; background: rgba(220, 38, 38, .85); }
+.progresso { position: absolute; left: 0; bottom: 0; height: 10px; z-index: 101; background: linear-gradient(90deg, #38bdf8, #10b981); }

@@ -805,9 +805,11 @@ tolerâncias de mixagem, entrega durante edições concorrentes, seleção dos
 provedores visuais e critérios do piloto. A consolidação aguarda a confirmação
 final de entendimento, sem nova rodada de decisões de produto identificada.
 
-A escolha concreta do motor, a equivalência prévia/exportação, o NVENC no WSL,
-a ponte de notificações, o alinhador PT-BR e as capacidades dos acessos aos
-provedores dependem de qualificação futura. A prova também precisa confirmar
+A escolha concreta do motor, a equivalência prévia/exportação e o NVENC no WSL foram
+qualificados depois, no MYC-11: ver [Qualificação da renderização](qualificacao-renderizacao.md)
+e a [ADR 0019](adr/0019-motor-de-composicao-html-deterministico.md). Continuam dependendo de
+qualificação futura a ponte de notificações, o alinhador PT-BR e as capacidades dos acessos aos
+provedores. A prova também precisa confirmar
 controle dos envios/contadores: um CLI que esconda gerações internas não comprova
 o contrato de registro e limites. Não se presume desempenho, acesso ou contagem
 exata apenas pela documentação ou pela presença de um binário.

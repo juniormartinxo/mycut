@@ -277,6 +277,17 @@ sincronizar a montagem e as legendas, com origem e confiança identificadas.
 Entrega do vídeo concluído em MP4 e SRT associados à mesma revisão do projeto,
 após resolver suas pendências bloqueantes.
 
+**Motor de composição**:
+Parte do MyCut que desenha cada quadro do vídeo a partir da descrição do vídeo e do instante do
+quadro, a mesma para a prévia e para a exportação. É o HTML determinístico (ADR 0019); o editor
+atual de Shorts ainda usa o motor em Python.
+
+**Prévia**:
+Reprodução do vídeo no editor, em resolução reduzida, que toca e vai direto a qualquer instante
+mostrando o mesmo quadro e a mesma mixagem da exportação. No editor atual de Shorts, a prévia é
+um MP4 reduzido gerado pelo motor em Python.
+_Evitar_: Prévia como sinônimo de rascunho ou de exportação de revisão.
+
 **Ensaio de escala**:
 Produção de teste destinada a medir desempenho, consumo de memória e resposta
 da prévia em um vídeo longo, sem constituir uma entrega final.
