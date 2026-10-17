@@ -59,7 +59,10 @@ def import_resource(project_id: str, file: UploadFile, revision: int = Form(ge=1
 @router.get('/{project_id}/resources/{digest}')
 def resource_file(project_id: str, digest: str):
     path, media_type = editing.resource_file(project_id, digest)
-    return FileResponse(path, media_type=media_type, headers={'Cache-Control': 'private, max-age=31536000, immutable'})
+    # Even a mislabeled file never runs as a page of the studio.
+    return FileResponse(path, media_type=media_type, headers={
+        'Cache-Control': 'private, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': 'sandbox'})
 
 
 @router.get('/{project_id}/storage')

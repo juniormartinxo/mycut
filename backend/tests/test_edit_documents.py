@@ -261,6 +261,16 @@ class EditDocumentTests(unittest.TestCase):
         stored = [path for path in DATA.rglob('*') if path.is_file() and path.read_bytes() == content]
         self.assertEqual(len(stored), 1)
 
+    def test_an_imported_svg_is_served_as_a_download_and_never_runs_in_the_studio(self):
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>fetch("/api/edit-projects")</script></svg>'
+        response = self.client.post(f'/api/edit-projects/{self.create()["id"]}/resources', data={
+            'revision': '1', 'author_kind': 'human', 'author_name': 'Autor'}, files={'file': ('desenho.svg', svg, 'image/svg+xml')})
+        project = response.json()
+        file = self.client.get(f'/api/edit-projects/{project["id"]}/resources/{project["resources"][0]["hash"]}')
+        self.assertEqual(file.headers['content-type'], 'application/octet-stream')
+        self.assertEqual(file.headers['x-content-type-options'], 'nosniff')
+        self.assertEqual(file.headers['content-security-policy'], 'sandbox')
+
     def test_no_project_resource_or_history_data_lives_where_git_versions_files(self):
         project = self.upload(self.create(), b'conteudo do teste')
         self.assertTrue(all(path.is_relative_to(DATA) for path in DATA.rglob('*')))

@@ -22,9 +22,11 @@ def path(digest):
 
 
 def media_type(declared):
-    """Only media are served with their own type; anything else is downloaded as bytes."""
+    """Only media are served with their own type; anything else is downloaded as bytes. SVG and other XML images can
+    carry scripts that would run with the studio's origin, so they are bytes too."""
     declared = (declared or '').split(';')[0].strip().lower()
-    return declared if declared.startswith(MEDIA) and len(declared) <= 100 else 'application/octet-stream'
+    scriptable = 'svg' in declared or declared.endswith('+xml')
+    return declared if declared.startswith(MEDIA) and not scriptable and len(declared) <= 100 else 'application/octet-stream'
 
 
 def keep(db, stream, declared):
