@@ -1,0 +1,9 @@
+Em 17 de outubro de 2026, o MyCut exportou um ensaio de 25 minutos em 1080p, a 30 quadros por segundo. A RTX 5070 Ti terminou em 4 min 12 s, quase 6 vezes mais rápido que o tempo real.
+
+O plano custa US$ 22 por mês e inclui 275.000 caracteres. Com o dólar a R$ 5,01, isso dá cerca de R$ 110,22. Uma narração de 15 min gasta perto de 14 mil caracteres, ou 5% da cota.
+
+O Dr. Silva leu o capítulo 3 sobre o NVENC e o FFmpeg, e às 9h30 mandou um e-mail para contato@mycut.dev com o título "Sincronia de ±100 ms".
+
+Este é um ensaio de escala do MyCut. O texto que você vai ouvir existe só para testar a exportação de um vídeo longo, com narração local, mídias baratas e esboços. Nada aqui é uma entrega final. A ideia é simples: montar um vídeo de cerca de vinte e cinco minutos, medir quanto tempo o computador leva para exportá-lo, quanta memória ele usa e como a prévia responde quando tocamos e pulamos para outros pontos.
+
+Para começar, vale lembrar o que é uma montagem. Montar é escolher o que entra, em que ordem e por quanto tempo. Um corte seco muda de uma imagem para outra sem aviso. Uma fusão deixa as duas imagens se misturarem por um instante. Um zoom aproxima o olhar de um detalhe, e uma panorâmica conduz o olhar de um lado para o outro. Cada uma dessas escolhas conta uma parte da história, mesmo quando ninguém percebe.

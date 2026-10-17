@@ -4,6 +4,10 @@ status: accepted
 
 # Áudio de ensaio local e narração final
 
+> Atualização (MYC-12): o Qwen foi reprovado como voz de ensaio e o motor local passa a ser o OmniVoice.
+> O alinhador local, a rota da ElevenLabs e o que segue em aberto estão na
+> [ADR 0020](0020-voz-local-omnivoice-alinhador-mms-e-rota-tts.md). A regra de narração final pela API continua valendo.
+
 O vídeo terá áudio de ensaio gerado localmente com Qwen TTS. Na Q16, o usuário
 escolheu como referência uma amostra da voz Junior da ElevenLabs em português
 brasileiro, para manter a pronúncia brasileira no ensaio. A narração final será

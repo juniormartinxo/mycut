@@ -73,3 +73,6 @@ dist/
 
 # Saídas da qualificação do motor (MYC-11): vídeos, quadros e relatórios locais
 /qualificacao/render/.saida/
+
+# Saídas da qualificação da voz (MYC-12): áudios, respostas da API e relatórios locais
+/qualificacao/voz/.saida/
