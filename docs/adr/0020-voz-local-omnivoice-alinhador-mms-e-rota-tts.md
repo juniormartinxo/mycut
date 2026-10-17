@@ -16,18 +16,20 @@ deficiência, e com sotaque". O Qwen também errou moedas, unidades, siglas e s�
 rápido que a voz final. O autor já tinha testado e aprovado o
 [OmniVoice](https://github.com/k2-fsa/OmniVoice) no MyVoice, seu estúdio local de clonagem de voz. O OmniVoice
 roda na mesma GPU, gera por parágrafo com o mesmo prompt de voz e prepara a leitura em PT-BR, guardando o texto
-original separado do falado. Onde a ADR 0010 e o plano dizem "Qwen", vale o motor local de ensaio.
+original separado do falado. Onde a ADR 0010 e o plano dizem "Qwen", vale o motor local de ensaio. A troca
+é uma escolha do autor feita de ouvido, ainda sem as medições desta qualificação sobre o OmniVoice. A
+referência continua sendo a da Q16, uma amostra da voz Junior da ElevenLabs em PT-BR, até que se decida outra.
 
 **O alinhador local é o alinhamento forçado MMS (torchaudio).** Ele alinha o próprio roteiro ao áudio, com um
-coringa para palavras com algarismos ou símbolos. Na prosa, 95–96% dos inícios de palavra ficaram a até 100 ms
+coringa para palavras com algarismos ou símbolos. Na prosa, 90–96% dos inícios de palavra ficaram a até 100 ms
 dos tempos da API. Numa referência exata no áudio local, 99% dos inícios de frase ficaram dentro dessa margem. O
 Whisper large-v3 atrasa os inícios em cerca de 200 ms, de forma sistemática, e sua confiança não avisa o erro.
-Ele fica só para conferir o conteúdo (omissões, trocas). A correspondência entre o texto escrito e o falado é
-feita por sequência, nunca por índice. Palavras sem correspondência recebem tempos interpolados com confiança
-zero e viram pendência pela Q45.
+Ele fica só para conferir o conteúdo (omissões, trocas). A confiança do MMS também não basta como detector de
+erro. A correspondência entre o texto escrito e o falado é feita por sequência, nunca por índice. Palavras sem
+correspondência recebem tempos interpolados com confiança zero e viram pendência pela Q45.
 
 **Na ElevenLabs, a rota é `eleven_v4` com TTS e tempos** (`/v1/text-to-speech/{voz}/with-timestamps`). Cada
-pedido leva os três `request-id` anteriores em `previous_request_ids` e o trecho seguinte em `next_text`. O
+pedido leva até três `request-id` anteriores em `previous_request_ids` e o trecho seguinte em `next_text`. O
 texto de contexto não foi cobrado. A rota de diálogo foi descartada: aceita só estabilidade e 100 caracteres de
 contexto, cortou o fim do último trecho, e o autor preferiu a TTS de ouvido. O consumo real (1.060 créditos)
 bateu com o estimado. O alinhamento ausente segue a Q39, nesta ordem: resposta, histórico pelo `request-id`

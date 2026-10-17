@@ -2,7 +2,7 @@
 com pausas fixas. Roda no ambiente da narração local (torch + qwen-tts), sem rede e sem ElevenLabs.
 
 Uso: python ensaio_qwen.py roteiro.txt .saida/qwen-trecho --perfil <perfil.json> --raiz <checkout com .cache>
-     [--modo trecho|frase] [--limite 500] [--juntar 1] [--lote 4]
+     [--modo trecho|frase] [--limite 500] [--juntar 1] [--grupo 4]
 
 O perfil é o JSON local da voz (referência, transcrição, modelo, revisão e configuração de geração); áudio de
 referência e pesos ficam fora do Git. Grava ensaio.wav (bruto, sem normalização por trecho) e trechos.json com
@@ -58,7 +58,8 @@ def main():
     ap.add_argument('--modo', choices=['trecho', 'frase'], default='trecho')
     ap.add_argument('--limite', type=int, default=500)
     ap.add_argument('--juntar', type=int, default=1)
-    ap.add_argument('--lote', type=int, default=4)
+    # Pedidos gerados juntos na GPU; não confundir com o lote de narração do glossário.
+    ap.add_argument('--grupo', type=int, default=4)
     args = ap.parse_args()
     perfil = json.loads(args.perfil.read_text(encoding='utf-8'))
     geracao = perfil['generation']
@@ -66,13 +67,13 @@ def main():
     tts, prompt = carregar(perfil, args.raiz)
     import torch
     sinais, sr, inicio = [], None, time.monotonic()
-    for k in range(0, len(itens), args.lote):
-        lote = itens[k:k + args.lote]
+    for k in range(0, len(itens), args.grupo):
+        grupo = itens[k:k + args.grupo]
         torch.manual_seed(geracao['seed'] + k)
         with torch.inference_mode():
             waves, sr = tts.generate_voice_clone(
-                text=[t['texto'] for t in lote], language=[geracao['language']] * len(lote),
-                voice_clone_prompt=prompt * len(lote) if isinstance(prompt, list) else [prompt] * len(lote),
+                text=[t['texto'] for t in grupo], language=[geracao['language']] * len(grupo),
+                voice_clone_prompt=prompt * len(grupo) if isinstance(prompt, list) else [prompt] * len(grupo),
                 max_new_tokens=geracao['max_new_tokens'])
         sinais += [np.asarray(w, dtype=np.float32) for w in waves]
         print(f'{len(sinais)}/{len(itens)} · {sum(s.size for s in sinais) / sr:.0f} s de áudio em '
@@ -92,7 +93,7 @@ def main():
     sf.write(args.saida / 'ensaio.wav', np.concatenate(partes), sr, subtype='PCM_16')
     (args.saida / 'trechos.json').write_text(json.dumps({
         'origem': 'Qwen3-TTS local (ensaio, sem ElevenLabs)', 'modelo': perfil['model'], 'modo': args.modo,
-        'limite': args.limite, 'juntar': args.juntar, 'lote': args.lote, 'sample_rate': sr,
+        'limite': args.limite, 'juntar': args.juntar, 'grupo': args.grupo, 'sample_rate': sr,
         'duracao': round(cursor, 3), 'tempo_de_geracao_s': round(gerado_em, 1),
         'gpu': torch.cuda.get_device_name(0), 'trechos': manifesto}, ensure_ascii=False, indent=1), encoding='utf-8')
     print(f'pronto: {cursor:.1f} s de áudio em {gerado_em:.0f} s', flush=True)

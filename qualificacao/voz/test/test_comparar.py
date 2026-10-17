@@ -16,7 +16,9 @@ class Comparar(unittest.TestCase):
     def test_desvio_de_inicio_por_palavra_em_ms(self):
         resultado = comparar(REFERENCIA, MEDIDO)
         self.assertEqual(resultado['inicio_ms'], {'mediana': 85, 'p90': 300, 'p95': 300, 'max': 300})
-        self.assertEqual(resultado['fim_ms']['max'], 50)
+
+    def test_desvio_de_fim_por_palavra_em_ms(self):
+        self.assertEqual(comparar(REFERENCIA, MEDIDO)['fim_ms']['max'], 50)
 
     def test_fracao_de_palavras_dentro_de_100_ms_no_inicio(self):
         self.assertEqual(comparar(REFERENCIA, MEDIDO)['dentro_100ms'], 0.5)

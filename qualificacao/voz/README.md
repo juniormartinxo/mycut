@@ -41,8 +41,8 @@ python3 -m unittest discover -s test -t .        # núcleo puro: trechos, mapeam
 
 # 1. Ensaio Qwen (local) por trecho e por frase
 PY=<venv da narração>/bin/python
-$PY ensaio_qwen.py textos/longo.txt .saida/qwen-trecho --perfil <perfil.json> --raiz <checkout> --modo trecho --lote 4
-$PY ensaio_qwen.py textos/longo.txt .saida/qwen-frase --perfil <perfil.json> --raiz <checkout> --modo frase --lote 6
+$PY ensaio_qwen.py textos/longo.txt .saida/qwen-trecho --perfil <perfil.json> --raiz <checkout> --modo trecho --grupo 4
+$PY ensaio_qwen.py textos/longo.txt .saida/qwen-frase --perfil <perfil.json> --raiz <checkout> --modo frase --grupo 6
 
 # 2. Alinhamento local e emendas
 export PYTHONPATH=../../backend

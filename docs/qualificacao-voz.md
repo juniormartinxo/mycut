@@ -39,17 +39,19 @@ está em [`qualificacao/voz/`](../qualificacao/voz/README.md). Áudios, resposta
 
 ### 1. Ensaio Qwen de texto longo: gerado, ouvido e avaliado
 
-O serviço de narração local limita cada pedido a 500 caracteres e devolve WAV sem tempos. Por isso o texto foi
-dividido em **trechos de fala** pela Q28 (`texto.trechos`): um parágrafo por trecho e, se ele passar do limite,
-divisão entre frases, sem nunca cortar uma frase. Os trechos foram emendados com pausa fixa de 0,9 s entre
-parágrafos. Para comparar, o mesmo texto também foi gerado frase a frase.
+O ensaio usou o perfil local da Q16: a referência é um recorte de 13,7 s de uma narração da voz Junior na
+ElevenLabs `v4`, com a transcrição, no ambiente da narração local do MyCut. O serviço de narração local limita
+cada pedido a 500 caracteres e devolve WAV sem tempos. Por isso o texto foi dividido em **trechos de fala** pela
+Q28 (`texto.trechos`): um parágrafo por trecho e, se ele passar do limite, divisão entre frases, sem nunca
+cortar uma frase. Os trechos foram emendados com pausa fixa de 0,9 s entre parágrafos. Para comparar, o mesmo
+texto também foi gerado frase a frase.
 
 | Modo | Unidades | Áudio | Tempo de GPU | Limite de tokens atingido |
 | --- | ---: | ---: | ---: | ---: |
 | Por trecho (Q28) | 25 trechos | 593,5 s (9,9 min) | 982 s (16,4 min) | 0 |
 | Por frase | 107 frases | 629,8 s (10,5 min) | 1.106 s (18,4 min) | 0 |
 
-A geração ficou em cerca de 0,6× o tempo real, em lotes de 4 e 6 pedidos.
+A geração ficou em cerca de 0,6× o tempo real, gerando 4 e 6 pedidos juntos na GPU.
 
 **Emendas.** Foram medidas em `emendas.py`, por trecho e por emenda:
 
@@ -66,10 +68,10 @@ inserida. O Qwen fala cerca de 13% mais rápido que a ElevenLabs com o mesmo tex
 prevê a duração da voz final, como a ADR 0010 já presumia. Na rota de diálogo, o último trecho termina sem
 silêncio e com amplitude alta na borda, sinal de fala cortada.
 
-**Conteúdo.** No ensaio Qwen, o Whisper reconheceu iguais ao texto 1.536 das 1.559 palavras da prosa. As 23 diferenças são
-números que o roteiro escreve por extenso e o Whisper escreve em algarismos. Nos três parágrafos de números,
-19 palavras saíram diferentes no Qwen e 13 na ElevenLabs. O Qwen errou também `MyCut`, `RTX 5070 Ti`, `12`,
-`6`, `22` e `9h30`, que a ElevenLabs acertou.
+**Conteúdo.** No ensaio Qwen, o Whisper reconheceu iguais ao texto 1.536 das 1.559 palavras da prosa. As 23
+diferenças são números que o roteiro escreve por extenso e o Whisper escreve em algarismos. Nos três parágrafos
+de números, 19 palavras saíram diferentes no Qwen, contra 13 na rota TTS e 14 na de diálogo da ElevenLabs. O
+Qwen errou também `MyCut`, `RTX 5070 Ti`, `12`, `6`, `22` e `9h30`, que a ElevenLabs acertou.
 
 **Escuta do autor.** O ensaio por trecho de 10 min foi ouvido, com os dois lotes da ElevenLabs para comparação.
 Veredito sobre o Qwen: *"tá cortando muito as palavras e parece que tem uma certa deficiência, e com sotaque"*.
@@ -126,9 +128,11 @@ posição conhecida. O começo da primeira palavra e o fim da última podem ent�
 | Tempo para alinhar os 10 min (GPU) | 132 s | 15 s |
 
 **Confiança.** A do Whisper não avisa o erro: quase todas as palavras saem com confiança alta, mesmo atrasadas
-em 200 ms. A do MMS (média do escore dos caracteres) separa um pouco: as palavras abaixo de 0,5 acertam 40–71%,
-contra 86–96% das demais. São poucas palavras (5 a 7 por áudio), então a confiança baixa serve como sinal de
-pendência pela Q45, mas a confiança alta não garante o tempo.
+em 200 ms. A do MMS (média do escore dos caracteres) também não separa o erro de forma consistente. As palavras
+abaixo de 0,5 são de 0 a 7 por áudio e acertam, conforme o áudio, entre 40% e 100% (2 de 5, 5 de 7, 6 de 6,
+5 de 7 e 4 de 6), contra 86–96% das demais. A confiança baixa pode abrir uma pendência pela Q45, mas não basta
+como detector. Os erros grandes se concentram perto de números e símbolos, e é a posição no texto que melhor
+indica onde conferir.
 
 **Limitações registradas:**
 
@@ -186,8 +190,9 @@ custo 1×), `eleven_v4_turbo` (0,5×), `eleven_v3`, `eleven_multilingual_v2`, `e
 | Emendas | sem corte | último trecho termina cortado |
 
 **Escolha: TTS com tempos.** O contexto vai nos pedidos assim: o primeiro leva só `next_text`; os seguintes
-levam os três últimos `request-id` em `previous_request_ids` e o texto do trecho seguinte. O texto de contexto
-**não é cobrado** (critério 5).
+levam até três `request-id` anteriores em `previous_request_ids` e o texto do trecho seguinte. O texto de
+contexto **não é cobrado** (critério 5). O efeito do contexto na entonação não foi medido em separado, porque não
+houve uma rodada sem contexto para comparar; a avaliação do autor foi sobre o lote encadeado.
 
 **Recuperação pelo histórico.** A chave precisa das permissões `user_read` (assinatura) e
 `speech_history_read` (histórico); sem elas, as consultas voltam 401. Com as duas, os 10 pedidos foram achados
@@ -197,7 +202,9 @@ o instante do fim** (`fins_absolutos` converte). Na listagem `/v1/history`, os i
 alinhamentos, que só aparecem na consulta do item. Os campos `character_count_change_from/to` de cada item não
 formam uma sequência e não servem para medir o consumo de um pedido.
 
-**Alinhamento ausente.** Não aconteceu nos 10 pedidos. O caminho previsto pela Q39 fica assim:
+**Alinhamento ausente.** Não aconteceu nos 10 pedidos, e não há como provocá-lo sem gastar créditos. Cada passo
+do caminho foi exercitado em separado: a recuperação pelo histórico nos 10 pedidos e o alinhamento local nos
+mesmos áudios. Falta exercitá-los como reserva de uma ausência real. O caminho previsto pela Q39 fica assim:
 
 1. usar o `alignment` se ele reproduz o texto enviado; senão, o `normalized_alignment` por correspondência
    (`palavras_da_api`);
@@ -221,7 +228,7 @@ A autorização está registrada em `.saida/autorizacao-lote.json`. O autor a de
 | Cobrado pelos cabeçalhos (`character-cost`) | 74 + 72 + 56 + 164 + 164 = 530 por rota, **1.060 no total** |
 | Assinatura antes → depois | 8.800 → 9.860 caracteres: **1.060**, igual aos cabeçalhos |
 
-O consumo real ficou 2 créditos abaixo do estimado (arredondamento por pedido). Os 1.150 caracteres de
+O consumo real ficou 2 créditos abaixo do estimado (arredondamento por pedido). Os 1.143 caracteres de
 `next_text` e os request ids de contexto não foram cobrados. Cada pedido foi gravado antes do envio, e o lote
 para antes de passar do teto (`elevenlabs.py`).
 

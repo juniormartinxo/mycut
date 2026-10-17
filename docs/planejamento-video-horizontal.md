@@ -809,9 +809,9 @@ A escolha concreta do motor, a equivalência prévia/exportação e o NVENC no W
 qualificados depois, no MYC-11: ver [Qualificação da renderização](qualificacao-renderizacao.md)
 e a [ADR 0019](adr/0019-motor-de-composicao-html-deterministico.md). Continuam dependendo de
 qualificação futura a ponte de notificações e as capacidades dos acessos aos provedores. O alinhador
-PT-BR, a rota da ElevenLabs e a voz de ensaio foram qualificados no MYC-12: ver
+PT-BR e a rota da ElevenLabs foram qualificados no MYC-12, que também reprovou o Qwen como voz de ensaio: ver
 [Qualificação da voz](qualificacao-voz.md) e a [ADR 0020](adr/0020-voz-local-omnivoice-alinhador-mms-e-rota-tts.md),
-que troca o Qwen pelo OmniVoice. A prova também precisa confirmar
+que troca o Qwen pelo OmniVoice, ainda por qualificar no MyCut. A prova também precisa confirmar
 controle dos envios/contadores: um CLI que esconda gerações internas não comprova
 o contrato de registro e limites. Não se presume desempenho, acesso ou contagem
 exata apenas pela documentação ou pela presença de um binário.
