@@ -14,7 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from PIL import UnidentifiedImageError, Image
 from . import store, media
 from .config import ROOT, DATA, UPLOAD_LIMIT
-from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice, ArtRun
+from .models import FORMAT_BRIEF_LIMIT, CreateProject, ProjectInput, RenderRequest, AgentRunRequest, AgentSettings, AgentCommands, AgentTestRequest, BrowserSettings, PricingSettings, ElevenConnect, ElevenSettings, CoverChoice, ArtRun, ChannelInput
 from . import integrations, elevenlabs, bridge, agent_models, agent_tests, commands, costs
 from . import voice_tests, covers, endings, flow, art, materials
 from . import visuals, scene_layout, scene_media, google_fonts, block_render
@@ -77,6 +77,9 @@ def present(project):
     project.setdefault('ending_id', None)
     project.setdefault('free', False)
     project.setdefault('warnings', [])
+    project.setdefault('voice', None)
+    channel = store.get_channel(project['channel_id'])
+    project['channel'] = {key: channel[key] for key in ('id', 'name', 'brand', 'voice')}
     if (project.get('visual_style') or {}).get('loop') and project.get('ending_id'):
         project['warnings'] = [*project['warnings'], 'O loop não é aplicado porque o Short termina com um vídeo de encerramento.']
     project['jobs'] = store.jobs(project['id'])
@@ -121,6 +124,9 @@ def scene_preview(body: ScenePreview):
     if body.project_id:
         owner = store.get_project(body.project_id)
         document['images'] = owner.get('images', [])
+        # The brand copied from the channel, as the video draws it when visual_style has no channel_name.
+        if 'brand' in owner:
+            document['brand'] = owner['brand']
         document['videos'] = owner.get('videos', [])
         clock = flow.scene_clock(owner, scene)
         scenes = owner['scenes']
@@ -189,6 +195,28 @@ def health():
             'instance': os.environ.get('MYCUT_INSTANCE', os.environ.get('HOSTNAME', 'local'))}
 
 
+@app.get('/api/channels')
+def channels():
+    return store.all_channels()
+
+
+@app.get('/api/channels/{channel_id}')
+def channel(channel_id: str):
+    return store.get_channel(channel_id)
+
+
+@app.post('/api/channels', status_code=201)
+def create_channel(body: ChannelInput):
+    return store.create_channel(body.model_dump() | {'voice': chosen_voice(body.voice)})
+
+
+@app.put('/api/channels/{channel_id}')
+def update_channel(channel_id: str, body: ChannelInput):
+    """Its projects keep the voice they copied and nothing is generated again (ADR 0018)."""
+    current = store.get_channel(channel_id)
+    return store.update_channel(channel_id, body.model_dump() | {'voice': chosen_voice(body.voice, current['voice'])})
+
+
 @app.get('/api/projects')
 def projects():
     return [present(p) for p in store.all_projects()]
@@ -199,16 +227,19 @@ def create(body: CreateProject):
     if len(body.brief) > FORMAT_BRIEF_LIMIT:
         raise ValueError(f'Use até {FORMAT_BRIEF_LIMIT} caracteres na pauta. Para um prompt maior, escolha Livre.')
     check_free_only(body, False)
+    channel = chosen_channel(body)
     if body.automation != 'none':
         if not body.brief.strip():
             raise ValueError('Informe a pauta ou link para iniciar os agentes.')
-        settings = ready_for(body.automation)
-    document = blank(body.title)
+        settings = ready_for(body.automation, voice=channel['voice'])
+    document = blank(body.title) | inherited(channel)
     document['title'] = body.title.strip() or 'Novo Short'
     document['brief'] = body.brief
     document['accent_locked'] = body.accent is not None
     if body.visual_style is not None:
         document['visual_style'] = body.visual_style.model_dump()
+        if 'channel_name' not in body.visual_style.model_fields_set:
+            document['visual_style']['channel_name'] = channel['brand']
         document['accent'] = body.accent or visuals.preset(body.visual_style.format_id)['accent']
         document['accent_locked'] = True
     if body.accent is not None:
@@ -236,7 +267,8 @@ def create_free(project: str = Form(max_length=200_000), files: list[UploadFile]
         raise ValueError('Escreva o prompt do Short livre para os agentes.')
     if len(files) > MAX_FREE_ATTACHMENTS:
         raise ValueError(f'Anexe até {MAX_FREE_ATTACHMENTS} imagens de referência.')
-    settings = ready_for(body.automation, art=body.art != 'none')
+    channel = chosen_channel(body)
+    settings = ready_for(body.automation, art=body.art != 'none', voice=channel['voice'])
     project_id = store.uid()
     images = []
     try:
@@ -248,7 +280,7 @@ def create_free(project: str = Form(max_length=200_000), files: list[UploadFile]
                 raise ValueError(f'Anexo {file.filename or ""}: {exc}') from None
             finally:
                 file.file.close()
-        document = blank(body.title)
+        document = blank(body.title) | inherited(channel)
         document.update(title=body.title.strip() or 'Short livre', brief=body.brief, free=True,
                         accent_locked=False, images=images, art={'mode': body.art})
         result = store.create_project(document, project_id)
@@ -257,6 +289,19 @@ def create_free(project: str = Form(max_length=200_000), files: list[UploadFile]
         raise
     store.enqueue(result['id'], 'final', result['revision'], body.automation, settings)
     return present(store.get_project(result['id']))
+
+
+def chosen_channel(body):
+    try:
+        return store.get_channel(body.channel_id or store.DEFAULT_CHANNEL)
+    except store.Missing:
+        raise ValueError('Escolha um canal existente para a produção.') from None
+
+
+def inherited(channel):
+    """A new project copies its channel's brand and voice: later edits to the channel never change what it renders nor
+    the voice it is narrated with, version after version (ADR 0018)."""
+    return {'channel_id': channel['id'], 'brand': channel['brand'], 'voice': channel['voice']}
 
 
 def check_free_only(body, free):
@@ -269,8 +314,10 @@ def check_free_only(body, free):
         raise ValueError('Pausas na narração só valem para um Short livre.')
 
 
-def ready_for(kind, art=False):
+def ready_for(kind, art=False, voice=None):
+    """The settings a production snapshots; voice is the project's own, over the one in Conexões."""
     settings = integrations.read()
+    settings['elevenlabs'].update(voice or {})
     if kind in ('pipeline', 'plan'):
         bridge.require(settings['agents'][role]['provider'] for role in integrations.TEXT_ROLES)
     if art:
@@ -278,8 +325,26 @@ def ready_for(kind, art=False):
     if kind == 'scenes':
         bridge.require(settings['agents'][role]['provider'] for role in ('director', 'reviewer'))
     if kind in ('pipeline', 'voice'):
-        integrations.require_voice()
+        integrations.require_voice(voice)
     return settings
+
+
+def catalog_voice(body):
+    """A voice and model the connected account offers, with the voice's name from the catalog."""
+    catalog = eleven_catalog()
+    voice = next((v for v in catalog['voices'] if v['id'] == body.voice_id), None)
+    if voice is None or body.model_id not in {m['id'] for m in catalog['models']}:
+        raise ValueError('Selecione uma voz e um modelo disponíveis na sua conta.')
+    return body.model_dump() | {'voice_name': voice['name']}
+
+
+def chosen_voice(voice, current=None):
+    """A channel's or project's own voice; one already saved is kept without asking ElevenLabs again."""
+    if voice is None:
+        return None
+    if current and voice.model_dump() | {'voice_name': current['voice_name']} == current:
+        return current
+    return catalog_voice(voice)
 
 
 @app.get('/api/integrations')
@@ -388,12 +453,7 @@ def eleven_catalog():
 
 @app.put('/api/integrations/elevenlabs')
 def configure_elevenlabs(body: ElevenSettings):
-    catalog = eleven_catalog()
-    if body.voice_id not in {v['id'] for v in catalog['voices']} or body.model_id not in {m['id'] for m in catalog['models']}:
-        raise ValueError('Selecione uma voz e um modelo disponíveis na sua conta.')
-    values = body.model_dump()
-    values['voice_name'] = next(v['name'] for v in catalog['voices'] if v['id'] == body.voice_id)
-    return integrations.save_section('elevenlabs', values)
+    return integrations.save_section('elevenlabs', catalog_voice(body))
 
 
 @app.post('/api/integrations/elevenlabs/disconnect')
@@ -423,7 +483,7 @@ def run_agents(project_id: str, body: AgentRunRequest):
         raise store.Conflict('Use a conversa da cena para revisar e aceitar alterações nos blocos.')
     current = store.get_project(project_id)
     settings = ready_for(body.kind, art=bool(current.get('free')) and body.kind in ('pipeline', 'plan')
-                         and art.mode(current) != 'none')
+                         and art.mode(current) != 'none', voice=current.get('voice'))
     return store.enqueue(project_id, body.mode, body.revision, body.kind, settings)
 
 
@@ -432,7 +492,7 @@ def run_art(project_id: str, body: ArtRun):
     """The Arte's remaining images; a production that stopped for the bases then goes on to the voice and video."""
     current = store.get_project(project_id)
     art.check_run(current)
-    settings = ready_for('voice' if art.resumes(current) else 'art', art=True)
+    settings = ready_for('voice' if art.resumes(current) else 'art', art=True, voice=current.get('voice'))
     return store.enqueue(project_id, 'final', body.revision, 'art', settings, {'action': 'pending'})
 
 
@@ -441,12 +501,13 @@ def redo_art(project_id: str, key: str, text: str = Form(max_length=2000), revis
              files: list[UploadFile] | None = File(None)):
     """One image again, following the author's message and examples, before the remaining ones are paid for."""
     files = files or []
-    art.check_redo(store.get_project(project_id), key)
+    current = store.get_project(project_id)
+    art.check_redo(current, key)
     if not text.strip():
         raise ValueError('Escreva o que a Arte deve mudar nesta imagem.')
     if len(files) > covers.MAX_ATTACHMENTS:
         raise ValueError(f'Envie até {covers.MAX_ATTACHMENTS} imagens de exemplo.')
-    settings = ready_for('art', art=True)
+    settings = ready_for('art', art=True, voice=current.get('voice'))
     bridge.require_images()
     paths = []
     try:
@@ -493,6 +554,7 @@ def update(project_id: str, body: ProjectInput):
                 google_fonts.entry(block.object.font)
     if any(scene.image_id and scene.image_id not in images for scene in body.scenes):
         raise ValueError('Escolha uma imagem desta produção ou use somente animação.')
+    values['voice'] = chosen_voice(body.voice, current.get('voice'))
     return present(store.update_project(project_id, values, revision))
 
 

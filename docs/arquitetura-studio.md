@@ -5,7 +5,7 @@ O MyCut usa React/Vite, FastAPI e um worker Python sequencial. API e worker roda
 ```mermaid
 flowchart LR
   UI[React / Vite] --> API[FastAPI]
-  API --> DB[(SQLite: projetos, jobs e etapas)]
+  API --> DB[(SQLite: canais, projetos, jobs e etapas)]
   Worker[Worker Python] --> DB
   Worker --> Pipeline[Pesquisa → Roteiro → Direção → Conferência]
   Pipeline --> Bridge[Fila em .data/agent-bridge]
@@ -19,8 +19,8 @@ flowchart LR
 
 ## Módulos e fronteiras
 
-- `store.py`: SQLite WAL, controle de revisão, um job ativo por projeto, entrada inicial imutável em `job_inputs`, checkpoints e etapas. Configurações públicas ficam no snapshot; a chave ElevenLabs nunca entra nele.
-- `api.py`: projetos, fila, uploads, conexões e exports. Retorna indicação de chave conectada, nunca o segredo. Catálogo de vozes/modelos vem da conta real.
+- `store.py`: SQLite WAL, canais (o padrão é criado e recebe os projetos sem canal ao iniciar), controle de revisão, um job ativo por projeto, entrada inicial imutável em `job_inputs`, checkpoints e etapas. Configurações públicas ficam no snapshot; a chave ElevenLabs nunca entra nele.
+- `api.py`: canais, projetos, fila, uploads, conexões e exports. Um projeto novo copia a marca e a voz do seu canal. Retorna indicação de chave conectada, nunca o segredo. Catálogo de vozes/modelos vem da conta real.
 - `integrations.py`: configurações persistidas atomicamente em `.data/private/integrations.json`, arquivo 0600 e diretório 0700. Segredos locais não são criptografados em disco; o backup completo de `.data` os contém.
 - `bridge.py` e `agent_runner.py`: solicitações JSON com prazo, lease e resposta atômica. O executor usa diretório temporário, sem shell para montar comandos, ferramentas restritas à pesquisa quando solicitada e sem autoaprovação ampla. Os logins continuam no host. CLI disponível não implica autenticação válida.
 - `pipeline.py`: contratos Pydantic para pesquisa, roteiro, direção e conferência. Falha fechada para pesquisa inacessível, esquema inválido ou revisão reprovada duas vezes. Salva artefatos editoriais por tentativa. O Short livre segue `free.py`: roteiro antes, pesquisa só para as afirmações listadas, direção em planos com reparo após uma correção, e conferência de fidelidade que salva o trabalho e para antes da voz quando reprova (ADR 0005). A capa é renderizada geometricamente a partir do conceito do agente.

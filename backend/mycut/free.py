@@ -276,14 +276,14 @@ def direct(ask, project, script, issues):
             if final:
                 message = f'A direção não pôde ser usada ({exc}); as cenas mostram o texto na tela do roteiro.'[:500]
                 store.step(ask.job['id'], 'director', 'failed', message)
-                notes, style = [message], generated_style(None, [], True, [])
+                notes, style = [message], generated_style(None, [], True, [], project.get('brand', 'MYCUT'))
                 styled = {**project, 'visual_style': style}
                 return None, [fallback(scene, index, styled, notes) for index, scene in enumerate(script.scenes)], notes, style, [], []
             corrections = [*issues, str(exc)]
             continue
         notes, problems = [], []
         # Text is measured with the font the Short will be drawn with.
-        style = generated_style(direction, problems, final, notes)
+        style = generated_style(direction, problems, final, notes, project.get('brand', 'MYCUT'))
         available = {item['id'] for item in images}
         requests = artwork.requests(direction, available, problems, final) if generating else []
         bases = {item['key'] for item in requests if item['base']}
@@ -297,9 +297,10 @@ def direct(ask, project, script, issues):
         corrections = [*issues, *problems[:8]]
 
 
-def generated_style(direction, problems, repair, notes):
-    """The Short's visual_style from the prompt's tone, chosen by the director with no format as a base (ADR 0005)."""
-    base = {'format_id': 'free', 'font': 'sans', 'media_mode': 'mixed', 'image_source': 'library'}
+def generated_style(direction, problems, repair, notes, brand):
+    """The Short's visual_style from the prompt's tone, chosen by the director with no format as a base (ADR 0005);
+    the brand stays the one the project copied from its channel (ADR 0018)."""
+    base = {'format_id': 'free', 'font': 'sans', 'media_mode': 'mixed', 'image_source': 'library', 'channel_name': brand}
     if direction is None:
         return VisualStyle(**base, google_font='Roboto', captions=CaptionStyle()).model_dump()
     font = direction.style.font

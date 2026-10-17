@@ -135,6 +135,7 @@ export function FormatPicker({
   disabled = false,
   free,
   onFreeChange,
+  brand,
 }: {
   value: VisualStyle | null;
   accent: string;
@@ -144,6 +145,8 @@ export function FormatPicker({
    * onChange then also means "not Livre". */
   free?: boolean;
   onFreeChange?: (free: boolean) => void;
+  /** The brand a project without visual_style copied from its channel. */
+  brand?: string;
 }) {
   const [catalog, setCatalog] = useState<{
     formats: ShortFormat[];
@@ -151,7 +154,11 @@ export function FormatPicker({
   } | null>(null);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const style = value || { ...initialStyle, font: "sans" as const };
+  const style = value || {
+    ...initialStyle,
+    font: "sans" as const,
+    channel_name: brand ?? initialStyle.channel_name,
+  };
   useEffect(() => {
     let live = true;
     setError("");

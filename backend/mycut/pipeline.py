@@ -359,7 +359,7 @@ def produce(job):
     if kind in ('pipeline', 'voice'):
         store.step(job['id'], 'voice', 'running', 'ElevenLabs gerando a narração')
         store.progress(job['id'], 45, 'Gerando sua voz na ElevenLabs')
-        settings = {**job['snapshot']['_voice'], 'api_key': integrations.require_voice()['api_key']}
+        settings = integrations.require_voice(job['snapshot']['_voice'])
         usage_id = uuid.uuid4().hex
         store.usage_start(usage_id, job['id'], 'voice', 1, 'elevenlabs', settings['model_id'])
         try:

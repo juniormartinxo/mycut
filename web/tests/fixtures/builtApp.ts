@@ -79,6 +79,22 @@ export async function builtApp(page: Page, image?: Buffer) {
       return route.fulfill({
         json: { status: "ok", worker_online: true, ffmpeg: true },
       });
+    if (path === "/api/channels")
+      return route.fulfill({
+        json: [
+          {
+            id: "default",
+            name: "Meu canal",
+            brand: "MYCUT",
+            voice: null,
+            default: true,
+            templates: {},
+            guidelines: [],
+            created_at: 0,
+            updated_at: 0,
+          },
+        ],
+      });
     if (
       path === "/" ||
       /^\/assets\/[^/]+$/.test(path) ||
