@@ -811,7 +811,10 @@ e a [ADR 0019](adr/0019-motor-de-composicao-html-deterministico.md). A ponte de 
 acessos de vídeo pelos CLIs Grok e Gemini foram qualificados no MYC-13: ver
 [Qualificação das integrações locais](qualificacao-integracoes.md). O Grok Build gerou um clipe,
 mas esconde a requisição remota e ficou registrado como não auditável para automação; o Gemini CLI
-não gera vídeo. O alinhador PT-BR continua dependendo de qualificação futura. Um CLI que esconda
+não gera vídeo. O alinhador PT-BR e a rota da ElevenLabs foram qualificados no MYC-12, que também
+reprovou o Qwen como voz de ensaio: ver [Qualificação da voz](qualificacao-voz.md) e a
+[ADR 0020](adr/0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md), que torna o OmniVoice
+local a voz principal e a ElevenLabs a segunda via. Um CLI que esconda
 gerações internas não comprova o contrato de registro e limites, e não se presume desempenho,
 acesso ou contagem exata apenas pela documentação ou pela presença de um binário.
 

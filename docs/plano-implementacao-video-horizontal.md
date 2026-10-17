@@ -1,5 +1,10 @@
 # Plano de implementação futura — vídeos horizontais
 
+> Atualização (MYC-12): a [ADR 0020](adr/0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md) reprovou o
+> Qwen e fez do OmniVoice local a voz principal, inclusive na narração final, com a ElevenLabs como segunda via.
+> Onde este plano diz que a entrega final usa sempre a voz da API e que o Qwen não é alternativa de voz final, vale
+> a ADR 0020; as perguntas que ela deixa em aberto (voz final, primeira exportação e legendas) seguem com o autor.
+
 Consolidação de 2026-10-17, aguardando confirmação final de entendimento.
 **Somente definição: este plano não autoriza implementar, executar provas técnicas
 ou gerar conteúdo pago.** As decisões de produto foram aceitas nas Q1–Q69 da
