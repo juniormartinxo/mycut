@@ -57,3 +57,8 @@ trechos que não falharam estão na ADR 0007.
 A decisão favorece continuidade e edição durante trabalhos demorados, em troca
 de manter versões, pedidos, consumo e resultados parcialmente aplicáveis. Este
 registro é de planejamento e não autoriza implementação ou geração nesta sessão.
+
+Em 2026-10-17, a [qualificação do MYC-13](../qualificacao-integracoes.md) verificou a ponte: um toast via
+`powershell.exe` com AUMID próprio, disparado por um serviço de usuário no WSL com a janela fechada, foi
+entregue, e o bloqueio pelo app é detectado. O Não perturbe não é detectável: com ele ligado o aviso vai só
+para a Central de Notificações, o que reforça a central do MyCut como garantia.

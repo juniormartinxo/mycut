@@ -73,3 +73,5 @@ dist/
 
 # Saídas da qualificação do motor (MYC-11): vídeos, quadros e relatórios locais
 /qualificacao/render/.saida/
+# Saídas da qualificação das integrações locais (MYC-13): clipes, sessões e respostas dos CLIs
+/qualificacao/integracoes/.saida/
