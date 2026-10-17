@@ -174,6 +174,10 @@ class EditDocumentTests(unittest.TestCase):
         project = self.history_step(project, 'undo')
         self.assertEqual((project['items'][0]['start_ms'], project['items'][0]['last_author']), (1200, AGENT))
         self.edit(project, {'op': 'update_item', 'item_id': 'mapa', 'changes': {'start_ms': 0}}, author=AGENT, expected=409)
+        # Nor can the agent undo what the author did.
+        moved = self.edit(project, {'op': 'update_item', 'item_id': 'mapa', 'changes': {'start_ms': 900}})
+        self.history_step(moved, 'undo', author=AGENT, expected=409)
+        project = self.history_step(moved, 'undo')
         # A request limited to a scope cannot reach other contents.
         scene = project['scenes'][0]['id']
         self.edit(project, {'op': 'update_scene', 'scene_id': scene, 'title': 'Outra'}, author=AGENT, scope=['mapa'], expected=422)

@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from . import editing
 
 router = APIRouter(prefix='/api/edit-projects')
-library_router = APIRouter(prefix='/api')
+archive_router = APIRouter(prefix='/api')
 
 
 @router.get('')
@@ -38,12 +38,12 @@ def operations(project_id: str, body: editing.EditRequest):
 
 @router.post('/{project_id}/undo')
 def undo(project_id: str, body: editing.HistoryRequest):
-    return editing.step_back(project_id, body)
+    return editing.undo(project_id, body)
 
 
 @router.post('/{project_id}/redo')
 def redo(project_id: str, body: editing.HistoryRequest):
-    return editing.step_back(project_id, body, redo=True)
+    return editing.redo(project_id, body)
 
 
 @router.post('/{project_id}/resources')
@@ -62,11 +62,6 @@ def resource_file(project_id: str, digest: str):
     return FileResponse(path, media_type=media_type, headers={'Cache-Control': 'private, max-age=31536000, immutable'})
 
 
-@library_router.get('/resources')
-def library():
-    return editing.library()
-
-
 @router.get('/{project_id}/storage')
 def storage(project_id: str):
     return editing.storage(project_id)
@@ -77,3 +72,9 @@ def cleanup(project_id: str, body: editing.CleanupRequest):
     if body.author.kind != 'human':
         raise HTTPException(403, 'Somente o autor pode apagar o histórico e liberar espaço.')
     return editing.cleanup(project_id, body)
+
+
+@archive_router.get('/resources')
+def archive():
+    """The shared acervo: each content once, with the projects that reference it."""
+    return editing.archive()

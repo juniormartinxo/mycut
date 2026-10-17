@@ -1,4 +1,4 @@
-"""Content-addressed library of the files the horizontal projects use (ADR 0015).
+"""Content-addressed archive (acervo) of the files the horizontal projects use (ADR 0015).
 
 A file is stored once under its SHA-256, outside Git, whatever the number of projects that import it. Projects
 reference it from their editing document and their history; a file is only deleted by a cleanup the author asks
@@ -59,13 +59,14 @@ def keep(db, stream, declared):
 
 
 def forget(db, digests):
-    """Delete the files and rows of contents that nothing references; returns the bytes freed."""
-    freed = 0
+    """Drop the rows of contents that nothing references; returns the bytes freed and the files to delete once
+    the transaction commits, so a rollback never leaves a row without its file."""
+    freed, paths = 0, []
     for digest in digests:
         row = db.execute('SELECT size FROM resources WHERE hash=?', (digest,)).fetchone()
         if row is None:
             continue
         db.execute('DELETE FROM resources WHERE hash=?', (digest,))
-        path(digest).unlink(missing_ok=True)
+        paths.append(path(digest))
         freed += row['size']
-    return freed
+    return freed, paths

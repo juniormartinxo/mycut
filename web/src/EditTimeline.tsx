@@ -165,7 +165,8 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
           body: body instanceof FormData ? body : JSON.stringify(body),
         });
         setProject(next);
-        await refreshSide();
+        // Storage and history follow in the background; the timeline is editable again right away.
+        refreshSide().catch((e: Error) => setError(e.message));
         return next;
       } catch (e) {
         setError((e as Error).message);

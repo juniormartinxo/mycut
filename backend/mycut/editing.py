@@ -253,6 +253,10 @@ def row_document(row):
     return json.loads(row['document'])
 
 
+def load(db, project_id):
+    return row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+
+
 def record(db, project_id, kind, revision, author, label, targets, changes, state='done', ref=None):
     seq = db.execute('SELECT COALESCE(MAX(seq),0)+1 FROM edit_history WHERE project_id=?', (project_id,)).fetchone()[0]
     entry_id = store.uid()
@@ -361,7 +365,7 @@ def redoable(db, project_id):
 
 def history(project_id):
     with store.connect() as db:
-        row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+        load(db, project_id)
         rows = db.execute('SELECT * FROM edit_history WHERE project_id=? ORDER BY seq', (project_id,)).fetchall()
     return {'entries': [{'id': row['id'], 'revision': row['revision'], 'kind': row['kind'], 'state': row['state'],
                          'author': json.loads(row['author']), 'label': row['label'], 'targets': json.loads(row['targets']),
@@ -545,6 +549,8 @@ class Draft:
         item['duration_ms'] = op.at_ms - item['start_ms']
         rest.update(id=self.new_id(op.new_id), start_ms=op.at_ms, duration_ms=end - op.at_ms,
                     source_start_ms=item['source_start_ms'] + item['duration_ms'])
+        if self.author['kind'] == 'agent':
+            rest['human'] = [f for f in rest['human'] if f not in ('start_ms', 'source_start_ms')]
         self.insert('item', rest)
 
     def remove_item(self, op):
@@ -605,7 +611,7 @@ def restore(document, changes, side):
 
 def locked(db, project_id, revision):
     db.execute('BEGIN IMMEDIATE')
-    document = row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+    document = load(db, project_id)
     if document['revision'] != revision:
         raise store.Conflict('O projeto mudou depois que você o abriu. Atualize-o antes de editar.')
     return document
@@ -640,21 +646,38 @@ def apply(project_id, body: EditRequest):
     return get(project_id)
 
 
-def step_back(project_id, body: HistoryRequest, redo=False):
+SIDES = {'undo': ('before', 'undone', undoable, 'Não há o que desfazer.'),
+         'redo': ('after', 'done', redoable, 'Não há o que refazer.')}
+
+
+def undo(project_id, body: HistoryRequest):
+    return walk(project_id, body, 'undo')
+
+
+def redo(project_id, body: HistoryRequest):
+    return walk(project_id, body, 'redo')
+
+
+def walk(project_id, body: HistoryRequest, kind):
     """Undo or redo one whole request; the step itself is a new revision with its own author in the history."""
+    side, state, pick, nothing = SIDES[kind]
     with store.connect() as db:
         document = locked(db, project_id, body.revision)
-        entry = (redoable if redo else undoable)(db, project_id)
+        entry = pick(db, project_id)
         if entry is None:
-            raise store.Conflict('Não há o que refazer.' if redo else 'Não há o que desfazer.')
+            raise store.Conflict(nothing)
+        if body.author.kind == 'agent' and json.loads(entry['author'])['kind'] == 'human':
+            # Undoing would replace the author's choices as surely as editing them (Q13).
+            raise store.Conflict(f'"{entry["label"]}" foi feito pelo autor; só ele pode desfazer ou refazer.')
         changes = json.loads(entry['changes'])
-        restore(document, changes, 'after' if redo else 'before')
+        restore(document, changes, side)
         revision = save(db, project_id, document)
-        db.execute('UPDATE edit_history SET state=? WHERE id=?', ('done' if redo else 'undone', entry['id']))
-        swapped = changes if redo else [c | {'before': c['after'], 'after': c['before'], 'index_before': c['index_after'],
-                                             'index_after': c['index_before']} for c in changes]
-        record(db, project_id, 'redo' if redo else 'undo', revision, body.author.model_dump(), entry['label'],
-               json.loads(entry['targets']), swapped, ref=entry['id'])
+        db.execute('UPDATE edit_history SET state=? WHERE id=?', (state, entry['id']))
+        if kind == 'undo':
+            changes = [c | {'before': c['after'], 'after': c['before'], 'index_before': c['index_after'],
+                            'index_after': c['index_before']} for c in changes]
+        record(db, project_id, kind, revision, body.author.model_dump(), entry['label'],
+               json.loads(entry['targets']), changes, ref=entry['id'])
     return get(project_id)
 
 
@@ -671,11 +694,11 @@ def references(db):
 
 
 def import_resource(project_id, revision, author, stream, name, declared):
-    """Keep the file in the shared library and reference it from the project through an operation."""
+    """Keep the file in the shared archive (acervo) and reference it from the project through an operation."""
     from . import resources
     with resources.LOCK:
         with store.connect() as db:
-            row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+            load(db, project_id)
             digest, _, created = resources.keep(db, stream, declared)
         try:
             if any(r['hash'] == digest for r in get(project_id)['resources']):
@@ -684,12 +707,13 @@ def import_resource(project_id, revision, author, stream, name, declared):
                 AddResource(op='add_resource', hash=digest, name=name)]))
         except BaseException:
             with store.connect() as db:
-                if created and digest not in references(db):
-                    resources.forget(db, [digest])
+                paths = resources.forget(db, [digest])[1] if created and digest not in references(db) else []
+            for path in paths:
+                path.unlink(missing_ok=True)
             raise
 
 
-def library():
+def archive():
     with store.connect() as db:
         found = references(db)
         titles = {row['id']: json.loads(row['document'])['title'] for row in db.execute('SELECT id, document FROM edit_projects')}
@@ -722,7 +746,7 @@ def history_only(found, project_id):
 
 def storage(project_id):
     with store.connect() as db:
-        document = row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+        document = load(db, project_id)
         found = references(db)
         sizes = {row['hash']: row['size'] for row in db.execute('SELECT hash, size FROM resources')}
         entries = db.execute("SELECT COUNT(*) FROM edit_history WHERE project_id=?", (project_id,)).fetchone()[0]
@@ -747,5 +771,7 @@ def cleanup(project_id, body: CleanupRequest):
             freeable = history_only(references(db), project_id)
             db.execute('DELETE FROM edit_history WHERE project_id=?', (project_id,))
             record(db, project_id, 'cleanup', body.revision, body.author.model_dump(), 'Apagar o histórico de edição', [], [])
-            freed = resources.forget(db, freeable)
+            freed, paths = resources.forget(db, freeable)
+        for path in paths:
+            path.unlink(missing_ok=True)
     return {'freed_bytes': freed, 'project': get(project_id), 'storage': storage(project_id)}
