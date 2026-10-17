@@ -209,8 +209,9 @@ Pendência de um clipe, teto de um provedor e pausa da produção são estados
 distintos. Trabalho independente continua onde permitido. A central do MyCut
 preserva pendências; uma ponte no Windows emite aviso com a janela fechada,
 uma vez por pendência nova e em resumo por produção para ocorrências simultâneas.
-Se notificações estiverem bloqueadas, indicar isso na interface. PowerShell toast
-é uma possibilidade a qualificar, não uma ponte já existente.
+Se notificações estiverem bloqueadas, indicar isso na interface. O toast via
+`powershell.exe` com AUMID próprio foi qualificado no MYC-13, inclusive a detecção do
+bloqueio pelo app; o Não perturbe não é detectável ([qualificação](qualificacao-integracoes.md)).
 
 ## Editor, mixagem e entrega
 
