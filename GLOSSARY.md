@@ -1,7 +1,7 @@
 # MyCut
 
-Vocabulário da composição de cenas dos Shorts. Os termos de edição abaixo
-descrevem o domínio solicitado para o editor de cenas.
+Vocabulário da produção e edição de vídeos do MyCut. As definições distinguem
+as regras dos Shorts das decisões para o editor de vídeos horizontais.
 
 ## Linguagem
 
@@ -10,8 +10,29 @@ Short criado a partir de um prompt (ideia ou roteiro completo), sem formato,
 arco narrativo ou esqueleto de cena impostos; convive com os quatro formatos.
 
 **Cena**:
-Trecho de um Short com narração e legenda próprias, composto por um ou mais
-planos.
+Trecho de um vídeo organizado por uma unidade de sentido da história, que pode
+reunir várias falas, mídias, textos, cortes e pausas.
+Nos Shorts, tem narração e legenda próprias e é composto por um ou mais planos.
+
+**Faixa**:
+Linha da edição que organiza no tempo conteúdos visuais, narração, música,
+efeitos sonoros ou textos. Uma faixa pode reunir trechos de cenas diferentes,
+e um conteúdo nela pode atravessar o limite entre cenas.
+_Evitar_: Usar faixa como sinônimo de cena.
+
+**Storyboard**:
+Esboço do vídeo organizado em cenas numa linha do tempo, relacionando a fala
+planejada, os textos na tela, os tempos previstos e a intenção visual antes da
+produção das mídias finais.
+
+**Esboço de mídia**:
+Representação de uma imagem ou vídeo planejado por meio de um ícone e de uma
+descrição do conteúdo pretendido, enquanto o material final ainda não existe.
+_Evitar_: Imagem provisória, que já designa uma imagem usada no lugar de um B-roll.
+
+**Pedido de clipe**:
+Especificação de um clipe a produzir, com prompt, referências, duração desejada,
+proporção e destino na timeline, que relaciona o esboço ao material gerado ou importado.
 
 **Plano**:
 Composição em blocos de uma cena durante um trecho da narração. O primeiro
@@ -43,6 +64,45 @@ pela conferência.
 Fundo, cor do texto, cor de destaque, fonte e legenda de um Short livre,
 escolhidos pelo diretor a partir do tom do prompt, sem um formato de base.
 
+**Template**:
+Formato reutilizável de um vídeo: fundo padrão (cor sólida, degradê ou imagem),
+cores, fontes, estilo dos objetos e da legenda e orientação aos agentes, sem
+definir composição, posições ou número de cenas. Cada vídeo guarda a sua cópia, e
+cenas e objetos herdam dele até receberem escolha própria.
+_Evitar_: Layout, modelo de cena.
+
+**Template de fábrica**:
+Template que acompanha o MyCut, criado a partir de um dos formatos atuais, editável
+no lugar e duplicável.
+
+**Mapa**:
+Área maior que o quadro em que os itens do vídeo ficam em posição livre e que a
+câmera percorre; cada cena ocupa uma região do mapa.
+_Evitar_: Mapa da cena, que sugere um mapa separado por cena.
+
+**Câmera**:
+Enquadramento do quadro sobre o mapa, que viaja, aproxima e recua ao longo do
+tempo, com cada movimento começando numa palavra da narração.
+_Evitar_: Movimento de câmera, que é a aproximação ou panorâmica aplicada a uma imagem.
+
+**Esmaecimento**:
+Estado de um item que perdeu o foco: continua no mapa, com menos destaque, enquanto
+a câmera e a narração seguem adiante.
+
+**Canal**:
+Destino de publicação ao qual cada projeto pertence, que guarda nome, marca, template
+padrão de cada formato, voz padrão e orientações próprias, sem misturá-los com os de
+outro canal.
+
+**Marca do canal**:
+Item comum que o autor decide inserir numa cena para identificar o canal, sem um
+tipo de objeto próprio.
+
+**Objeto livre**:
+Objeto visual criado sob medida pelo agente quando nenhum objeto existente serve,
+com seus ajustes expostos ao autor e restrito ao vídeo em que nasceu, salvo se for
+guardado num template.
+
 **Área segura**:
 Parte do quadro fora dos 15% inferiores e da faixa direita, onde o YouTube não
 desenha botões nem textos; as legendas do Short livre ficam nela.
@@ -60,16 +120,16 @@ Opções de título, descrição, tags, hashtags e comentário fixado que o
 roteirista entrega com um Short livre.
 
 **Bíblia visual**:
-Tom, fichas de personagem e de cenário extraídos do prompt de um Short livre,
-que servem de referência para todas as imagens geradas.
+Tom e fichas de personagem, cenário e estilo de um vídeo, que orientam a
+aparência e a continuidade das imagens e dos clipes produzidos.
 
 **Arte**:
 Papel de agente que gera as imagens de um Short livre a partir da bíblia
 visual, com Codex ou Grok.
 
 **Imagem-base**:
-Ficha de personagem ou cenário vazio gerado primeiro pela Arte e anexado como
-referência às imagens que precisam manter aquele rosto ou lugar.
+Imagem que estabelece a aparência de um personagem, cenário ou estilo e serve
+de referência às imagens e aos clipes que precisam manter essa identidade.
 _Evitar_: Imagem de referência, para não confundir com os anexos do prompt.
 
 **Lista de materiais**:
@@ -134,13 +194,103 @@ Sinalização de que um objeto visual é assunto de uma conversa entre usuário 
 agente; a marcação, por si só, não solicita uma alteração.
 
 **Proposta de alteração**:
-Mudança sugerida pelo agente para objetos visuais identificados, apresentada
+Mudança sugerida pelo agente para conteúdos identificados do projeto, apresentada
 ao usuário para aceitar ou descartar antes de substituir o conteúdo atual.
 
+**Pedido de alteração**:
+Orientação explícita do autor para o agente modificar um conteúdo ou trecho
+identificado do projeto.
+
+**Conversa com o agente**:
+Troca persistente de mensagens entre o autor e os agentes sobre um alvo do projeto,
+que continua a mesma quando muda o agente, o provedor ou a página aberta.
+_Evitar_: Chat, sessão do agente.
+
+**Alcance da conversa**:
+Item, trecho de fala, cena, sequência de cenas ou projeto inteiro a que uma
+conversa com o agente e seus pedidos se limitam.
+
+**Resumo da conversa**:
+Síntese atualizada a cada resposta de uma conversa com o agente, que permite a
+quem assume entender o assunto sem reler todas as mensagens.
+
+**Nota de passagem**:
+Registro curto deixado por um agente a cada execução, com intenção, decisões,
+pendências e o que não deve mudar, destinado a quem continuar o trabalho.
+_Evitar_: Handoff, memória do agente.
+
+**Pacote de contexto**:
+Conjunto de informações entregue a um agente em cada chamada: estado atual do
+alcance, fichas relevantes, regras de proteção humana, resumo, mensagens recentes
+e notas de passagem.
+_Evitar_: Sessão, histórico do modelo.
+
+**Pedido de versões**:
+Pedido ao agente que produz várias propostas alternativas para o mesmo alcance,
+das quais nenhuma é aplicada até o autor escolher uma ou misturá-las.
+
+**Ousadia**:
+Grau de liberdade dado ao agente ao compor um vídeo ou num pedido de versões:
+sóbrio (ritmo, câmera e ênfase), criativo (novos objetos e outra composição) ou
+ousado (quebra a composição naquele trecho).
+
+**Orientações do canal**:
+Preferências de um canal aprendidas com o que o autor aceita e descarta, entregues
+aos agentes para evitar repetir estruturas e escolhas rejeitadas naquele canal.
+
+**Operação de edição**:
+Alteração delimitada do vídeo solicitada pelo humano ou por um agente, com
+autoria identificada, que participa do histórico de edição e de desfazer/refazer.
+
+**Documento de edição**:
+Descrição editável do vídeo que reúne cenas, faixas, trechos de fala, recursos,
+tempos e efeitos, desde o storyboard até a montagem final.
+
 **Narração**:
-Texto destinado à fala que acompanha o Short, independente dos títulos e
+Texto destinado à fala que acompanha o vídeo, independente dos títulos e
 parágrafos exibidos nos objetos visuais.
 
+**Áudio de ensaio**:
+Versão provisória da fala usada para ouvir e revisar o vídeo antes da narração final.
+
+**Áudio final**:
+Versão da fala destinada à entrega final do vídeo, que substitui o áudio de ensaio.
+
+**Trecho de fala**:
+Parte identificável e inteira da narração de uma única cena, usada para gerar,
+reaproveitar ou refazer áudio; pode ser dividida ou juntada a outra dentro da cena.
+Também chamado de bloco de fala na entrevista, distinto do bloco visual.
+
+**Autorização de narração**:
+Decisão do autor de liberar um lote específico de geração paga da fala, com os
+textos, as escolhas de voz e o custo apresentados, no momento que ele escolher.
+
+**Lote de narração**:
+Conjunto identificado de trechos de fala e escolhas de voz apresentado ao autor
+para uma autorização de geração, com alcance e custo próprios.
+
+**Alinhamento da fala**:
+Correspondência entre o texto da narração e seus instantes no áudio, usada para
+sincronizar a montagem e as legendas, com origem e confiança identificadas.
+
+**Exportação final**:
+Entrega do vídeo concluído em MP4 e SRT associados à mesma revisão do projeto,
+após resolver suas pendências bloqueantes.
+
+**Ensaio de escala**:
+Produção de teste destinada a medir desempenho, consumo de memória e resposta
+da prévia em um vídeo longo, sem constituir uma entrega final.
+
+**Afirmação factual**:
+Trecho do roteiro que apresenta uma informação sobre o mundo real e pode ser
+conferido em fontes, mesmo quando aparece dentro de uma história fictícia.
+
+**Fonte de afirmação**:
+Referência vinculada a um trecho do roteiro para fundamentar ou conferir uma
+afirmação factual, sem fazer parte do conteúdo exibido no vídeo.
+
 **Legenda**:
-Texto exibido em sincronia com a narração, em uma área separada dos blocos da
-cena.
+Texto sincronizado à narração, que pode ser gravado na imagem ou entregue como
+arquivo separado. No editor atual de Shorts, ocupa uma área separada dos blocos.
+Nos vídeos com template, é um objeto dentro de um item da cena: a posição é a do
+item, definida em cada cena, e o estilo vem do template; uma cena pode não ter legenda.

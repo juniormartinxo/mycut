@@ -30,3 +30,9 @@ alterações dentro do alcance escolhido. Uma mudança de altura pode compensar
 apenas um vizinho imediato, movendo uma borda por vez. A prévia inclui esse
 ajuste de altura; a aceitação ou o descarte aplica-se ao conjunto.
 Essas regras foram confirmadas na terceira rodada da entrevista em 2026-10-15.
+
+Para o novo editor de vídeos horizontais, a
+[ADR 0009](0009-pedidos-de-correcao-com-aplicacao-direta.md) distingue pedidos
+explícitos, aplicados diretamente com desfazer, de sugestões espontâneas, que
+continuam como propostas. As regras acima permanecem vigentes para o editor
+atual de Shorts.
