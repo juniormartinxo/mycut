@@ -233,8 +233,9 @@ entre as rodadas; diferenças de até ~6% entre linhas estão dentro desse ruíd
 No mesmo critério, o motor atual é cerca de 6% mais rápido que o HTML no 9:16 (0,54× contra 0,51×), usando um
 núcleo, mas desenha uma composição bem mais simples: sem desfoque, vidro, mola nem câmera, e sem 16:9. Os
 motores em navegador entregam esses efeitos em tempo de relógio parecido, usando a máquina inteira. Na
-qualidade de codificação os três usam H.264 em 1080p com ajustes equivalentes (CRF 20 no x264, CQ 20 no
-NVENC); a diferença visível entre eles é o que cada motor consegue desenhar, não a compressão.
+qualidade de codificação os três usam H.264 em 1080p: CRF 20 no x264 (os três motores), CQ 20 no NVENC do
+motor HTML e 16 Mbit/s no NVENC do Remotion, que com aceleração por hardware só aceita taxa fixa e recusa
+CRF. A diferença visível entre eles é o que cada motor consegue desenhar, não a compressão.
 
 ### 6. Ensaio de escala de 25 min (16:9)
 
@@ -293,9 +294,22 @@ decodificado, por `ebur128` com pico verdadeiro:
 | Ensaio 25 min (HTML) | −14,1 | −1,5 dBTP | 48 kHz | aprovado (com limitador) |
 | Short real no motor atual (referência) | −17,0 | −1,5 dBTP | 48 kHz, mono | não aprovado (anterior à Q46) |
 
+Dois pontos ficam abertos para o MYC-15:
+
+- **O limitador é processamento dinâmico.** A Q46 pede medir e aplicar um ganho linear, justamente para não
+  haver processamento dinâmico. No ensaio, só o ganho linear levaria o pico acima do teto, e o arquivo passou
+  com o limitador; o efeito é pequeno (age só nos picos), mas é um desvio da decisão. As saídas são deixar mais
+  folga de pico na mixagem (voz normalizada com teto mais baixo) para o ganho linear bastar, ou o autor aceitar
+  o limitador como exceção.
+- **A prévia toca a mistura antes da masterização.** O ganho de masterização (−0,5 dB nos Shorts e no ensaio) e o
+  limitador só existem na exportação; a paridade de som foi medida descontando esse ganho. O glossário define a
+  prévia como a mesma mixagem da exportação, então o editor precisa aplicar na prévia o ganho da última medição
+  e o mesmo limitador.
+
 Voz × música na fala (`medir/partes.mjs`): a narração e a música são renderizadas separadas pelo mesmo grafo
-da exportação e comparadas pela loudness momentânea só nos instantes com fala. A música ficou 19,9 LU abaixo
-da voz no Short e 20,0 LU no ensaio: dentro da faixa de 15 a 20 LU da Q46, mas no limite. O ganho de partida
+da exportação e comparadas pela loudness momentânea só nos instantes com fala, nos primeiros 5 minutos do
+vídeo (o Short inteiro). A música ficou 19,9 LU abaixo da voz no Short e 20,0 LU nos 5 primeiros minutos do
+ensaio: dentro da faixa de 15 a 20 LU da Q46, mas no limite. O ganho de partida
 da música na fala (−18 dB) deve subir para algo como −16 dB quando virar padrão de template. Inteligibilidade,
 ducking e emendas ainda pedem escuta humana; os números não provam isso.
 

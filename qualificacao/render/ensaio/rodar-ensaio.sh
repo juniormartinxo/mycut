@@ -4,7 +4,7 @@
 # Uso: bash qualificacao/render/ensaio/rodar-ensaio.sh <narracao-qwen.wav> <palavras.json> [abas]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-NARRACAO="$1"; PALAVRAS="$2"; ABAS="${3:-6}"
+NARRACAO="$1"; PALAVRAS="$2"; ABAS="${3:-4}"   # 4 abas já saturam as 8 CPUs lógicas do hardware alvo
 E=.saida/ensaio
 sem_rede() { unshare -rn sh -c 'ip link set lo up && exec "$@"' sh "$@"; }
 mkdir -p "$E" .saida/paridade

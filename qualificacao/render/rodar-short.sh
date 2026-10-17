@@ -7,6 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 S="${1:-.saida/short}"
 sem_rede() { unshare -rn sh -c 'ip link set lo up && exec "$@"' sh "$@"; }
+mkdir -p .saida/paridade .saida/remotion-previa
 
 node_modules/.bin/esbuild motor-remotion/previa.jsx --bundle --jsx=automatic --format=iife \
   --define:process.env.NODE_ENV='"production"' --minify --outfile=.saida/remotion-previa/previa.js --log-level=warning

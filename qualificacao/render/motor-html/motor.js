@@ -150,8 +150,16 @@ function aplicar(q) {
     n.style.filter = s.desfoque > 0.01 ? `blur(${s.desfoque}px)` : 'none';
     n.style.setProperty('--brilho', item.brilho ? s.brilho : 0);
   }
-  const html = q.legenda ? q.legenda.palavras.map((w, i) => q.legenda.destaques[i] ? `<span class="destaque">${w}</span>` : w).join(' ') : '';
-  if (html !== ultimaLegenda) { legendaEl.innerHTML = html; ultimaLegenda = html; }
+  // Texto montado por nós (textContent), nunca por innerHTML: palavras com < ou & aparecem como são.
+  const chave = q.legenda ? JSON.stringify(q.legenda) : '';
+  if (chave !== ultimaLegenda) {
+    legendaEl.replaceChildren(...(q.legenda ? q.legenda.palavras.flatMap((w, i) => {
+      const parte = q.legenda.destaques[i] ? el('span', 'destaque') : document.createTextNode('');
+      parte.textContent = w;
+      return i ? [document.createTextNode(' '), parte] : [parte];
+    }) : []));
+    ultimaLegenda = chave;
+  }
   legendaEl.style.visibility = q.legenda ? 'visible' : 'hidden';
   progressoEl.style.width = `${q.progresso * 100}%`;
 }

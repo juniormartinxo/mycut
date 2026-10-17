@@ -4,17 +4,20 @@
 import { spawn } from 'node:child_process';
 import { loadavg } from 'node:os';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { bundle } from '@remotion/bundler';
 import { renderMedia, selectComposition } from '@remotion/renderer';
+import { chromium } from 'playwright-core';
 import { conferirQ46, masterizar } from '../medir/audio.mjs';
 import { vigiarMemoria } from '../medir/memoria.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-export const CHROME = join(homedir(), '.cache/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell');
+// O mesmo chrome-headless-shell que o Playwright instalado usa (a revisão vem dele); QUALIF_CHROME_BIN substitui.
+const completo = chromium.executablePath();
+export const CHROME = process.env.QUALIF_CHROME_BIN ?? join(dirname(dirname(dirname(completo))),
+  `chromium_headless_shell-${/chromium-(\d+)/.exec(completo)[1]}`, 'chrome-headless-shell-linux64', 'chrome-headless-shell');
 
 export async function empacotar(pastaMidia) {
   return bundle({ entryPoint: join(AQUI, 'src/index.jsx'), publicDir: pastaMidia, outDir: join(pastaMidia, '..', 'remotion-bundle') });

@@ -42,7 +42,7 @@ bash rodar-short.sh .saida/short
 # 3. NVENC com o caminho verificado, voz × música e determinismo (mesmos pixels em qualquer ordem)
 node medir/nvenc.mjs .saida/short/html-16x9-h264_nvenc.video.mp4 .saida/nvenc
 node medir/partes.mjs .saida/short/cena-9x16.json .saida/short/midia .saida/partes/short
-node medir/determinismo.mjs .saida/short/cena-9x16.json .saida/short/midia 40
+node medir/determinismo.mjs .saida/short/cena-9x16.json .saida/short/midia 40 > .saida/determinismo-short.json
 
 # 4. Motor atual como referência (cópia isolada dos dados; não toca o banco original)
 PYTHONPATH=../../backend python referencia-python/render.py <pasta .data> <id de um job final> .saida/referencia
