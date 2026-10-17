@@ -39,6 +39,8 @@ import { SceneEditor } from "./SceneEditor";
 import { SceneEditorDialog } from "./SceneEditorDialog";
 import { newScene } from "./sceneLayout";
 import { EndingStudio } from "./EndingStudio";
+import { EditTimeline } from "./EditTimeline";
+import { HorizontalProjects } from "./HorizontalProjects";
 import { FormatPicker, RenderedScene, initialStyle } from "./FormatPicker";
 import { money, ProjectCosts, tokens } from "./ProjectCosts";
 import { SettingsMenu } from "./SettingsMenu";
@@ -315,7 +317,13 @@ export default function App() {
             <Notice error>{error}</Notice>
           </div>
         )}
-        {loading ? (
+        {route.editId ? (
+          <EditTimeline
+            key={route.editId}
+            id={route.editId}
+            onBack={() => select(null)}
+          />
+        ) : loading ? (
           <div className="loading">
             <LoaderCircle className="spin" />
             Abrindo seu estúdio…
@@ -489,6 +497,11 @@ export default function App() {
                   detail="Tente buscar por outra palavra do título."
                 />
               )}
+            <HorizontalProjects
+              onOpen={(id) =>
+                navigate({ page: "projects", projectId: null, editId: id })
+              }
+            />
             <div className="library-bottom">
               <span>
                 <Film size={17} /> Animações, fluxos e histórias que explicam.

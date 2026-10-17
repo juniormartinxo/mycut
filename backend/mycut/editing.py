@@ -1,0 +1,751 @@
+"""Editing document of a horizontal project and the operations that change it (ADR 0014).
+
+Humans and agents change the document only through operations: one request is validated, applied and recorded in
+the history inside the same transaction, and is undone as a whole. The history keeps, for each entity it touched,
+the value before and after, so undo and redo restore exactly those entities and survive a restart.
+"""
+import copy
+import json
+import math
+import time
+from typing import Annotated, Any, Literal, Union
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from . import store
+from .models import ElevenSettings
+
+SCHEMA_VERSION = 1
+# Contents of the timeline (ADR 0006); a project starts with one track of each.
+TRACKS = {'visual': 'Visuais', 'text': 'Textos', 'narration': 'Narração', 'music': 'Música', 'effects': 'Efeitos'}
+AUDIO = {'narration', 'music', 'effects'}
+# What an item shows until it has its own choice; templates (MYC-25) will be the source of these values (Q65).
+TEMPLATE = {
+    'visual': {'opacity': 1.0, 'fit': 'cover'},
+    'text': {'opacity': 1.0, 'color': '#ffffff', 'font_family': 'Manrope', 'font_size': 64, 'align': 'center'},
+    'audio': {'volume': 1.0},
+}
+# Composition space (Q64): items may sit past the frame, but not at absurd distances.
+SPACE_LIMIT = 100_000
+LONGEST = 6 * 3600 * 1000
+
+EntityId = Annotated[str, StringConstraints(pattern=r'^[a-z0-9][a-z0-9_-]{0,63}$')]
+Hash = Annotated[str, StringConstraints(pattern=r'^[a-f0-9]{64}$')]
+Text = Annotated[str, StringConstraints(max_length=2000)]
+Ms = Annotated[int, Field(ge=0, le=LONGEST)]
+Length = Annotated[int, Field(ge=1, le=LONGEST)]
+Coordinate = Annotated[float, Field(ge=-SPACE_LIMIT, le=SPACE_LIMIT, allow_inf_nan=False)]
+Size = Annotated[float, Field(gt=0, le=SPACE_LIMIT, allow_inf_nan=False)]
+
+
+class Strict(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+
+class Author(Strict):
+    kind: Literal['human', 'agent']
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+
+
+class Format(Strict):
+    """Proportion, resolution and fps belong to the project (Q34): 16:9 is the default, not a rule."""
+    width: int = Field(default=1920, ge=16, le=7680)
+    height: int = Field(default=1080, ge=16, le=7680)
+    fps: int = Field(default=30, ge=1, le=120)
+
+
+class Geometry(Strict):
+    """Position and size in the composition space, in pixels of the frame; the frame is the default framing."""
+    x: Coordinate
+    y: Coordinate
+    width: Size
+    height: Size
+
+
+class NewScene(Strict):
+    id: EntityId | None = None
+    title: Annotated[str, StringConstraints(max_length=100)] = ''
+    duration_ms: Length = 5000
+
+
+class AddScene(Strict):
+    op: Literal['add_scene']
+    scene: NewScene = Field(default_factory=NewScene)
+    index: int | None = Field(default=None, ge=0)
+
+
+class UpdateScene(Strict):
+    op: Literal['update_scene']
+    scene_id: EntityId
+    title: Annotated[str, StringConstraints(max_length=100)] | None = None
+    duration_ms: Length | None = None
+
+
+class MoveScene(Strict):
+    op: Literal['move_scene']
+    scene_id: EntityId
+    index: int = Field(ge=0)
+
+
+class RemoveScene(Strict):
+    op: Literal['remove_scene']
+    scene_id: EntityId
+
+
+class NewTrack(Strict):
+    id: EntityId | None = None
+    kind: Literal['visual', 'text', 'narration', 'music', 'effects']
+    name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)] = ''
+
+
+class AddTrack(Strict):
+    op: Literal['add_track']
+    track: NewTrack
+    index: int | None = Field(default=None, ge=0)
+
+
+class RemoveTrack(Strict):
+    op: Literal['remove_track']
+    track_id: EntityId
+
+
+class ItemFields(Strict):
+    track_id: EntityId | None = None
+    scene_id: EntityId | None = None
+    start_ms: Ms | None = None
+    duration_ms: Length | None = None
+    # Trim at the start of the media: the moment of the resource shown when the item begins.
+    source_start_ms: Ms | None = None
+    # Visual order: higher layers are drawn over lower ones.
+    layer: int | None = Field(default=None, ge=-1000, le=1000)
+    geometry: Geometry | None = None
+    text: Text | None = None
+    resource: Hash | None = None
+
+
+class NewItem(ItemFields):
+    id: EntityId | None = None
+    track_id: EntityId
+    start_ms: Ms
+    duration_ms: Length
+    style: dict[str, Any] = Field(default_factory=dict)
+
+
+class AddItem(Strict):
+    op: Literal['add_item']
+    item: NewItem
+
+
+class UpdateItem(Strict):
+    op: Literal['update_item']
+    item_id: EntityId
+    changes: ItemFields
+
+
+class SetStyle(Strict):
+    """A value records the choice of that property only; null removes it and the item inherits again (Q65)."""
+    op: Literal['set_style']
+    item_id: EntityId
+    values: dict[str, Any] = Field(min_length=1, max_length=20)
+
+
+class SplitItem(Strict):
+    op: Literal['split_item']
+    item_id: EntityId
+    at_ms: Ms
+    new_id: EntityId | None = None
+
+
+class RemoveItem(Strict):
+    op: Literal['remove_item']
+    item_id: EntityId
+
+
+class AddResource(Strict):
+    op: Literal['add_resource']
+    hash: Hash
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+
+class RemoveResource(Strict):
+    op: Literal['remove_resource']
+    hash: Hash
+
+
+class UpdateProject(Strict):
+    """Own choices of the project; null goes back to the channel's (ADR 0018)."""
+    op: Literal['update_project']
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)] | None = None
+    format: Format | None = None
+    channel_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)] | None = None
+    brand: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = None
+    # Checked against the connected ElevenLabs account by the HTTP adapter, as a channel's voice.
+    voice: ElevenSettings | None = None
+
+
+Operation = Annotated[Union[AddScene, UpdateScene, MoveScene, RemoveScene, AddTrack, RemoveTrack, AddItem, UpdateItem,
+                            SetStyle, SplitItem, RemoveItem, AddResource, RemoveResource, UpdateProject],
+                      Field(discriminator='op')]
+
+
+class EditRequest(Strict):
+    revision: int = Field(ge=1)
+    author: Author
+    label: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] = ''
+    operations: list[Operation] = Field(min_length=1, max_length=500)
+    # Entities the request may change, when its author limited it (alcance); new entities are always allowed.
+    scope: list[EntityId] | None = Field(default=None, max_length=500)
+    # An explicit request to replace the author's choices (Q13); without it they stay protected.
+    replace_human: bool = False
+
+
+class HistoryRequest(Strict):
+    revision: int = Field(ge=1)
+    author: Author
+
+
+class CreateRequest(Strict):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] = ''
+    channel_id: str | None = None
+    format: Format = Field(default_factory=Format)
+    author: Author
+
+
+LABELS = {'add_scene': 'Adicionar cena', 'update_scene': 'Alterar cena', 'move_scene': 'Mover cena',
+          'remove_scene': 'Remover cena', 'add_track': 'Adicionar faixa', 'remove_track': 'Remover faixa',
+          'add_item': 'Inserir item', 'update_item': 'Alterar item', 'set_style': 'Alterar estilo',
+          'split_item': 'Cortar item', 'remove_item': 'Remover item', 'add_resource': 'Importar recurso',
+          'remove_resource': 'Remover recurso', 'update_project': 'Alterar projeto'}
+COLLECTIONS = {'scene': 'scenes', 'track': 'tracks', 'item': 'items', 'resource': 'resources'}
+PROJECT_FIELDS = ('title', 'format', 'channel_name', 'brand', 'voice')
+FIELD_NAMES = {'track_id': 'a faixa', 'scene_id': 'a cena', 'start_ms': 'o início', 'duration_ms': 'a duração',
+               'source_start_ms': 'o recorte', 'layer': 'a ordem visual', 'geometry': 'a posição e o tamanho',
+               'text': 'o texto', 'resource': 'a mídia'}
+
+
+def blank(title, format, channel_id):
+    return {'schema_version': SCHEMA_VERSION, 'revision': 1, 'title': title or 'Novo vídeo', 'channel_id': channel_id,
+            'format': format, 'channel_name': None, 'brand': None, 'voice': None,
+            'scenes': [{'id': store.uid(), 'title': 'Cena 1', 'duration_ms': 5000}],
+            'tracks': [{'id': store.uid(), 'kind': kind, 'name': name} for kind, name in TRACKS.items()],
+            'items': [], 'resources': []}
+
+
+def create(body: CreateRequest):
+    channel_id = body.channel_id or store.DEFAULT_CHANNEL
+    try:
+        store.get_channel(channel_id)
+    except store.Missing:
+        raise ValueError('Escolha um canal existente para o projeto.') from None
+    project_id, now = store.uid(), time.time()
+    document = blank(body.title, body.format.model_dump(), channel_id)
+    with store.connect() as db:
+        db.execute('INSERT INTO edit_projects VALUES(?,?,?,?)', (project_id, dump(document), now, now))
+        record(db, project_id, 'create', 1, body.author.model_dump(), 'Criar projeto', [], [])
+    return get(project_id)
+
+
+def dump(value):
+    return json.dumps(value, ensure_ascii=False)
+
+
+def row_document(row):
+    if row is None:
+        raise store.Missing('Projeto não encontrado.')
+    return json.loads(row['document'])
+
+
+def record(db, project_id, kind, revision, author, label, targets, changes, state='done', ref=None):
+    seq = db.execute('SELECT COALESCE(MAX(seq),0)+1 FROM edit_history WHERE project_id=?', (project_id,)).fetchone()[0]
+    entry_id = store.uid()
+    db.execute('INSERT INTO edit_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+               (entry_id, project_id, seq, revision, kind, state, dump(author), label, dump(targets), dump(changes),
+                dump(sorted(change_resources(changes))), ref, time.time()))
+    return entry_id
+
+
+def change_resources(changes):
+    return {value['hash'] for change in changes if change['kind'] == 'resource'
+            for value in (change['before'], change['after']) if value}
+
+
+def get(project_id):
+    with store.connect() as db:
+        row = db.execute('SELECT * FROM edit_projects WHERE id=?', (project_id,)).fetchone()
+        document = row_document(row)
+        undo, redo = undoable(db, project_id), redoable(db, project_id)
+    return present(document, row, undo, redo)
+
+
+def all_projects():
+    with store.connect() as db:
+        rows = db.execute('SELECT * FROM edit_projects ORDER BY updated_at DESC').fetchall()
+    return [summary(row_document(row), row) for row in rows]
+
+
+def summary(document, row):
+    channel = store.get_channel(document['channel_id'])
+    return {'id': row['id'], 'title': document['title'], 'format': document['format'], 'revision': document['revision'],
+            'scenes': len(document['scenes']), 'duration_ms': duration(document),
+            'channel': {key: channel[key] for key in ('id', 'name', 'brand')}, 'updated_at': row['updated_at']}
+
+
+def duration(document):
+    scenes = sum(scene['duration_ms'] for scene in document['scenes'])
+    return max([scenes, *(item['start_ms'] + item['duration_ms'] for item in document['items'])])
+
+
+def aspect(width, height):
+    divisor = math.gcd(width, height)
+    return f'{width // divisor}:{height // divisor}'
+
+
+def present(document, row, undo=None, redo=None):
+    project = copy.deepcopy(document)
+    channel = store.get_channel(document['channel_id'])
+    project.update(id=row['id'], created_at=row['created_at'], updated_at=row['updated_at'])
+    project['channel'] = {key: channel[key] for key in ('id', 'name', 'brand', 'voice')}
+    own = {'channel_name': document['channel_name'], 'brand': document['brand'], 'voice': document['voice']}
+    fallback = {'channel_name': channel['name'], 'brand': channel['brand'], 'voice': channel['voice']}
+    project['inherited'] = {key: {'value': fallback[key] if own[key] is None else own[key], 'inherited': own[key] is None}
+                            for key in own}
+    width, height = document['format']['width'], document['format']['height']
+    project['aspect'] = aspect(width, height)
+    # Horizontal videos keep the framing still on the frame; the camera of MYC-24 will move it over the space.
+    project['framing'] = {'x': 0, 'y': 0, 'width': width, 'height': height}
+    start = 0
+    for scene in project['scenes']:
+        scene['start_ms'] = start
+        start += scene['duration_ms']
+    kinds = {track['id']: track['kind'] for track in document['tracks']}
+    for item in project['items']:
+        item['resolved_style'] = resolved_style(item, kinds[item['track_id']])
+        item['in_frame'] = placement(item.get('geometry'), width, height)
+    project['duration_ms'] = duration(document)
+    project['undo'] = undo and {'label': undo['label'], 'author': json.loads(undo['author'])}
+    project['redo'] = redo and {'label': redo['label'], 'author': json.loads(redo['author'])}
+    return project
+
+
+def style_group(kind):
+    return 'audio' if kind in AUDIO else kind
+
+
+def resolved_style(item, kind):
+    inherited = TEMPLATE[style_group(kind)]
+    return {name: {'value': item['style'].get(name, value), 'inherited': name not in item['style']}
+            for name, value in inherited.items()}
+
+
+def placement(geometry, width, height):
+    if geometry is None:
+        return None
+    left, top = max(geometry['x'], 0), max(geometry['y'], 0)
+    right, bottom = min(geometry['x'] + geometry['width'], width), min(geometry['y'] + geometry['height'], height)
+    if right <= left or bottom <= top:
+        return 'outside'
+    inside = geometry['x'] >= 0 and geometry['y'] >= 0 and geometry['x'] + geometry['width'] <= width \
+        and geometry['y'] + geometry['height'] <= height
+    return 'inside' if inside else 'partial'
+
+
+def undoable(db, project_id):
+    """The latest request still applied; undo walks the history back one request at a time."""
+    return db.execute("SELECT * FROM edit_history WHERE project_id=? AND kind='apply' AND state='done' "
+                      "ORDER BY seq DESC LIMIT 1", (project_id,)).fetchone()
+
+
+def redoable(db, project_id):
+    # The undone requests form a stack: the earliest of them was the last one undone.
+    return db.execute("SELECT * FROM edit_history WHERE project_id=? AND kind='apply' AND state='undone' "
+                      "ORDER BY seq LIMIT 1", (project_id,)).fetchone()
+
+
+def history(project_id):
+    with store.connect() as db:
+        row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+        rows = db.execute('SELECT * FROM edit_history WHERE project_id=? ORDER BY seq', (project_id,)).fetchall()
+    return {'entries': [{'id': row['id'], 'revision': row['revision'], 'kind': row['kind'], 'state': row['state'],
+                         'author': json.loads(row['author']), 'label': row['label'], 'targets': json.loads(row['targets']),
+                         'created_at': row['created_at']} for row in rows]}
+
+
+STYLE_RULES = {
+    'opacity': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1,
+    'volume': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 2,
+    'font_size': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 8 <= v <= 400,
+    'fit': lambda v: v in ('cover', 'contain'),
+    'align': lambda v: v in ('left', 'center', 'right'),
+    'color': lambda v: isinstance(v, str) and len(v) == 7 and v[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in v[1:]),
+    'font_family': lambda v: isinstance(v, str) and 0 < len(v.strip()) <= 150,
+}
+NAMES = {'scene': 'A cena', 'track': 'A faixa', 'item': 'O item', 'resource': 'O recurso'}
+
+
+def key(kind):
+    return 'hash' if kind == 'resource' else 'id'
+
+
+def locate(document, kind, entity_id):
+    if kind == 'project':
+        return 0, {field: document[field] for field in PROJECT_FIELDS}
+    for index, value in enumerate(document[COLLECTIONS[kind]]):
+        if value[key(kind)] == entity_id:
+            return index, value
+    return None, None
+
+
+class Draft:
+    """A working copy of the document that one request changes; nothing is saved unless every operation passes."""
+
+    def __init__(self, document, author, replace_human, db):
+        self.original, self.doc = document, copy.deepcopy(document)
+        self.author, self.replace_human, self.db = author, replace_human, db
+        self.touched = {}
+
+    def find(self, kind, entity_id):
+        index, value = locate(self.doc, kind, entity_id)
+        if value is None:
+            raise ValueError(f'{NAMES[kind]} {entity_id} não existe neste projeto.')
+        self.touched[kind, entity_id] = True
+        return index, value
+
+    def new_id(self, wanted):
+        entity_id = wanted or store.uid()
+        if any(locate(self.doc, kind, entity_id)[1] is not None for kind in ('scene', 'track', 'item')):
+            raise ValueError(f'Já existe um conteúdo com o identificador {entity_id}.')
+        return entity_id
+
+    def insert(self, kind, value, index=None):
+        values = self.doc[COLLECTIONS[kind]]
+        values.insert(len(values) if index is None else min(index, len(values)), value)
+        self.touched[kind, value[key(kind)]] = True
+
+    def remove(self, kind, entity_id):
+        index, _ = self.find(kind, entity_id)
+        del self.doc[COLLECTIONS[kind]][index]
+
+    def track_kind(self, track_id):
+        _, track = locate(self.doc, 'track', track_id)
+        if track is None:
+            raise ValueError(f'A faixa {track_id} não existe neste projeto.')
+        return track['kind']
+
+    def claim(self, item, field):
+        """Who changes a field of an item; a choice of the author stays protected from the agents (Q13, ADR 0009)."""
+        item['last_author'] = self.author
+        if self.author['kind'] == 'human':
+            item['human'] = sorted({*item['human'], field})
+        elif field in item['human']:
+            if not self.replace_human:
+                name = FIELD_NAMES.get(field) or f'o estilo {field.removeprefix("style.")}'
+                raise store.Conflict(f'O autor escolheu {name} do item {item["id"]}. Para substituir, faça um pedido explícito.')
+            item['human'] = [f for f in item['human'] if f != field]
+
+    def check_item(self, item):
+        kind = self.track_kind(item['track_id'])
+        if item['scene_id'] is not None and locate(self.doc, 'scene', item['scene_id'])[1] is None:
+            raise ValueError(f'A cena {item["scene_id"]} não existe neste projeto.')
+        if item['resource'] is not None and locate(self.doc, 'resource', item['resource'])[1] is None:
+            raise ValueError('Importe o recurso no projeto antes de usá-lo num item.')
+        if kind in AUDIO and item['geometry'] is not None:
+            raise ValueError('Itens de áudio não têm posição nem tamanho.')
+        if kind not in AUDIO and item['geometry'] is None:
+            raise ValueError('Itens visuais e de texto precisam de posição e tamanho.')
+        if item['text'] is not None and kind != 'text':
+            raise ValueError('Somente itens de texto têm texto.')
+        return kind
+
+    def check_style(self, kind, name, value):
+        if name not in TEMPLATE[style_group(kind)]:
+            raise ValueError(f'O estilo {name} não vale para itens desta faixa.')
+        if value is not None and not STYLE_RULES[name](value):
+            raise ValueError(f'Valor inválido para o estilo {name}.')
+
+    def run(self, op):
+        getattr(self, op.op)(op)
+
+    def add_scene(self, op):
+        self.insert('scene', {'id': self.new_id(op.scene.id), 'title': op.scene.title, 'duration_ms': op.scene.duration_ms}, op.index)
+
+    def update_scene(self, op):
+        _, scene = self.find('scene', op.scene_id)
+        for field in ('title', 'duration_ms'):
+            if getattr(op, field) is not None:
+                scene[field] = getattr(op, field)
+
+    def move_scene(self, op):
+        index, scene = self.find('scene', op.scene_id)
+        del self.doc['scenes'][index]
+        self.insert('scene', scene, op.index)
+
+    def remove_scene(self, op):
+        self.find('scene', op.scene_id)
+        if len(self.doc['scenes']) == 1:
+            raise ValueError('O projeto precisa de ao menos uma cena.')
+        if any(item['scene_id'] == op.scene_id for item in self.doc['items']):
+            raise ValueError('Remova ou desagrupe os itens da cena antes de removê-la.')
+        self.remove('scene', op.scene_id)
+
+    def add_track(self, op):
+        self.insert('track', {'id': self.new_id(op.track.id), 'kind': op.track.kind,
+                              'name': op.track.name or TRACKS[op.track.kind]}, op.index)
+
+    def remove_track(self, op):
+        self.find('track', op.track_id)
+        if any(item['track_id'] == op.track_id for item in self.doc['items']):
+            raise ValueError('Remova os itens da faixa antes de removê-la.')
+        self.remove('track', op.track_id)
+
+    def add_item(self, op):
+        given = op.item.model_dump(exclude={'id', 'style'})
+        item = {**given, 'id': self.new_id(op.item.id), 'source_start_ms': op.item.source_start_ms or 0,
+                'layer': op.item.layer or 0, 'style': {}, 'last_author': self.author, 'human': []}
+        if item['geometry'] is None and self.track_kind(item['track_id']) not in AUDIO:
+            # The frame is the default framing (Q64).
+            item['geometry'] = {'x': 0, 'y': 0, 'width': self.doc['format']['width'], 'height': self.doc['format']['height']}
+        kind = self.check_item(item)
+        for name, value in op.item.style.items():
+            self.check_style(kind, name, value)
+            if value is not None:
+                item['style'][name] = value
+        if self.author['kind'] == 'human':
+            chosen = (op.item.model_fields_set - {'id', 'style'}) | {'start_ms', 'duration_ms'}
+            item['human'] = sorted(chosen | {f'style.{name}' for name in item['style']})
+        self.insert('item', item)
+
+    def update_item(self, op):
+        _, item = self.find('item', op.item_id)
+        before = self.track_kind(item['track_id'])
+        for field in sorted(op.changes.model_fields_set):
+            value = getattr(op.changes, field)
+            if value is None and field not in ('scene_id', 'geometry', 'text', 'resource'):
+                raise ValueError(f'Informe {FIELD_NAMES[field]} do item.')
+            self.claim(item, field)
+            item[field] = value.model_dump() if isinstance(value, BaseModel) else value
+        if style_group(self.check_item(item)) != style_group(before):
+            raise ValueError('Um item só muda para uma faixa do mesmo tipo de conteúdo.')
+
+    def set_style(self, op):
+        _, item = self.find('item', op.item_id)
+        kind = self.track_kind(item['track_id'])
+        for name, value in op.values.items():
+            self.check_style(kind, name, value)
+            self.claim(item, f'style.{name}')
+            if value is None:
+                item['style'].pop(name, None)
+            else:
+                item['style'][name] = value
+
+    def split_item(self, op):
+        _, item = self.find('item', op.item_id)
+        end = item['start_ms'] + item['duration_ms']
+        if not item['start_ms'] < op.at_ms < end:
+            raise ValueError('Corte o item num instante entre o início e o fim dele.')
+        self.claim(item, 'duration_ms')
+        rest = copy.deepcopy(item)
+        item['duration_ms'] = op.at_ms - item['start_ms']
+        rest.update(id=self.new_id(op.new_id), start_ms=op.at_ms, duration_ms=end - op.at_ms,
+                    source_start_ms=item['source_start_ms'] + item['duration_ms'])
+        self.insert('item', rest)
+
+    def remove_item(self, op):
+        _, item = self.find('item', op.item_id)
+        if self.author['kind'] == 'agent' and item['human'] and not self.replace_human:
+            raise store.Conflict(f'O item {item["id"]} tem escolhas do autor. Para removê-lo, faça um pedido explícito.')
+        self.remove('item', op.item_id)
+
+    def add_resource(self, op):
+        row = self.db.execute('SELECT * FROM resources WHERE hash=?', (op.hash,)).fetchone()
+        if row is None:
+            raise ValueError('O recurso não está no acervo.')
+        if locate(self.doc, 'resource', op.hash)[1] is not None:
+            raise ValueError('Este recurso já está no projeto.')
+        self.insert('resource', {'hash': op.hash, 'name': op.name, 'media_type': row['media_type'], 'size': row['size']})
+
+    def remove_resource(self, op):
+        self.find('resource', op.hash)
+        if any(item['resource'] == op.hash for item in self.doc['items']):
+            raise ValueError('O recurso ainda é usado por um item da timeline.')
+        self.remove('resource', op.hash)
+
+    def update_project(self, op):
+        self.touched['project', None] = True
+        for field in op.model_fields_set - {'op'}:
+            value = getattr(op, field)
+            if value is None and field in ('title', 'format'):
+                raise ValueError('Informe o título e o formato do projeto.')
+            self.doc[field] = value.model_dump() if isinstance(value, BaseModel) else value
+
+    def changes(self):
+        """Before and after of each entity the request touched, in the order of the document."""
+        result = []
+        for kind, entity_id in self.touched:
+            index_before, before = locate(self.original, kind, entity_id)
+            index_after, after = locate(self.doc, kind, entity_id)
+            if (before, index_before) != (after, index_after):
+                result.append({'kind': kind, 'id': entity_id, 'before': copy.deepcopy(before), 'after': copy.deepcopy(after),
+                               'index_before': index_before, 'index_after': index_after})
+        return result
+
+
+def restore(document, changes, side):
+    """Put back each changed entity as it was on one side of a request; the others keep their relative order."""
+    for kind, collection in COLLECTIONS.items():
+        mine = [c for c in changes if c['kind'] == kind]
+        if not mine:
+            continue
+        ids = {c['id'] for c in mine}
+        values = [v for v in document[collection] if v[key(kind)] not in ids]
+        for change in sorted((c for c in mine if c[side] is not None), key=lambda c: c[f'index_{side}']):
+            values.insert(change[f'index_{side}'], copy.deepcopy(change[side]))
+        document[collection] = values
+    for change in changes:
+        if change['kind'] == 'project':
+            document.update(copy.deepcopy(change[side]))
+
+
+def locked(db, project_id, revision):
+    db.execute('BEGIN IMMEDIATE')
+    document = row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+    if document['revision'] != revision:
+        raise store.Conflict('O projeto mudou depois que você o abriu. Atualize-o antes de editar.')
+    return document
+
+
+def save(db, project_id, document):
+    document['revision'] += 1
+    db.execute('UPDATE edit_projects SET document=?, updated_at=? WHERE id=?', (dump(document), time.time(), project_id))
+    return document['revision']
+
+
+def apply(project_id, body: EditRequest):
+    """Validate, apply and record one request atomically; a refused request leaves the document as it was."""
+    author = body.author.model_dump()
+    with store.connect() as db:
+        document = locked(db, project_id, body.revision)
+        draft = Draft(document, author, body.replace_human, db)
+        for operation in body.operations:
+            draft.run(operation)
+        changes = draft.changes()
+        if body.scope is not None:
+            outside = [c['id'] or 'project' for c in changes if c['before'] is not None and (c['id'] or 'project') not in body.scope]
+            if outside:
+                raise ValueError(f'O pedido alcança conteúdos fora do seu alcance: {", ".join(outside)}.')
+        if not changes:
+            raise ValueError('O pedido não altera o projeto.')
+        revision = save(db, project_id, draft.doc)
+        # A new request after undo closes the way back to what was undone.
+        db.execute("UPDATE edit_history SET state='discarded' WHERE project_id=? AND kind='apply' AND state='undone'", (project_id,))
+        label = body.label or (LABELS[body.operations[0].op] if len(body.operations) == 1 else 'Alterações')
+        record(db, project_id, 'apply', revision, author, label, [c['id'] or 'project' for c in changes], changes)
+    return get(project_id)
+
+
+def step_back(project_id, body: HistoryRequest, redo=False):
+    """Undo or redo one whole request; the step itself is a new revision with its own author in the history."""
+    with store.connect() as db:
+        document = locked(db, project_id, body.revision)
+        entry = (redoable if redo else undoable)(db, project_id)
+        if entry is None:
+            raise store.Conflict('Não há o que refazer.' if redo else 'Não há o que desfazer.')
+        changes = json.loads(entry['changes'])
+        restore(document, changes, 'after' if redo else 'before')
+        revision = save(db, project_id, document)
+        db.execute('UPDATE edit_history SET state=? WHERE id=?', ('done' if redo else 'undone', entry['id']))
+        swapped = changes if redo else [c | {'before': c['after'], 'after': c['before'], 'index_before': c['index_after'],
+                                             'index_after': c['index_before']} for c in changes]
+        record(db, project_id, 'redo' if redo else 'undo', revision, body.author.model_dump(), entry['label'],
+               json.loads(entry['targets']), swapped, ref=entry['id'])
+    return get(project_id)
+
+
+def references(db):
+    """Who still needs each content: a project's document or its preserved history (ADR 0015)."""
+    found = {}
+    for row in db.execute('SELECT id, document FROM edit_projects'):
+        for resource in json.loads(row['document'])['resources']:
+            found.setdefault(resource['hash'], {}).setdefault(row['id'], set()).add('document')
+    for row in db.execute('SELECT project_id, resources FROM edit_history'):
+        for digest in json.loads(row['resources']):
+            found.setdefault(digest, {}).setdefault(row['project_id'], set()).add('history')
+    return found
+
+
+def import_resource(project_id, revision, author, stream, name, declared):
+    """Keep the file in the shared library and reference it from the project through an operation."""
+    from . import resources
+    with resources.LOCK:
+        with store.connect() as db:
+            row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+            digest, _, created = resources.keep(db, stream, declared)
+        try:
+            if any(r['hash'] == digest for r in get(project_id)['resources']):
+                return get(project_id)
+            return apply(project_id, EditRequest(revision=revision, author=author, operations=[
+                AddResource(op='add_resource', hash=digest, name=name)]))
+        except BaseException:
+            with store.connect() as db:
+                if created and digest not in references(db):
+                    resources.forget(db, [digest])
+            raise
+
+
+def library():
+    with store.connect() as db:
+        found = references(db)
+        titles = {row['id']: json.loads(row['document'])['title'] for row in db.execute('SELECT id, document FROM edit_projects')}
+        rows = db.execute('SELECT * FROM resources ORDER BY created_at').fetchall()
+    listed = [{'hash': row['hash'], 'size': row['size'], 'media_type': row['media_type'],
+               'references': [{'project_id': pid, 'title': titles[pid], 'document': 'document' in where, 'history': 'history' in where}
+                              for pid, where in sorted(found.get(row['hash'], {}).items())]} for row in rows]
+    return {'resources': listed, 'total_bytes': sum(r['size'] for r in listed)}
+
+
+def resource_file(project_id, digest):
+    from . import resources
+    with store.connect() as db:
+        row = db.execute('SELECT media_type FROM resources WHERE hash=?', (digest,)).fetchone()
+        if row is None or project_id not in references(db).get(digest, {}):
+            raise store.Missing('Recurso não encontrado neste projeto.')
+    return resources.path(digest), row['media_type']
+
+
+class CleanupRequest(Strict):
+    kind: Literal['history']
+    revision: int = Field(ge=1)
+    author: Author
+
+
+def history_only(found, project_id):
+    """Contents that only this project's history keeps: what deleting that history really frees."""
+    return [digest for digest, users in found.items() if users == {project_id: {'history'}}]
+
+
+def storage(project_id):
+    with store.connect() as db:
+        document = row_document(db.execute('SELECT document FROM edit_projects WHERE id=?', (project_id,)).fetchone())
+        found = references(db)
+        sizes = {row['hash']: row['size'] for row in db.execute('SELECT hash, size FROM resources')}
+        entries = db.execute("SELECT COUNT(*) FROM edit_history WHERE project_id=?", (project_id,)).fetchone()[0]
+    names = {r['hash']: r['name'] for r in document['resources']}
+    mine = {digest: users for digest, users in found.items() if project_id in users and digest in sizes}
+    listed = [{'hash': digest, 'name': names.get(digest), 'size': sizes[digest], 'in_document': 'document' in users[project_id],
+               'in_history': 'history' in users[project_id], 'other_projects': len(users) - 1}
+              for digest, users in sorted(mine.items())]
+    return {'referenced_bytes': sum(r['size'] for r in listed),
+            'shared_bytes': sum(r['size'] for r in listed if r['other_projects']),
+            'resources': listed,
+            'cleanups': [{'kind': 'history', 'label': 'Apagar o histórico de edição', 'entries': entries,
+                          'frees_bytes': sum(sizes[d] for d in history_only(mine, project_id))}]}
+
+
+def cleanup(project_id, body: CleanupRequest):
+    """Only by the author's choice (Q40): the history goes, the document stays, and so does every content still used."""
+    from . import resources
+    with resources.LOCK:
+        with store.connect() as db:
+            locked(db, project_id, body.revision)
+            freeable = history_only(references(db), project_id)
+            db.execute('DELETE FROM edit_history WHERE project_id=?', (project_id,))
+            record(db, project_id, 'cleanup', body.revision, body.author.model_dump(), 'Apagar o histórico de edição', [], [])
+            freed = resources.forget(db, freeable)
+    return {'freed_bytes': freed, 'project': get(project_id), 'storage': storage(project_id)}

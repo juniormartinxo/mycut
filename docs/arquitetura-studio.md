@@ -5,7 +5,7 @@ O MyCut usa React/Vite, FastAPI e um worker Python sequencial. API e worker roda
 ```mermaid
 flowchart LR
   UI[React / Vite] --> API[FastAPI]
-  API --> DB[(SQLite: canais, projetos, jobs e etapas)]
+  API --> DB[(SQLite: canais, projetos, jobs, etapas e documentos de edição)]
   Worker[Worker Python] --> DB
   Worker --> Pipeline[Pesquisa → Roteiro → Direção → Conferência]
   Pipeline --> Bridge[Fila em .data/agent-bridge]
@@ -22,6 +22,8 @@ flowchart LR
 - `store.py`: SQLite WAL, canais (o padrão é criado e recebe os projetos sem canal ao iniciar), controle de revisão, um job ativo por projeto, entrada inicial imutável em `job_inputs`, checkpoints e etapas. Configurações públicas ficam no snapshot; a chave ElevenLabs nunca entra nele.
 - `api.py`: canais, projetos, fila, uploads, conexões e exports. Um projeto novo copia a marca e a voz do seu canal. Retorna indicação de chave conectada, nunca o segredo. Catálogo de vozes/modelos vem da conta real.
 - `integrations.py`: configurações persistidas atomicamente em `.data/private/integrations.json`, arquivo 0600 e diretório 0700. Segredos locais não são criptografados em disco; o backup completo de `.data` os contém.
+- `editing.py` e `edit_api.py`: documento de edição dos projetos horizontais (ADR 0014), em tabelas próprias, separado dos Shorts. Cada pedido de operações é validado, aplicado e registrado no histórico na mesma transação, com autoria, revisão esperada e alcance opcional. O histórico guarda o antes e o depois de cada entidade tocada; desfazer e refazer restauram o pedido inteiro. Escolhas humanas ficam marcadas no item e o agente só as substitui com pedido explícito. Geometria em pixels do espaço de composição, que pode passar do quadro; estilo grava só as escolhas e herda o resto do template.
+- `resources.py`: acervo de Recursos por SHA-256 em `.data/resources`, compartilhado entre projetos (ADR 0015). As referências vêm dos documentos e dos históricos; apagar o histórico de um projeto só remove arquivos que nada mais referencia.
 - `bridge.py` e `agent_runner.py`: solicitações JSON com prazo, lease e resposta atômica. O executor usa diretório temporário, sem shell para montar comandos, ferramentas restritas à pesquisa quando solicitada e sem autoaprovação ampla. Os logins continuam no host. CLI disponível não implica autenticação válida.
 - `pipeline.py`: contratos Pydantic para pesquisa, roteiro, direção e conferência. Falha fechada para pesquisa inacessível, esquema inválido ou revisão reprovada duas vezes. Salva artefatos editoriais por tentativa. O Short livre segue `free.py`: roteiro antes, pesquisa só para as afirmações listadas, direção em planos com reparo após uma correção, e conferência de fidelidade que salva o trabalho e para antes da voz quando reprova (ADR 0005). A capa é renderizada geometricamente a partir do conceito do agente.
 - `elevenlabs.py`: catálogo e uma chamada de síntese com timestamps, sem retry pago automático. Valida áudio, normaliza volume e converte tempos de caracteres em palavras. Cenas e legendas reutilizam esse alinhamento por hash.
@@ -38,6 +40,7 @@ flowchart LR
   agent-bridge/
     heartbeat.json
     requests/<id>/request.json, response.json, lease, cli.log, cli-error.log
+  resources/<hash[:2]>/<hash>     acervo por conteúdo dos projetos horizontais
   projects/<id>/
     uploads/
     renders/<job-id>/

@@ -22,6 +22,8 @@ export type SettingsSection =
 export type Route = {
   page: Page;
   projectId: string | null;
+  /** A horizontal project open on its timeline. */
+  editId?: string;
   tab?: Tab;
   settings?: SettingsSection;
 };
@@ -76,6 +78,8 @@ export function readRoute(hash: string): Route {
         settings: settings ?? "agents",
       };
   }
+  if (section === "edicao" && id && projectId.test(id) && !tab)
+    return { ...home, editId: id };
   if (section === "producoes" && id && projectId.test(id) && !extra) {
     // "media" was the combined voice and cover tab; its links now open Áudio.
     const known = tab === "media" ? "audio" : tab;
@@ -95,6 +99,7 @@ export function readRoute(hash: string): Route {
 }
 
 export function routeHash(route: Route): string {
+  if (route.editId) return `#/edicao/${route.editId}`;
   return route.projectId
     ? `#/producoes/${route.projectId}${route.tab ? `/${route.tab}` : ""}`
     : route.page === "environment"

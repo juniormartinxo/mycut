@@ -242,6 +242,15 @@ aos agentes para evitar repetir estruturas e escolhas rejeitadas naquele canal.
 Alteração delimitada do vídeo solicitada pelo humano ou por um agente, com
 autoria identificada, que participa do histórico de edição e de desfazer/refazer.
 
+**Recurso**:
+Arquivo importado para um projeto, guardado uma única vez no acervo pelo seu conteúdo e
+referenciado pelos projetos e históricos que o usam.
+_Evitar_: Asset, mídia da biblioteca (que designa a biblioteca de imagens dos Shorts).
+
+**Enquadramento**:
+Recorte do espaço de composição mostrado no quadro; por padrão é o próprio quadro e, nos
+vídeos horizontais, fica parado.
+
 **Documento de edição**:
 Descrição editável do vídeo que reúne cenas, faixas, trechos de fala, recursos,
 tempos e efeitos, desde o storyboard até a montagem final.

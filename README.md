@@ -317,6 +317,17 @@ A aba **Capa** é um chat: descreva a capa, anexe até 4 imagens de referência 
 
 O chat roda numa fila própria do worker: gerar uma imagem não bloqueia a edição nem uma produção em andamento, e há uma geração por vez por produção. O custo aparece em **Custos** como versão “Capa”. Depois de atualizar o MyCut, espere a fila esvaziar e reinicie o serviço dos agentes, porque o executor troca anexos e imagens com os CLIs. Alterar formato ou cores não solicita uma nova voz nem consome créditos ElevenLabs.
 
+### Vídeos horizontais
+
+Abaixo das produções, **Vídeos horizontais › Novo vídeo horizontal** cria um projeto no documento de edição novo ([ADR 0014](docs/adr/0014-documento-de-edicao-e-operacoes-compartilhadas.md)), com canal, título e formato próprios: 1920×1080 a 30 fps por padrão, ou 1080×1920. O projeto usa o nome, a marca e a voz do canal enquanto não tem escolha própria. Ele abre numa timeline mínima com cenas em sequência e uma faixa para cada conteúdo (visuais, textos, narração, música e efeitos); um item pode atravessar o limite entre cenas.
+
+- **Inserir**: o botão **+** de cada faixa insere um item no cursor; clique na régua de tempo para mover o cursor.
+- **Mover e redimensionar**: arraste o item; a borda direita muda a duração e a esquerda corta o início da mídia. Os tempos também podem ser digitados no painel do item, que mostra o último autor e as escolhas do autor protegidas.
+- **Cortar**: **Cortar no cursor** divide o item em dois.
+- **Desfazer e refazer**: botões no topo ou `Ctrl+Z` e `Ctrl+Shift+Z`. Um pedido com várias operações é desfeito de uma vez, e o histórico sobrevive ao reinício.
+
+Toda mudança, sua ou de um agente, é uma operação validada e registrada com autoria; uma operação com revisão desatualizada ou alvo inválido é recusada sem alterar nada. Os arquivos importados em **Importar recurso** vão para um acervo em `.data/resources`, identificado pelo hash do conteúdo: o mesmo arquivo em dois projetos ocupa espaço uma vez. **Espaço do projeto** mostra o que o projeto referencia e quanto **Apagar histórico** realmente libera: só o conteúdo que nenhum outro projeto, documento ou histórico ainda usa. Nada é apagado sem essa escolha. O editor de Shorts continua como antes.
+
 ## Executar sem Docker
 
 Requisitos: Node.js 24+, pnpm 12.8.1, Python 3.12, `uv`, FFmpeg/ffprobe e fontes DejaVu. No Ubuntu:
