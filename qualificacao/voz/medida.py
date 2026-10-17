@@ -27,10 +27,10 @@ def comparar(referencia, medido, limiar=0.5):
     piloto, Q48) e essa fração separada pela confiança do alinhador, para saber se a confiança baixa avisa o erro."""
     if [chave(p['palavra']) for p in referencia] != [chave(p['palavra']) for p in medido]:
         raise ValueError('Os alinhamentos não são do mesmo texto.')
-    inicio = [round(abs(m['inicio'] - r['inicio']) * 1000) for r, m in zip(referencia, medido)]
-    fim = [round(abs(m['fim'] - r['fim']) * 1000) for r, m in zip(referencia, medido)]
+    inicio = [round(abs(m['inicio'] - r['inicio']) * 1000) for r, m in zip(referencia, medido, strict=True)]
+    fim = [round(abs(m['fim'] - r['fim']) * 1000) for r, m in zip(referencia, medido, strict=True)]
     grupos = {'alta': [], 'baixa': []}
-    for desvio, m in zip(inicio, medido):
+    for desvio, m in zip(inicio, medido, strict=True):
         if 'confianca' in m:
             grupos['alta' if m['confianca'] >= limiar else 'baixa'].append(desvio)
     return {'palavras': len(inicio), 'inicio_ms': resumo(inicio), 'fim_ms': resumo(fim),

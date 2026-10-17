@@ -80,7 +80,7 @@ def main():
               f'{time.monotonic() - inicio:.0f} s', flush=True)
     gerado_em = time.monotonic() - inicio
     partes, manifesto, cursor = [], [], 0.0
-    for i, (item, sinal) in enumerate(zip(itens, sinais)):
+    for i, (item, sinal) in enumerate(zip(itens, sinais, strict=True)):
         if i:
             pausa = PAUSA_PARAGRAFO if item['paragrafo'] != itens[i - 1]['paragrafo'] else PAUSA_TRECHO
             partes.append(np.zeros(round(pausa * sr), np.float32))

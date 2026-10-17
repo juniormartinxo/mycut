@@ -26,7 +26,7 @@ def palavras_com_tempos(alinhamento):
     caracteres = alinhamento['characters']
     inicios, fins = alinhamento['character_start_times_seconds'], alinhamento['character_end_times_seconds']
     palavras, atual = [], None
-    for c, inicio, fim in zip(caracteres, inicios, fins):
+    for c, inicio, fim in zip(caracteres, inicios, fins, strict=True):
         if c.isspace():
             atual = None
         elif atual is None:
@@ -63,7 +63,7 @@ def corresponder(palavras, faladas, duracao=None):
                                      autojunk=False).get_opcodes()
     for operacao, i1, i2, j1, j2 in opcoes:
         if operacao == 'equal':
-            for i, j in zip(range(i1, i2), range(j1, j2)):
+            for i, j in zip(range(i1, i2), range(j1, j2), strict=True):
                 resultado[i].update(inicio=faladas[j]['inicio'], fim=faladas[j]['fim'], mapeamento='exato')
                 if 'confianca' in faladas[j]:
                     resultado[i]['confianca'] = faladas[j]['confianca']
@@ -93,7 +93,7 @@ def dividir(resultado, i1, i2, inicio, fim, mapeamento):
     """Reparte [inicio, fim] entre as palavras i1..i2-1 na proporção do tamanho de cada uma."""
     pesos = [len(resultado[i]['palavra']) for i in range(i1, i2)]
     cursor = inicio
-    for i, peso in zip(range(i1, i2), pesos):
+    for i, peso in zip(range(i1, i2), pesos, strict=True):
         proximo = cursor + max(0.0, fim - inicio) * peso / sum(pesos)
         resultado[i].update(inicio=round(cursor, 3), fim=round(proximo, 3), mapeamento=mapeamento)
         cursor = proximo

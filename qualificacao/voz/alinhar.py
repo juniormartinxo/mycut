@@ -85,7 +85,7 @@ class Mms:
         spans = self.F.merge_tokens(alinhado[0], pontos[0].exp())
         segundos_por_quadro = trecho.size / TAXA / emissao.size(1)
         resultado, k = [], 0
-        for escrita, forma in zip(escritas, formas):
+        for escrita, forma in zip(escritas, formas, strict=True):
             n = len(forma or '*')
             grupo, k = spans[k:k + n], k + n
             resultado.append({'palavra': escrita, 'inicio': round(grupo[0].start * segundos_por_quadro, 3),

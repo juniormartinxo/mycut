@@ -5,9 +5,9 @@ produto: serve para repetir as medições. Áudios, respostas da API e relatóri
 O perfil da voz local (áudio de referência e transcrição), os pesos do Qwen e a chave da ElevenLabs ficam fora do
 repositório.
 
-O Qwen foi reprovado como voz de ensaio e o motor local passa a ser o OmniVoice (ADR 0020). `ensaio_qwen.py`
-fica para repetir esta prova. Para qualificar outro motor local, troque só o gerador: a divisão em trechos, as
-emendas, o alinhamento e as medições não dependem do modelo de voz.
+O Qwen foi reprovado como voz de ensaio, e o OmniVoice local passa a ser a voz principal (ADR 0020).
+`ensaio_qwen.py` fica para repetir esta prova. Para medir outro motor local, troque só o gerador: a divisão em
+trechos, as emendas, o alinhamento e as medições não dependem do modelo de voz.
 
 ## Peças
 
@@ -68,6 +68,7 @@ $APP elevenlabs.py recuperar $I .saida/elevenlabs --rota tts
 $PY medir.py lote .saida/elevenlabs/lote-tts .saida/alinhamento-lote-tts
 ```
 
-O lote pago só roda com `--autorizado`, registra cada pedido antes do envio, para antes de passar do teto de
+A simulação grava em `lote-<rota>-simulado/`, sem tocar no registro de um lote pago. O lote pago só roda com
+`--autorizado`, registra cada pedido antes do envio, para antes de passar do teto de
 caracteres e não repete pedidos sozinho. Cada execução é uma nova geração paga: só repita com nova autorização
 (ADR 0007).

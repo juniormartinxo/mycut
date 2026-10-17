@@ -2,13 +2,13 @@
 status: accepted
 ---
 
-# Voz local OmniVoice, alinhador MMS e rota TTS da ElevenLabs
+# Voz principal OmniVoice, alinhador MMS e rota TTS da ElevenLabs
 
 Em 2026-10-17, a qualificação do MYC-12 ([relatório](../qualificacao-voz.md)) testou três coisas: o ensaio
 Qwen num texto longo, dois alinhadores locais em PT-BR e as rotas da ElevenLabs com tempos, contexto e
-histórico. O teste incluiu um lote pago autorizado. Esta decisão ajusta a
-[ADR 0010](0010-audio-de-ensaio-local-e-narracao-final.md) no motor local e fixa o que a ADR 0010 deixava
-para qualificar.
+histórico. O teste incluiu um lote pago autorizado. Esta decisão troca o motor
+local da [ADR 0010](0010-audio-de-ensaio-local-e-narracao-final.md), fixa o que ela deixava para qualificar e,
+por decisão posterior do autor, inverte o papel das duas vozes (última seção).
 
 **O motor de voz local passa a ser o OmniVoice, no lugar do Qwen.** O autor ouviu 10 min de ensaio Qwen
 dividido em trechos e o reprovou como voz de ensaio: "tá cortando muito as palavras e parece que tem uma certa
@@ -40,17 +40,26 @@ Os tempos da API não são confiáveis perto de números e símbolos. A `v4` dev
 igual ao texto original, dá ao algarismo uma duração de texto (`5070` em 0,16 s) e adianta a palavra seguinte
 em até 1,3 s. Nesses pontos, legendas e cortes devem usar o MMS.
 
-## Em aberto: OmniVoice como voz principal
+## OmniVoice como voz principal e ElevenLabs como segunda via
 
-Ao trocar o Qwen, o autor indicou que o OmniVoice talvez vire a voz principal, com a ElevenLabs como segunda
-via. Isso reverteria a regra central da ADR 0010: narração final sempre pela API, ensaio local só para testes.
-**Esta ADR não muda essa regra.** Ela segue valendo até uma decisão explícita, que precisa considerar:
+Em 2026-10-17, depois da qualificação, o autor aprovou o OmniVoice como **voz principal do MyCut**: mais barato
+e, na avaliação dele, tão bom quanto a ElevenLabs. **Isso substitui a regra central da ADR 0010**, que exigia a
+narração final sempre pela API e deixava o motor local só para testes. Passa a valer:
 
-- **a licença dos pesos.** O código do OmniVoice é Apache-2.0, mas os pesos oficiais (`k2-fsa/OmniVoice`) são
-  CC-BY-NC, com restrição de uso comercial. Vídeos de um canal monetizado podem ser uso comercial;
-- **a qualidade em texto longo.** Ainda não foram medidos no OmniVoice o ensaio longo, as emendas, a
-  estabilidade e o alinhamento desta qualificação;
-- **o que muda no fluxo:** a autorização de narração (ADR 0007) deixaria de ser obrigatória para a voz final, e
-  o áudio de ensaio passaria a poder ser entregue.
+- **a narração final é gerada localmente pelo OmniVoice** com a voz Junior. O mesmo motor produz o áudio que
+  se ouve na revisão do storyboard e o que vai para a entrega, sem troca obrigatória de voz no fim;
+- **a ElevenLabs é a segunda via**, usada quando o autor escolher. Uma geração nela continua sujeita à
+  autorização de narração da [ADR 0007](0007-autorizacao-humana-para-gerar-narracao.md), com alcance e custo
+  apresentados antes, e segue a rota e os cuidados descritos acima;
+- **o alinhamento da fala principal é local**, porque o OmniVoice devolve WAV sem tempos. O MMS alinha o texto
+  falado (a leitura preparada) e os tempos voltam ao texto original por correspondência. A origem `local` e a
+  confiança ficam registradas, e as pendências seguem a Q45;
+- a falha do motor local deixa a narração pendente. Usar a ElevenLabs no lugar é uma escolha do autor, nunca
+  automática.
 
-O próximo passo é qualificar o OmniVoice no MyCut com os scripts de `qualificacao/voz/`.
+Ficam condições conhecidas desta escolha:
+- **a licença dos pesos oficiais** (`k2-fsa/OmniVoice`) é CC-BY-NC, com restrição de uso comercial; o código
+  é Apache-2.0;
+- **as medições desta prova ainda não foram repetidas no OmniVoice** dentro do MyCut: emendas em texto longo,
+  alinhamento MMS sobre o áudio dele e mapeamento da leitura preparada. A aprovação veio da escuta do autor no
+  MyVoice.

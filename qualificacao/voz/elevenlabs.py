@@ -127,7 +127,9 @@ def lote(http, config, pasta, roteiro, rota, teto, simular):
     """O lote pago: cada trecho registrado antes do envio (Q31), parando antes de passar do teto de caracteres;
     guarda áudio, alinhamentos, cabeçalhos de custo e identificação. Sem nova tentativa automática."""
     trechos = [p.strip() for p in Path(roteiro).read_text(encoding='utf-8').split('\n\n') if p.strip()]
-    destino, ids, enviados, creditos = pasta / f'lote-{rota}', [], 0, 0.0
+    # A simulação grava à parte, para não sobrescrever o registro de um lote pago já enviado.
+    destino = pasta / (f'lote-{rota}-simulado' if simular else f'lote-{rota}')
+    ids, enviados, creditos = [], 0, 0.0
     destino.mkdir(parents=True, exist_ok=True)
     for n, texto in enumerate(trechos):
         if enviados + len(texto) > teto:
@@ -176,14 +178,14 @@ def fins_absolutos(alinhamento):
     if not alinhamento:
         return alinhamento
     fins = [round(i + d, 6) for i, d in zip(alinhamento['character_start_times_seconds'],
-                                            alinhamento['character_end_times_seconds'])]
+                                            alinhamento['character_end_times_seconds'], strict=True)]
     return {**alinhamento, 'character_end_times_seconds': fins}
 
 
 def mesmos_tempos(a, b):
-    return bool(a and b) and a['characters'] == b['characters'] and all(
-        abs(x - y) < 1e-6 for k in ('character_start_times_seconds', 'character_end_times_seconds')
-        for x, y in zip(a[k], b[k]))
+    chaves = ('character_start_times_seconds', 'character_end_times_seconds')
+    return bool(a and b) and a['characters'] == b['characters'] and all(len(a[k]) == len(b[k]) for k in chaves) and all(
+        abs(x - y) < 1e-6 for k in chaves for x, y in zip(a[k], b[k], strict=True))
 
 
 def pcm(conteudo):

@@ -7,14 +7,16 @@ ElevenLabs com contexto e tempos. Produz evidência e escolhas, não funcionalid
 está em [`qualificacao/voz/`](../qualificacao/voz/README.md). Áudios, respostas da API e relatórios ficam em
 `qualificacao/voz/.saida/`, fora do Git.
 
-**Escolhas** ([ADR 0020](adr/0020-voz-local-omnivoice-alinhador-mms-e-rota-tts.md)):
+**Escolhas** ([ADR 0020](adr/0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md)):
 
-- **Ensaio local:** o Qwen foi reprovado de ouvido pelo autor. O motor local passa a ser o
-  [OmniVoice](https://github.com/k2-fsa/OmniVoice), já testado e aprovado pelo autor no MyVoice.
+- **Voz principal:** o Qwen foi reprovado de ouvido pelo autor. O
+  [OmniVoice](https://github.com/k2-fsa/OmniVoice), testado e aprovado pelo autor no MyVoice, passa a ser a voz
+  principal do MyCut, inclusive na narração final. A ElevenLabs vira a segunda via.
 - **Alinhador local:** alinhamento forçado MMS (torchaudio), com um coringa para números e símbolos. O Whisper
   serve só para conferir o conteúdo, não os tempos.
-- **ElevenLabs:** `eleven_v4` na rota TTS com tempos (`/v1/text-to-speech/{voz}/with-timestamps`), com os
-  pedidos encadeados por `previous_request_ids` e `next_text`.
+- **ElevenLabs (segunda via):** `eleven_v4` na rota TTS com tempos
+  (`/v1/text-to-speech/{voz}/with-timestamps`), com os pedidos encadeados por `previous_request_ids` e
+  `next_text`.
 
 ## Hardware e versões
 
@@ -89,7 +91,7 @@ voz que fica fora deste repositório. O que lá foi verificado e importa para o 
   pronúncias) e guarda o texto original separado do texto falado. É o caso de original × normalizado do
   critério 3;
 - o código upstream é Apache-2.0, mas **os pesos oficiais (`k2-fsa/OmniVoice`) são CC-BY-NC**, com restrição
-  de uso comercial. Isso pesa na proposta de torná-lo a voz principal (ver a ADR 0020).
+  de uso comercial, uma condição conhecida da escolha (ver a ADR 0020).
 
 A validação do MyVoice registra que estabilidade em texto longo,
 naturalidade e prosódia não foram medidas lá. Antes de o OmniVoice entrar no MyCut, falta repetir sobre ele o
@@ -152,7 +154,7 @@ indica onde conferir.
 
 ### 3. Texto original × normalizado, sem presumir índices iguais
 
-Testes do núcleo puro (`python3 -m unittest discover -s test -t .`, 15 testes):
+Testes do núcleo puro (`python3 -m unittest discover -s test -t .`, 16 testes):
 
 - `palavras_da_api` usa o alinhamento do texto original quando ele reproduz o texto enviado. Se o original
   faltar ou não bater com o texto, recorre ao normalizado. Nesse caso, um grupo escrito de outro jeito na fala
@@ -234,14 +236,13 @@ para antes de passar do teto (`elevenlabs.py`).
 
 ### 6. Registro em `docs/`
 
-Este relatório e a [ADR 0020](adr/0020-voz-local-omnivoice-alinhador-mms-e-rota-tts.md).
+Este relatório e a [ADR 0020](adr/0020-voz-principal-omnivoice-alinhador-mms-e-rota-tts.md).
 
 ## O que fica para depois
 
-- **Qualificar o OmniVoice no MyCut:** ensaio longo dividido em trechos, emendas, alinhamento MMS sobre o texto
-  falado com volta ao original, e escuta do autor. Os scripts desta pasta servem com a troca do gerador.
-- **Decidir se o OmniVoice vira a voz principal**, com a ElevenLabs como segunda via. Isso muda a ADR 0010 e
-  depende da licença CC-BY-NC dos pesos.
+- **Medir o OmniVoice no MyCut**, agora voz principal: ensaio longo dividido em trechos, emendas, alinhamento
+  MMS sobre o texto falado com volta ao original, e escuta do autor. Os scripts desta pasta servem com a troca
+  do gerador.
 - **Conferir sempre os tempos da API perto de números e símbolos** e preferir o MMS nesses pontos ao montar
   legendas e cortes.
 
