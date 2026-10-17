@@ -14,6 +14,7 @@ import { AgentConnections } from "./AgentConnections";
 import { BrowserSettings } from "./BrowserSettings";
 import { CliCommands } from "./CliCommands";
 import { PricingSettings } from "./PricingSettings";
+import { ChannelSettings } from "./ChannelSettings";
 import { VoicePreview, VoiceTests } from "./VoiceSamples";
 import {
   languageName,
@@ -568,6 +569,7 @@ export function Connections({
               </p>
             </section>
           )}
+          {section === "channels" && <ChannelSettings settings={settings} />}
           {section === "costs" && (
             <section className="connection-section">
               <PricingSettings

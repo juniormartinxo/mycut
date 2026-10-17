@@ -191,6 +191,15 @@ class FreeShortTests(unittest.TestCase):
             'captions': CAPTIONS, 'loop': True})
         self.assertEqual(saved['accent'], '#f2b544')
 
+    def test_the_generated_style_keeps_the_brand_of_the_channel_it_was_created_in(self):
+        self.online()
+        channel = self.client.post('/api/channels', json={'name': 'Histórias', 'brand': '@historias'}).json()
+        project = self.create_free(channel_id=channel['id']).json()
+        self.assertEqual(project['channel']['id'], channel['id'])
+        with patch.object(bridge, 'invoke', side_effect=[FREE_SCRIPT, free_direction(), APPROVED]):
+            pipeline.produce(store.claim())
+        self.assertEqual(store.get_project(project['id'])['visual_style']['channel_name'], '@historias')
+
     def test_publication_package_has_title_options_description_hashtags_and_pinned_comment(self):
         project, job = self.start_free()
         with patch.object(bridge, 'invoke', side_effect=[FREE_SCRIPT, free_direction(), APPROVED]):

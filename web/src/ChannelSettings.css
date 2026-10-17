@@ -1,0 +1,68 @@
+.channel-form {
+  display: grid;
+  gap: 18px;
+  max-width: 640px;
+  padding: 20px 22px;
+  margin-bottom: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffef9;
+}
+.channel-form fieldset {
+  display: grid;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.channel-form small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.channel-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.channel-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.channel-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.channel-list li > div {
+  min-width: 0;
+}
+.channel-list strong {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+.channel-list small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.channel-list .text-button {
+  flex-shrink: 0;
+}
+.channel-list .channel-default {
+  display: inline;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

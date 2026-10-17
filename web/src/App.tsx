@@ -303,7 +303,7 @@ export default function App() {
           <span>
             <span className="topbar-muted">Workspace</span>
             <ChevronRight size={15} />
-            Meu canal
+            {project?.channel?.name ?? "Meu canal"}
           </span>
           <span className="topbar-right">
             <Monitor size={15} /> MyCut Studio{" "}
@@ -532,6 +532,7 @@ function Editor({
   const ready = readiness(
     settings,
     !!project.free && (project.art?.mode ?? "none") !== "none",
+    project.voice,
   );
   const visualReady =
     !!settings?.runner.online &&
@@ -618,6 +619,7 @@ function Editor({
       accent_locked = true,
       visual_style = null,
       ending_id = null,
+      voice = null,
       scenes,
       revision,
     } = draft;
@@ -633,6 +635,7 @@ function Editor({
         accent_locked,
         visual_style,
         ending_id,
+        voice,
         scenes,
         revision,
       }),
@@ -897,6 +900,7 @@ function Editor({
                 {!project.free && (
                   <FormatPicker
                     value={draft.visual_style || null}
+                    brand={draft.brand}
                     accent={draft.accent}
                     onChange={(visual_style, accent) =>
                       change({
@@ -922,7 +926,7 @@ function Editor({
                   </div>
                 )}
                 <MissingClips project={project} onOpen={() => onTabChange("materials")} />
-                <ConnectionHint settings={settings} onConnect={onConnect} />
+                <ConnectionHint settings={settings} onConnect={onConnect} voice={project.voice} />
                 {connectionError && <Notice error>{connectionError}</Notice>}
                 <div className="automation-actions">
                   <button
@@ -1324,7 +1328,7 @@ function Editor({
                     </p>
                   </div>
                 </div>
-                <ConnectionHint settings={settings} onConnect={onConnect} />
+                <ConnectionHint settings={settings} onConnect={onConnect} voice={project.voice} />
                 <div className="automation-actions">
                   <button
                     className="button primary"
@@ -1673,7 +1677,9 @@ function Editor({
                   { "--project-accent": draft.accent } as React.CSSProperties
                 }
               >
-                <span>MYCUT</span>
+                <span>
+                  {draft.brand ?? "MYCUT"}
+                </span>
                 <h3>{scene.title}</h3>
                 <SceneDiagram scene={scene} />
                 <div className="preview-narration">

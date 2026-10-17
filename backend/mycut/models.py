@@ -85,6 +85,19 @@ class Scene(BaseModel):
         return self
 
 
+class ElevenSettings(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    voice_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,100}$')
+    voice_name: str = Field(default='', max_length=150)
+    model_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,100}$')
+    stability: float = Field(default=.5, ge=0, le=1)
+    similarity_boost: float = Field(default=.75, ge=0, le=1)
+    speed: float = Field(default=1, ge=.7, le=1.2)
+
+
+CHANNEL_ID = r'^(default|[a-f0-9]{32})$'
+
+
 class ProjectInput(BaseModel):
     model_config = ConfigDict(extra='forbid')
     title: str = Field(min_length=1, max_length=100)
@@ -96,6 +109,8 @@ class ProjectInput(BaseModel):
     accent_locked: bool = True
     visual_style: VisualStyle | None = None
     ending_id: str | None = Field(default=None, pattern=r'^[a-f0-9]{32}$')
+    # Copied from the channel on creation and replaceable here; None narrates with the voice in Conexões (ADR 0018).
+    voice: ElevenSettings | None = None
     scenes: list[Scene] = Field(min_length=1, max_length=12)
     revision: int = Field(default=0, ge=0)
 
@@ -124,6 +139,8 @@ class ProjectInput(BaseModel):
 
 class CreateProject(BaseModel):
     title: str = Field(default='Novo Short', min_length=1, max_length=100)
+    # Omitted: the default channel (ADR 0018).
+    channel_id: str | None = Field(default=None, pattern=CHANNEL_ID)
     template: Literal['blank'] = 'blank'
     brief: str = Field(default='', max_length=BRIEF_LIMIT)
     automation: Literal['none', 'plan', 'pipeline'] = 'none'
@@ -211,16 +228,6 @@ class ElevenConnect(BaseModel):
     api_key: SecretStr = Field(min_length=1, max_length=300)
 
 
-class ElevenSettings(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    voice_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,100}$')
-    voice_name: str = Field(default='', max_length=150)
-    model_id: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,100}$')
-    stability: float = Field(default=.5, ge=0, le=1)
-    similarity_boost: float = Field(default=.75, ge=0, le=1)
-    speed: float = Field(default=1, ge=.7, le=1.2)
-
-
 class AgentRunRequest(BaseModel):
     kind: Literal['pipeline', 'plan', 'voice', 'scenes'] = 'pipeline'
     mode: Literal['preview', 'final'] = 'final'
@@ -236,3 +243,13 @@ class CoverChoice(BaseModel):
     job_id: str = Field(pattern=r'^[a-f0-9]{32}$')
     image_id: str = Field(pattern=r'^[0-9]{1,2}$')
     revision: int = Field(ge=1)
+
+
+class ChannelInput(BaseModel):
+    """What a channel's projects inherit (ADR 0018); its templates and guidelines are filled by later cards."""
+    model_config = ConfigDict(extra='forbid')
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+    # The text drawn as the channel's mark, as a project's visual_style.channel_name.
+    brand: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] = 'MYCUT'
+    # None narrates with the voice chosen in Conexões.
+    voice: ElevenSettings | None = None

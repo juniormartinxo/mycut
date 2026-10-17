@@ -8,6 +8,10 @@ from contextlib import contextmanager
 from .config import DATA, configure
 
 
+# Created by initialize(); every project without a chosen channel belongs to it (ADR 0018).
+DEFAULT_CHANNEL = 'default'
+
+
 class Conflict(Exception):
     pass
 
@@ -92,7 +96,63 @@ def initialize():
                 credits REAL, credits_estimated INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL, updated_at REAL NOT NULL);
             CREATE INDEX IF NOT EXISTS usage_by_job ON usage(job_id, created_at);
+            CREATE TABLE IF NOT EXISTS channels (
+                id TEXT PRIMARY KEY, document TEXT NOT NULL,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL);
         ''')
+        now = time.time()
+        db.execute('INSERT OR IGNORE INTO channels VALUES(?,?,?,?)',
+                   (DEFAULT_CHANNEL, json.dumps(channel_document({'name': 'Meu canal'}), ensure_ascii=False), now, now))
+        # Shorts made before channels join the default one; only the link is added, so revision and render stay.
+        db.execute("UPDATE projects SET document=json_set(document,'$.channel_id',?) "
+                   "WHERE json_extract(document,'$.channel_id') IS NULL", (DEFAULT_CHANNEL,))
+
+
+def channel_document(values):
+    # Templates (MYC-25) and guidelines (MYC-30) have their place before anything fills them.
+    return {'brand': 'MYCUT', 'voice': None, 'templates': {}, 'guidelines': [], **values}
+
+
+def channel_row(row):
+    if row is None:
+        raise Missing('Canal não encontrado.')
+    return dict(json.loads(row['document']), id=row['id'], default=row['id'] == DEFAULT_CHANNEL,
+                created_at=row['created_at'], updated_at=row['updated_at'])
+
+
+def channel_in(db, channel_id):
+    return channel_row(db.execute('SELECT * FROM channels WHERE id=?', (channel_id,)).fetchone())
+
+
+def get_channel(channel_id):
+    with connect() as db:
+        return channel_in(db, channel_id)
+
+
+def all_channels():
+    with connect() as db:
+        rows = db.execute('SELECT * FROM channels ORDER BY id != ?, created_at', (DEFAULT_CHANNEL,))
+        return [channel_row(row) for row in rows]
+
+
+def create_channel(values):
+    channel_id, now = uid(), time.time()
+    with connect() as db:
+        db.execute('INSERT INTO channels VALUES(?,?,?,?)',
+                   (channel_id, json.dumps(channel_document(values), ensure_ascii=False), now, now))
+    return get_channel(channel_id)
+
+
+def update_channel(channel_id, values):
+    """Only the channel changes: its projects keep what they already inherited or generated (ADR 0018)."""
+    with connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row = db.execute('SELECT document FROM channels WHERE id=?', (channel_id,)).fetchone()
+        if row is None:
+            raise Missing('Canal não encontrado.')
+        db.execute('UPDATE channels SET document=?, updated_at=? WHERE id=?',
+                   (json.dumps(json.loads(row['document']) | values, ensure_ascii=False), time.time(), channel_id))
+    return get_channel(channel_id)
 
 
 def project_row(row):
@@ -114,8 +174,10 @@ def all_projects():
 def create_project(document, project_id=None):
     project_id = project_id or uid()
     document = dict(document, revision=1)
+    document.setdefault('channel_id', DEFAULT_CHANNEL)
     now = time.time()
     with connect() as db:
+        channel_in(db, document['channel_id'])
         db.execute('INSERT INTO projects VALUES(?,?,?,?)', (project_id, json.dumps(document, ensure_ascii=False), now, now))
     (DATA / 'projects' / project_id).mkdir(parents=True, exist_ok=True)
     return get_project(project_id)

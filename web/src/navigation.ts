@@ -13,7 +13,12 @@ export type Tab =
   | "materials"
   | "versions"
   | "costs";
-export type SettingsSection = "agents" | "voices" | "environment" | "costs";
+export type SettingsSection =
+  | "agents"
+  | "channels"
+  | "voices"
+  | "environment"
+  | "costs";
 export type Route = {
   page: Page;
   projectId: string | null;
@@ -23,6 +28,7 @@ export type Route = {
 
 const settingsPaths: Record<SettingsSection, string> = {
   agents: "agentes",
+  channels: "canais",
   voices: "vozes",
   environment: "ambiente",
   costs: "custos",

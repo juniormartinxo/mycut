@@ -1,4 +1,4 @@
-import { Bot, Coins, Headphones, Monitor } from "lucide-react";
+import { Bot, Coins, Headphones, Monitor, Tv } from "lucide-react";
 import type { SettingsSection } from "./navigation";
 import "./Settings.css";
 
@@ -8,6 +8,12 @@ export const settingsSections = [
     label: "Agentes",
     description: "Escolha quem pesquisa, escreve e cria seus Shorts.",
     icon: Bot,
+  },
+  {
+    id: "channels",
+    label: "Canais",
+    description: "Nome, marca e voz que cada produção herda do seu canal.",
+    icon: Tv,
   },
   {
     id: "voices",

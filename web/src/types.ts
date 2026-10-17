@@ -124,8 +124,27 @@ export type Material = {
   /** "<message id>/<image id>" when the cover was chosen in the cover chat. */
   chat_image?: string;
 };
+export type ChannelVoice = Omit<Integrations["elevenlabs"], "connected">;
+/** Owner of the brand and voice its productions inherit (ADR 0018). */
+export type Channel = {
+  id: string;
+  name: string;
+  brand: string;
+  /** null narrates with the voice chosen in Conexões. */
+  voice: ChannelVoice | null;
+  default: boolean;
+  templates: Record<string, unknown>;
+  guidelines: unknown[];
+  created_at: number;
+  updated_at: number;
+};
 export type Project = {
   id: string;
+  channel?: Pick<Channel, "id" | "name" | "brand" | "voice">;
+  /** The brand copied from the channel, drawn while visual_style has no channel_name of its own. */
+  brand?: string;
+  /** Copied from the channel on creation; null narrates with the voice in Conexões. */
+  voice?: ChannelVoice | null;
   title: string;
   description: string;
   tags: string;

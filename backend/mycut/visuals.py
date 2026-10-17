@@ -28,7 +28,8 @@ def resolve(project):
     custom = project.get('visual_style') or {}
     base = preset(custom.get('format_id', 'editorial'))
     # A project without visual_style keeps the original sans-serif composition.
-    return {**base, 'channel_name': 'MYCUT', **{key: value for key, value in custom.items() if value is not None},
+    # The brand copied from the channel applies when the project never chose its own channel_name.
+    return {**base, 'channel_name': project.get('brand', 'MYCUT'), **{key: value for key, value in custom.items() if value is not None},
             'font': custom.get('font') or (base['font'] if custom else 'sans'),
             'accent': project.get('accent') or base['accent']}
 

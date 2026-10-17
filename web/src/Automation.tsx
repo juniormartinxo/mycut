@@ -9,9 +9,10 @@ import {
   X,
 } from "lucide-react";
 import { request } from "./api";
-import { FormatPicker } from "./FormatPicker";
+import { FormatPicker, initialStyle } from "./FormatPicker";
 import { money, providers } from "./ProjectCosts";
-import type { ArtMode, Integrations, Job, Project, VisualStyle } from "./types";
+import { useChannels } from "./ChannelSettings";
+import type { ArtMode, ChannelVoice, Integrations, Job, Project, VisualStyle } from "./types";
 
 export function useIntegrations() {
   const [settings, setSettings] = useState<Integrations | null>(null);
@@ -44,27 +45,37 @@ export function useIntegrations() {
   return { settings, error };
 }
 
-/** The Arte only counts for a Short livre that generates images. */
-export function readiness(settings: Integrations | null, art = false) {
+/** The Arte only counts for a Short livre that generates images; voice is the project's or its channel's, over Conexões. */
+export function readiness(
+  settings: Integrations | null,
+  art = false,
+  voice: ChannelVoice | null = null,
+) {
   const agents =
     !!settings?.runner.online &&
     Object.entries(settings.agents).every(
       ([role, a]) =>
         (role === "art" && !art) || settings.runner.providers[a.provider],
     );
-  const voice =
-    !!settings?.elevenlabs.connected && !!settings.elevenlabs.voice_id;
-  return { agents, voice };
+  return {
+    agents,
+    voice:
+      !!settings?.elevenlabs.connected &&
+      !!(voice?.voice_id || settings.elevenlabs.voice_id),
+    voiceName: voice?.voice_name || settings?.elevenlabs.voice_name || "",
+  };
 }
 
 export function ConnectionHint({
   settings,
   onConnect,
+  voice = null,
 }: {
   settings: Integrations | null;
   onConnect: () => void;
+  voice?: ChannelVoice | null;
 }) {
-  const ready = readiness(settings);
+  const ready = readiness(settings, false, voice);
   return (
     <div className="automation-connection">
       <p>
@@ -74,7 +85,7 @@ export function ConnectionHint({
             ? "Conecte o executor e configure os CLIs para iniciar os agentes."
             : !ready.voice
               ? "Agentes prontos. Conecte sua voz ElevenLabs para produzir o vídeo completo."
-              : `Agentes prontos · Voz: ${settings.elevenlabs.voice_name}`}
+              : `Agentes prontos · Voz: ${ready.voiceName}`}
       </p>
       <button type="button" className="text-button" onClick={onConnect}>
         <Settings2 size={16} />
@@ -135,6 +146,8 @@ export function AgentSteps({ job }: { job?: Job }) {
 }
 
 export type ProductionDraft = {
+  /** null until the channels load: the default channel. */
+  channel_id: string | null;
   title: string;
   brief: string;
   automation: "pipeline" | "plan" | "none";
@@ -148,6 +161,7 @@ export type ProductionDraft = {
 };
 
 export const emptyDraft = (visual_style: VisualStyle): ProductionDraft => ({
+  channel_id: null,
   title: "",
   brief: "",
   automation: "pipeline",
@@ -194,6 +208,7 @@ export function NewProduction({
   onConnect: () => void;
 }) {
   const {
+    channel_id,
     title,
     brief,
     automation,
@@ -233,7 +248,29 @@ export function NewProduction({
     });
   };
   const { settings, error: connectionError } = useIntegrations();
-  const ready = readiness(settings, free && art !== "none");
+  const { channels, error: channelError } = useChannels();
+  const channel =
+    channels?.find((item) => item.id === channel_id) ??
+    channels?.find((item) => item.default);
+  // The format starts with the channel's brand; one the author wrote stays when the channel changes.
+  const chooseChannel = (id: string) => {
+    const next = channels?.find((item) => item.id === id);
+    const inherited = [channel?.brand, initialStyle.channel_name].includes(
+      visual_style.channel_name,
+    );
+    onDraftChange({
+      ...draft,
+      channel_id: id,
+      visual_style: inherited
+        ? { ...visual_style, channel_name: next?.brand ?? "" }
+        : visual_style,
+    });
+  };
+  useEffect(() => {
+    if (channel_id === null && channel) chooseChannel(channel.id);
+    // Only the first load of the channels picks the default one.
+  }, [channel_id, channel]);
+  const ready = readiness(settings, free && art !== "none", channel?.voice);
   const artist = settings?.agents.art?.provider;
   const perImage = artist ? settings?.pricing?.images?.[artist] : null;
   const enabled =
@@ -263,6 +300,7 @@ export function NewProduction({
               body.append(
                 "project",
                 JSON.stringify({
+                  channel_id: channel?.id,
                   title: title.trim() || "Short livre",
                   brief,
                   automation,
@@ -282,6 +320,7 @@ export function NewProduction({
               await request<Project>("/projects", {
                 method: "POST",
                 body: JSON.stringify({
+                  channel_id: channel?.id,
                   title: title.trim() || "Nova pauta",
                   brief,
                   automation,
@@ -297,6 +336,21 @@ export function NewProduction({
           }
         }}
       >
+        <label>
+          Canal
+          <select
+            value={channel?.id ?? ""}
+            onChange={(e) => chooseChannel(e.target.value)}
+            disabled={busy || !channels}
+          >
+            {!channels && <option value="">Carregando canais…</option>}
+            {channels?.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <label>
           {free ? "Prompt do Short livre" : "Pauta ou link"}
           <textarea
@@ -461,7 +515,11 @@ export function NewProduction({
             ))}
         </fieldset>
         {automation !== "none" && (
-          <ConnectionHint settings={settings} onConnect={onConnect} />
+          <ConnectionHint
+            settings={settings}
+            onConnect={onConnect}
+            voice={channel?.voice}
+          />
         )}
         {automation === "pipeline" && (
           <p className="connection-help">
@@ -471,9 +529,9 @@ export function NewProduction({
               : "O vídeo usa animações e diagramas e fica pronto para revisão."}
           </p>
         )}
-        {(error || connectionError) && (
+        {(error || connectionError || channelError) && (
           <div className="notice danger" role="alert">
-            {error || connectionError}
+            {error || connectionError || channelError}
           </div>
         )}
         <button className="button primary" disabled={busy || !enabled}>

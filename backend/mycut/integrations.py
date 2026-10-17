@@ -64,8 +64,9 @@ def public():
                           'connected': bool(eleven['api_key'])}}
 
 
-def require_voice():
-    settings = read()['elevenlabs']
+def require_voice(voice=None):
+    """The connection's key with the given voice, or with the one chosen in Conexões."""
+    settings = {**read()['elevenlabs'], **(voice or {})}
     if not settings['api_key'] or not settings['voice_id']:
         raise ValueError('Conecte a ElevenLabs e selecione sua voz em Conexões.')
     return settings
