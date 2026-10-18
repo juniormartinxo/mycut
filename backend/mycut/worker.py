@@ -88,6 +88,8 @@ def main():
         except BlockingIOError:
             raise SystemExit('Já existe um worker ativo neste diretório de dados.')
         store.recover()
+        from . import exporting
+        exporting.recover()
         print('MyCut worker pronto.', flush=True)
         signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
         def lane(covers):
@@ -96,6 +98,8 @@ def main():
                 if not run_once(covers):
                     time.sleep(1)
         threading.Thread(target=lane, args=(True,), daemon=True, name='covers').start()
+        # Exports of horizontal projects have their own lane, beside the Shorts' productions.
+        threading.Thread(target=exporting.lane, daemon=True, name='exports').start()
         lane(False)
 
 

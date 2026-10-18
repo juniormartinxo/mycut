@@ -13,6 +13,11 @@ import {
   Upload,
 } from "lucide-react";
 import { request } from "./api";
+import { HUMAN, NumberField, bytes, clock, seconds } from "./EditFields";
+import { EditEffects, propertyNames } from "./EditEffects";
+import { EditExports } from "./EditExports";
+import { EditPreview } from "./EditPreview";
+import type { Keyframe } from "./engine/timeline";
 import type {
   EditAuthor,
   EditHistoryEntry,
@@ -23,22 +28,9 @@ import type {
 } from "./types";
 import "./EditTimeline.css";
 
-/** Every change made on this screen is an operation of the author, recorded with this authorship. */
-export const HUMAN: EditAuthor = { kind: "human", name: "Autor" };
 // Pixels per millisecond of the timeline.
 const SCALE = 0.08;
 const NEW_ITEM_MS = 2000;
-const number = (value: number, digits = 2) =>
-  value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: digits });
-export const seconds = (ms: number) => `${number(ms / 1000)} s`;
-export const clock = (ms: number) =>
-  `${Math.floor(ms / 60000)}:${(Math.floor(ms / 1000) % 60).toString().padStart(2, "0")}`;
-export const bytes = (size: number) =>
-  size < 1024
-    ? `${size} B`
-    : size < 1024 ** 2
-      ? `${number(size / 1024, 1)} KB`
-      : `${number(size / 1024 ** 2, 1)} MB`;
 const fieldNames: Record<string, string> = {
   track_id: "faixa",
   scene_id: "cena",
@@ -51,6 +43,7 @@ const fieldNames: Record<string, string> = {
   resource: "mídia",
 };
 const styleNames: Record<string, string> = {
+  ...propertyNames,
   opacity: "Opacidade",
   volume: "Volume",
   color: "Cor",
@@ -84,47 +77,6 @@ function itemLabel(project: EditProject, item: EditItem, track: EditTrack) {
   return resource?.name ?? track.name;
 }
 
-/** Commits a typed value when the field loses focus or on Enter, as one operation. */
-function NumberField({
-  label,
-  value,
-  step,
-  min,
-  onCommit,
-  disabled,
-}: {
-  label: string;
-  value: number;
-  step: number;
-  min?: number;
-  onCommit: (value: number) => void;
-  disabled?: boolean;
-}) {
-  const [text, setText] = useState(String(value));
-  useEffect(() => setText(String(value)), [value]);
-  const commit = () => {
-    const parsed = Number(text.replace(",", "."));
-    if (!Number.isFinite(parsed) || parsed === value) return setText(String(value));
-    onCommit(parsed);
-  };
-  return (
-    <label>
-      {label}
-      <input
-        type="number"
-        inputMode="decimal"
-        step={step}
-        min={min}
-        value={text}
-        disabled={disabled}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === "Enter" && commit()}
-      />
-    </label>
-  );
-}
-
 export function EditTimeline({ id, onBack }: { id: string; onBack: () => void }) {
   const [project, setProject] = useState<EditProject | null>(null);
   const [storage, setStorage] = useState<EditStorage | null>(null);
@@ -136,6 +88,7 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [property, setProperty] = useState<string | null>(null);
   const upload = useRef<HTMLInputElement>(null);
 
   const refreshSide = useCallback(async () => {
@@ -374,6 +327,8 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
         {notice || `Revisão ${project.revision} · ${clock(project.duration_ms)} · cursor em ${seconds(cursor)}`}
       </p>
 
+      <EditPreview project={project} cursor={cursor} onCursor={setCursor} />
+
       <div className="edit-toolbar">
         <button
           className="button secondary"
@@ -487,6 +442,10 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
                         onPointerMove={(e) => moveDrag(e, value)}
                         onPointerUp={() => endDrag(value)}
                       />
+                      {[...new Set(Object.values(value.keyframes).flat().map((p) => p.at_ms))].map((at) => (
+                        <span key={at} className="timeline-keyframe" aria-hidden="true"
+                          style={{ left: (at * view.duration_ms) / value.duration_ms * SCALE }} />
+                      ))}
                       <button
                         type="button"
                         aria-label={`${label}, ${seconds(view.start_ms)} a ${seconds(view.start_ms + view.duration_ms)}`}
@@ -527,6 +486,11 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
               pending={pending}
               onChange={(changes) => change(item, changes)}
               onStyle={(values) => send([{ op: "set_style", item_id: item.id, values }])}
+              onKeyframes={(name, points) =>
+                send([{ op: "set_keyframes", item_id: item.id, property: name, points }])
+              }
+              property={property}
+              onProperty={setProperty}
               onSplit={() => send([{ op: "split_item", item_id: item.id, at_ms: snap(cursor), new_id: newId() }])}
               onRemove={async () => (await send([{ op: "remove_item", item_id: item.id }])) && setSelected(null)}
             />
@@ -570,6 +534,8 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
             </p>
           )}
         </section>
+
+        <EditExports project={project} onError={setError} />
 
         <section className="edit-panel" aria-labelledby="resources-heading">
           <h2 id="resources-heading">Recursos</h2>
@@ -706,6 +672,9 @@ function ItemInspector({
   pending,
   onChange,
   onStyle,
+  onKeyframes,
+  property,
+  onProperty,
   onSplit,
   onRemove,
 }: {
@@ -716,6 +685,9 @@ function ItemInspector({
   pending: boolean;
   onChange: (changes: Operation) => void;
   onStyle: (values: Record<string, string | number | null>) => void;
+  onKeyframes: (property: string, points: Keyframe[] | null) => void;
+  property: string | null;
+  onProperty: (property: string) => void;
   onSplit: () => void;
   onRemove: () => void;
 }) {
@@ -832,6 +804,8 @@ function ItemInspector({
           </div>
         ))}
       </fieldset>
+      <EditEffects project={project} item={item} track={track} cursor={cursor} pending={pending} onChange={onChange}
+        onKeyframes={onKeyframes} property={property} onProperty={onProperty} />
       <div className="edit-list-actions">
         <button type="button" className="button secondary" disabled={pending || !inside} onClick={onSplit}
           title={inside ? undefined : "Coloque o cursor dentro do item"}>

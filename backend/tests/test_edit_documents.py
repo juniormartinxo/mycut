@@ -42,7 +42,7 @@ class EditDocumentTests(unittest.TestCase):
         channel = self.client.post('/api/channels', json={'name': 'Histórias dark', 'brand': '@dark'}).json()
         project = self.create(channel_id=channel['id'])
         self.assertEqual(project['format'], {'width': 1920, 'height': 1080, 'fps': 30})
-        self.assertEqual((project['revision'], project['schema_version']), (1, 1))
+        self.assertEqual((project['revision'], project['schema_version']), (1, 2))
         self.assertEqual(project['channel']['id'], channel['id'])
         self.assertEqual({t['kind'] for t in project['tracks']}, {'visual', 'text', 'narration', 'music', 'effects'})
         vertical = self.create(format={'width': 1080, 'height': 1920, 'fps': 30})

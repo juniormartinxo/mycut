@@ -17,6 +17,10 @@ if (!Number.isInteger(apiPort) || apiPort < 1024 || apiPort > 65535) {
 }
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // The export page of the composition engine is built beside the studio (ADR 0019).
+    rollupOptions: { input: { main: resolve(import.meta.dirname, "index.html"), render: resolve(import.meta.dirname, "render.html") } },
+  },
   server: {
     port: 5173,
     strictPort: true,

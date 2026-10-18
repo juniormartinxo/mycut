@@ -282,6 +282,17 @@ para uma autorização de geração, com alcance e custo próprios.
 Correspondência entre o texto da narração e seus instantes no áudio, usada para
 sincronizar a montagem e as legendas, com origem e confiança identificadas.
 
+**Ponto no tempo**:
+Valor de uma propriedade de um item (posição, escala, rotação, opacidade, filtros, zoom ou panorâmica)
+num instante relativo ao início do item, com a curva até o ponto seguinte. Entre os pontos, o motor
+interpola; sem pontos, vale o valor único do estilo.
+_Evitar_: Keyframe, quadro-chave.
+
+**Exportação de revisão**:
+MP4 de uma revisão congelada do documento de edição, com a revisão no nome. A edição continua durante a
+exportação sem alterar o arquivo, que fica guardado até o autor removê-lo. A exportação final é a exportação
+de revisão feita depois de resolvidas as pendências bloqueantes.
+
 **Exportação final**:
 Entrega do vídeo concluído em MP4 e SRT associados à mesma revisão do projeto,
 após resolver suas pendências bloqueantes.

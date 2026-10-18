@@ -1,0 +1,56 @@
+/* No transition nor animation anywhere: every frame comes from frameAt(ms) alone. */
+.stage {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+  font-family: "Manrope Variable", sans-serif;
+}
+.stage-layer {
+  position: absolute;
+  transform-origin: 50% 50%;
+  visibility: hidden;
+}
+.stage-content {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform-origin: 50% 50%;
+}
+.stage-layer.media .stage-content img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 50%;
+}
+.stage-layer.text .stage-content {
+  display: flex;
+  align-items: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  font-weight: 700;
+  line-height: 1.15;
+}
+/* A media sketch (esboço de mídia): an icon and the content it stands for, until the media exists. */
+.stage-layer.sketch .stage-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #cbd5e1;
+  background: repeating-linear-gradient(135deg, #1e293b 0 24px, #273449 24px 48px);
+  outline: 4px dashed #64748b;
+  outline-offset: -4px;
+}
+.stage-sketch-icon {
+  font-size: 96px;
+  line-height: 1;
+}
+.stage-sketch-label {
+  font-size: 40px;
+  font-weight: 600;
+  text-align: center;
+  padding: 0 24px;
+}

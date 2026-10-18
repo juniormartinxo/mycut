@@ -1,3 +1,5 @@
+import type { Freeze, Keyframe, Transition } from "./engine/timeline";
+
 export type Scene = {
   id?: string | null;
   blocks?: SceneBlock[] | null;
@@ -503,6 +505,12 @@ export type EditItem = {
   style: Record<string, StyleValue>;
   resolved_style: Record<string, { value: StyleValue; inherited: boolean }>;
   in_frame: "inside" | "partial" | "outside" | null;
+  /** Points in time of each animated property, relative to the item's start (Q22). */
+  keyframes: Record<string, Keyframe[]>;
+  enter: Transition | null;
+  exit: Transition | null;
+  speed: number;
+  freeze: Freeze | null;
   last_author: EditAuthor;
   /** Fields the author chose that the agents keep until an explicit request replaces them. */
   human: string[];
@@ -558,4 +566,19 @@ export type EditHistoryEntry = {
   label: string;
   targets: string[];
   created_at: number;
+};
+export type EditExport = {
+  id: string;
+  project_id: string;
+  revision: number;
+  state: "queued" | "running" | "done" | "failed";
+  progress: number;
+  message: string;
+  name: string;
+  size: number | null;
+  author: EditAuthor;
+  format: EditFormat;
+  duration_ms: number;
+  created_at: number;
+  updated_at: number;
 };
