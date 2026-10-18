@@ -106,10 +106,16 @@ def file(project_id, export_id):
 
 
 def remove(project_id, export_id):
-    """Only by the author's choice (Q47): a running export stops, and its file goes with it."""
-    with store.connect() as db:
-        row = find(db, project_id, export_id)
-        db.execute('DELETE FROM edit_exports WHERE id=?', (export_id,))
+    """Only by the author's choice (Q47): a running export stops, its file goes with it, and so do the media that only
+    this export still held after a cleanup of the history (ADR 0015)."""
+    with resources.LOCK:
+        with store.connect() as db:
+            row = find(db, project_id, export_id)
+            db.execute('DELETE FROM edit_exports WHERE id=?', (export_id,))
+            held = {r['hash'] for r in json.loads(row['document'])['resources']} - set(editing.references(db))
+            paths = resources.forget(db, sorted(held))[1]
+        for path in paths:
+            path.unlink(missing_ok=True)
     shutil.rmtree(output(row).parent, ignore_errors=True)
     return listing(project_id)
 

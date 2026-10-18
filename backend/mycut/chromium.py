@@ -4,6 +4,7 @@ No extra package: the browser reads commands on fd 3 and writes replies on fd 4,
 The browser comes from MYCUT_CHROMIUM, or from the Playwright cache the studio's tests already install, or from the
 system. Requests outside the loopback go to a closed proxy, so a recording never reaches the network (ADR 0019).
 """
+import base64
 import fcntl
 import glob
 import json
@@ -148,6 +149,5 @@ class Page:
         return self.evaluate(f'({function})(...{json.dumps(args, ensure_ascii=False)})', timeout)
 
     def capture(self, quality=92):
-        import base64
         data = self.send('Page.captureScreenshot', {'format': 'jpeg', 'quality': quality, 'optimizeForSpeed': True})['data']
         return base64.b64decode(data)

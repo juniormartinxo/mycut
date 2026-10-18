@@ -126,6 +126,17 @@ test("corte, fusão e fades decidem quem aparece e com que opacidade", () => {
   assert.deepEqual(frameAt(m, 4000).layers.map((l) => [l.id, l.opacity]), [["corte", 1]]);
 });
 
+test("o item coberto por uma fusão segue tocando por baixo, sem a própria saída", () => {
+  const m = montage([
+    item({ id: "antes", track_id: "visuais", start_ms: 0, duration_ms: 2000, resource: RESOURCES[0].hash,
+           exit: { kind: "fade", duration_ms: 500 } }),
+    item({ id: "fusao", track_id: "visuais", start_ms: 2000, duration_ms: 2000, enter: { kind: "dissolve", duration_ms: 600 } }),
+  ]);
+  // The dissolve takes the place of the exit: no fade to black before it, no flash when it starts.
+  assert.equal(layer(m, 1750, "antes")!.opacity, 1);
+  assert.deepEqual([layer(m, 2300, "antes")!.opacity, layer(m, 2300, "antes")!.media!.sourceMs], [1, 2300]);
+});
+
 test("textos entram e saem: digitação revela letras, subida desloca, saída esmaece", () => {
   const m = montage([
     item({

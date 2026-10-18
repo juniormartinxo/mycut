@@ -285,8 +285,8 @@ sincronizar a montagem e as legendas, com origem e confiança identificadas.
 **Ponto no tempo**:
 Valor de uma propriedade de um item (posição, escala, rotação, opacidade, filtros, zoom ou panorâmica)
 num instante relativo ao início do item, com a curva até o ponto seguinte. Entre os pontos, o motor
-interpola; sem pontos, vale o valor único do estilo.
-_Evitar_: Keyframe, quadro-chave.
+interpola; sem pontos, vale o valor único do estilo. No código e nas operações, `keyframes`.
+_Evitar_: Quadro-chave.
 
 **Exportação de revisão**:
 MP4 de uma revisão congelada do documento de edição, com a revisão no nome. A edição continua durante a

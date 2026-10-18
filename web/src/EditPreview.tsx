@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle, Pause, Play } from "lucide-react";
+import { snapToFrame } from "./EditFields";
 import { Mixer, RATE } from "./engine/mix";
 import { Stage } from "./engine/stage";
 import type { EditProject } from "./types";
@@ -135,8 +136,7 @@ export function EditPreview({
   function go(text: string) {
     const seconds = Number(text.replace(",", "."));
     if (!Number.isFinite(seconds)) return;
-    const frame = 1000 / project.format.fps;
-    const ms = Math.max(0, Math.round(Math.round((seconds * 1000) / frame) * frame));
+    const ms = snapToFrame(seconds * 1000, project.format.fps);
     if (ms !== cursor) onCursor(ms);
   }
 

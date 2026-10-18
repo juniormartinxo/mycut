@@ -14,6 +14,11 @@ export const bytes = (size: number) =>
     : size < 1024 ** 2
       ? `${number(size / 1024, 1)} KB`
       : `${number(size / 1024 ** 2, 1)} MB`;
+/** The start of the frame nearest to ms, in whole ms: every time the editor sends falls on a frame. */
+export function snapToFrame(ms: number, fps: number) {
+  const frame = 1000 / fps;
+  return Math.max(0, Math.round(Math.round(ms / frame) * frame));
+}
 
 /** Commits a typed value when the field loses focus or on Enter, as one operation. */
 export function NumberField({

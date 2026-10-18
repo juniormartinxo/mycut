@@ -599,7 +599,7 @@ class Draft:
     def update_item(self, op):
         _, item = self.find('item', op.item_id)
         before = self.track_kind(item['track_id'])
-        span = media_span(item)
+        span, speed = media_span(item), item['speed']
         for field in sorted(op.changes.model_fields_set):
             value = getattr(op.changes, field)
             if value is None and field not in ('scene_id', 'geometry', 'text', 'resource', 'enter', 'exit', 'freeze'):
@@ -609,6 +609,9 @@ class Draft:
         if {'speed', 'freeze'} & op.changes.model_fields_set and 'duration_ms' not in op.changes.model_fields_set:
             # The clip keeps the same stretch of media; only the time it occupies changes (the next items stay put).
             self.claim(item, 'duration_ms')
+            if item['freeze'] and 'freeze' not in op.changes.model_fields_set:
+                # The held frame stays on the same moment of the media.
+                item['freeze'] = {**item['freeze'], 'at_ms': round(item['freeze']['at_ms'] * speed / item['speed'])}
             item['duration_ms'] = max(1, round(span / item['speed'])) + hold(item)
         if style_group(self.check_item(item)) != style_group(before):
             raise ValueError('Um item só muda para uma faixa do mesmo tipo de conteúdo.')
@@ -658,10 +661,12 @@ class Draft:
                 if frozen['at_ms'] < cut else None
             remaining = frozen['at_ms'] + frozen['duration_ms'] - max(cut, frozen['at_ms'])
             rest['freeze'] = {'at_ms': max(0, frozen['at_ms'] - cut), 'duration_ms': remaining} if remaining > 0 else None
+        # The entrance stays with the first part and the exit with the second; a ramp goes on across the cut.
+        item['exit'], rest['enter'] = None, None
         for name, points in item['keyframes'].items():
-            item['keyframes'][name] = [p for p in points if p['at_ms'] <= cut] or points[:1]
-            rest['keyframes'][name] = [{**p, 'at_ms': p['at_ms'] - cut} for p in points if p['at_ms'] >= cut] or \
-                [{**points[-1], 'at_ms': 0}]
+            at_cut = {**next((p for p in reversed(points) if p['at_ms'] <= cut), points[0]), 'value': value_at(points, cut)}
+            item['keyframes'][name] = [p for p in points if p['at_ms'] < cut] + [{**at_cut, 'at_ms': cut}]
+            rest['keyframes'][name] = [{**at_cut, 'at_ms': 0}] + [{**p, 'at_ms': p['at_ms'] - cut} for p in points if p['at_ms'] > cut]
         if self.author['kind'] == 'agent':
             rest['human'] = [f for f in rest['human'] if f not in ('start_ms', 'source_start_ms')]
         self.insert('item', rest)
@@ -722,6 +727,18 @@ def source_at(item, local_ms):
         at, length = item['freeze']['at_ms'], item['freeze']['duration_ms']
         played = local_ms if local_ms < at else max(at, local_ms - length)
     return item['source_start_ms'] + played * item['speed']
+
+
+def value_at(points, local):
+    """A property at local ms between its points in time, as the composition interpolates it (timeline.ts)."""
+    if local <= points[0]['at_ms']:
+        return points[0]['value']
+    if local >= points[-1]['at_ms']:
+        return points[-1]['value']
+    a, b = next((a, b) for a, b in zip(points, points[1:]) if b['at_ms'] > local)
+    p = (local - a['at_ms']) / (b['at_ms'] - a['at_ms'])
+    eased = 0 if a['easing'] == 'hold' else p * p * (3 - 2 * p) if a['easing'] == 'ease' else p
+    return round(a['value'] + (b['value'] - a['value']) * eased, 6)
 
 
 def restore(document, changes, side):
@@ -813,7 +830,7 @@ def walk(project_id, body: HistoryRequest, kind):
 
 
 def references(db):
-    """Who still needs each content: a project's document or its preserved history (ADR 0015)."""
+    """Who still needs each content: a project's document, its preserved history or an export to render (ADR 0015)."""
     found = {}
     for row in db.execute('SELECT id, document FROM edit_projects'):
         for resource in json.loads(row['document'])['resources']:
@@ -821,6 +838,10 @@ def references(db):
     for row in db.execute('SELECT project_id, resources FROM edit_history'):
         for digest in json.loads(row['resources']):
             found.setdefault(digest, {}).setdefault(row['project_id'], set()).add('history')
+    # An export still to render reads the media of its frozen revision (Q47).
+    for row in db.execute("SELECT project_id, document FROM edit_exports WHERE state IN ('queued','running')"):
+        for resource in json.loads(row['document'])['resources']:
+            found.setdefault(resource['hash'], {}).setdefault(row['project_id'], set()).add('export')
     return found
 
 

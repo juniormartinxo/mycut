@@ -85,6 +85,7 @@ export type AudioClip = {
 };
 
 const AUDIO = new Set(["narration", "music", "effects"]);
+export const isAudio = (kind: string) => AUDIO.has(kind);
 // Distance travelled by a text that rises in or sinks out, in pixels of the composition.
 const TEXT_TRAVEL = 40;
 const POP_FROM = 0.6;
@@ -167,12 +168,12 @@ function indexOf(montage: Montage) {
   return index;
 }
 
-function layerAt(montage: Montage, item: MontageItem, kind: "visual" | "text", ms: number, held: boolean): Layer {
-  // A covered item stays whole, on its last moment, until the dissolve over it ends.
-  const local = Math.min(ms - item.start_ms, item.duration_ms);
+function layerAt(montage: Montage, item: MontageItem, kind: "visual" | "text", ms: number, covered: boolean): Layer {
+  // An item covered by a dissolve goes on under it, past its end, and the dissolve takes the place of its exit.
+  const local = ms - item.start_ms;
   const { enter, exit } = transitions(item);
-  const entering = !held && item.enter && enter > 0 && local < enter ? local / enter : 1;
-  const leaving = !held && item.exit && exit > 0 && local > item.duration_ms - exit ? (item.duration_ms - local) / exit : 1;
+  const entering = item.enter && enter > 0 && local < enter ? local / enter : 1;
+  const leaving = !covered && item.exit && exit > 0 && local > item.duration_ms - exit ? (item.duration_ms - local) / exit : 1;
   const value = (name: string, fallback: number) => valueAt(item.keyframes[name], local, style(item, name, fallback));
   const geometry = item.geometry!;
   let opacity = value("opacity", 1);
@@ -227,15 +228,13 @@ function layerAt(montage: Montage, item: MontageItem, kind: "visual" | "text", m
 /** Everything drawn at ms, bottom to top: by visual order, then by track (later tracks on top), then by start. */
 export function frameAt(montage: Montage, ms: number): Frame {
   const { tracks: kinds, covers } = indexOf(montage);
-  const shown: { item: MontageItem; held: boolean }[] = [];
+  const shown: { item: MontageItem; covered: boolean }[] = [];
   for (const item of montage.items) {
     const track = kinds.get(item.track_id);
     if (!track || AUDIO.has(track.kind) || !item.geometry) continue;
-    if (item.start_ms <= ms && ms < end(item)) shown.push({ item, held: false });
-    else if (ms >= end(item)) {
-      const next = covers.get(item.id);
-      if (next && ms < next.start_ms + transitions(next).enter) shown.push({ item, held: true });
-    }
+    const next = covers.get(item.id);
+    const until = next ? next.start_ms + transitions(next).enter : end(item);
+    if (item.start_ms <= ms && ms < until) shown.push({ item, covered: Boolean(next) });
   }
   shown.sort(
     (a, b) =>
@@ -245,8 +244,8 @@ export function frameAt(montage: Montage, ms: number): Frame {
   );
   return {
     ms,
-    layers: shown.map(({ item, held }) =>
-      layerAt(montage, item, kinds.get(item.track_id)!.kind === "text" ? "text" : "visual", ms, held),
+    layers: shown.map(({ item, covered }) =>
+      layerAt(montage, item, kinds.get(item.track_id)!.kind === "text" ? "text" : "visual", ms, covered),
     ),
   };
 }

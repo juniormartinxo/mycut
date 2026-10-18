@@ -20,7 +20,8 @@ class EditEffectsTests(unittest.TestCase):
         self.context = ASGIClient(app)
         self.client = self.context.__enter__()
         with store.connect() as db:
-            db.execute('DELETE FROM edit_history'); db.execute('DELETE FROM edit_projects'); db.execute('DELETE FROM resources')
+            db.execute('DELETE FROM edit_exports'); db.execute('DELETE FROM edit_history'); db.execute('DELETE FROM edit_projects')
+            db.execute('DELETE FROM resources')
         shutil.rmtree(DATA / 'resources', ignore_errors=True)
         response = self.client.post('/api/edit-projects', json={'title': 'Efeitos', 'author': HUMAN})
         self.assertEqual(response.status_code, 201, response.text)
@@ -172,6 +173,45 @@ class EditEffectsTests(unittest.TestCase):
         self.edit({'op': 'set_keyframes', 'item_id': 'titulo', 'property': 'y',
                    'points': [{'at_ms': 0, 'value': 100}, {'at_ms': 500, 'value': 0}]})
         self.assertEqual(self.item('titulo')['keyframes']['y'][0]['easing'], 'linear')
+
+    def test_cutting_an_item_keeps_its_entrance_on_the_first_part_its_exit_on_the_second_and_its_ramps(self):
+        self.add('titulo', 'text', text='Olá', enter={'kind': 'fade', 'duration_ms': 300}, exit={'kind': 'sink', 'duration_ms': 300})
+        self.edit({'op': 'set_keyframes', 'item_id': 'titulo', 'property': 'opacity',
+                   'points': [{'at_ms': 0, 'value': 0}, {'at_ms': 1000, 'value': 1}]})
+        self.edit({'op': 'split_item', 'item_id': 'titulo', 'at_ms': 500, 'new_id': 'resto'})
+        first, rest = self.item('titulo'), self.item('resto')
+        self.assertEqual((first['enter'], first['exit']), ({'kind': 'fade', 'duration_ms': 300}, None))
+        self.assertEqual((rest['enter'], rest['exit']), (None, {'kind': 'sink', 'duration_ms': 300}))
+        # The ramp goes on across the cut: each part gets the value of the moment of the cut.
+        self.assertEqual([(p['at_ms'], p['value']) for p in first['keyframes']['opacity']], [(0, 0), (500, 0.5)])
+        self.assertEqual([(p['at_ms'], p['value']) for p in rest['keyframes']['opacity']], [(0, 0.5), (500, 1)])
+
+    def test_a_new_speed_keeps_the_held_frame_on_the_same_moment_of_the_media(self):
+        self.add('clipe', 'visual')
+        self.edit({'op': 'update_item', 'item_id': 'clipe', 'changes': {'freeze': {'at_ms': 3000, 'duration_ms': 500}}})
+        self.edit({'op': 'update_item', 'item_id': 'clipe', 'changes': {'speed': 2}})
+        self.assertEqual((self.item('clipe')['freeze'], self.item('clipe')['duration_ms']), ({'at_ms': 1500, 'duration_ms': 500}, 2500))
+
+    def test_an_export_waiting_in_line_keeps_its_media_through_a_cleanup_of_the_history(self):
+        content = b'imagem do teste'
+        response = self.client.post(f'/api/edit-projects/{self.project["id"]}/resources', data={'revision': self.project['revision']},
+                                    files={'file': ('foto.png', content, 'image/png')})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.project = response.json()
+        digest = self.project['resources'][0]['hash']
+        self.add('foto', 'visual', resource=digest)
+        asked = self.client.post(f'/api/edit-projects/{self.project["id"]}/exports', json={'revision': self.project['revision'], 'author': HUMAN})
+        self.assertEqual(asked.status_code, 201, asked.text)
+        self.edit({'op': 'remove_item', 'item_id': 'foto'}, {'op': 'remove_resource', 'hash': digest})
+        cleanup = self.client.post(f'/api/edit-projects/{self.project["id"]}/cleanup',
+                                   json={'kind': 'history', 'revision': self.project['revision'], 'author': HUMAN})
+        self.assertEqual(cleanup.json()['freed_bytes'], 0)
+        self.assertEqual(self.client.get(f'/api/edit-projects/{self.project["id"]}/resources/{digest}').content, content)
+        # Removing the export is the author's choice too: what only it held leaves the acervo.
+        removed = self.client.request('DELETE', f'/api/edit-projects/{self.project["id"]}/exports/{asked.json()["id"]}', json={'author': HUMAN})
+        self.assertEqual(removed.json(), {'exports': []})
+        self.assertEqual(self.client.get(f'/api/edit-projects/{self.project["id"]}/resources/{digest}').status_code, 404)
+        self.assertEqual(self.client.get('/api/resources').json()['resources'], [])
 
 
 if __name__ == '__main__':

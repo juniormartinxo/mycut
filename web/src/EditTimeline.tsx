@@ -13,10 +13,11 @@ import {
   Upload,
 } from "lucide-react";
 import { request } from "./api";
-import { HUMAN, NumberField, bytes, clock, seconds } from "./EditFields";
+import { HUMAN, NumberField, bytes, clock, seconds, snapToFrame } from "./EditFields";
 import { EditEffects, propertyNames } from "./EditEffects";
 import { EditExports } from "./EditExports";
 import { EditPreview } from "./EditPreview";
+import { isAudio } from "./engine/timeline";
 import type { Keyframe } from "./engine/timeline";
 import type {
   EditAuthor,
@@ -168,7 +169,7 @@ export function EditTimeline({ id, onBack }: { id: string; onBack: () => void })
     );
 
   const frame = 1000 / project.format.fps;
-  const snap = (ms: number) => Math.max(0, Math.round(Math.round(ms / frame) * frame));
+  const snap = (ms: number) => snapToFrame(ms, project.format.fps);
   const width = (Math.max(project.duration_ms, cursor) + 5000) * SCALE;
   const sceneAt = (ms: number) =>
     project.scenes.find((s) => s.start_ms <= ms && ms < s.start_ms + s.duration_ms)?.id ?? null;
@@ -692,9 +693,9 @@ function ItemInspector({
   onRemove: () => void;
 }) {
   const frame = 1000 / project.format.fps;
-  const ms = (value: number) => Math.max(0, Math.round(Math.round((value * 1000) / frame) * frame));
+  const ms = (value: number) => snapToFrame(value * 1000, project.format.fps);
   const inside = item.start_ms < cursor && cursor < item.start_ms + item.duration_ms;
-  const audio = ["narration", "music", "effects"].includes(track.kind);
+  const audio = isAudio(track.kind);
   const media = project.resources.filter((r) =>
     audio ? r.media_type.startsWith("audio/") : !r.media_type.startsWith("audio/"),
   );

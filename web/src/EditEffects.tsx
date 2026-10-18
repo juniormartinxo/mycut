@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
-import { valueAt } from "./engine/timeline";
+import { isAudio, valueAt } from "./engine/timeline";
 import type { Easing, Keyframe } from "./engine/timeline";
-import { NumberField } from "./EditFields";
+import { NumberField, snapToFrame } from "./EditFields";
 import type { EditItem, EditProject, EditTrack } from "./types";
 
 type Operation = Record<string, unknown>;
@@ -62,9 +62,9 @@ export function EditEffects({
   property: string | null;
   onProperty: (property: string) => void;
 }) {
-  const group = ["narration", "music", "effects"].includes(track.kind) ? "audio" : track.kind;
+  const group = isAudio(track.kind) ? "audio" : track.kind;
   const frame = 1000 / project.format.fps;
-  const ms = (seconds: number) => Math.max(0, Math.round(Math.round((seconds * 1000) / frame) * frame));
+  const ms = (seconds: number) => snapToFrame(seconds * 1000, project.format.fps);
   const local = cursor - item.start_ms;
   const inside = local >= 0 && local <= item.duration_ms;
   return (

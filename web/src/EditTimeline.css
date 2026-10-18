@@ -375,7 +375,7 @@
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #0b0f17;
+  background: var(--sidebar);
 }
 .edit-preview-stage {
   overflow: hidden;
@@ -384,7 +384,7 @@
   position: absolute;
   inset: 0;
   margin: auto;
-  color: #cbd5e1;
+  color: var(--paper);
 }
 .edit-preview-controls {
   display: flex;
