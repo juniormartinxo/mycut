@@ -325,6 +325,9 @@ Abaixo das produções, **Vídeos horizontais › Novo vídeo horizontal** cria 
 - **Mover e redimensionar**: arraste o item; a borda direita muda a duração e a esquerda corta o início da mídia. Os tempos também podem ser digitados no painel do item, que mostra o último autor e as escolhas do autor protegidas.
 - **Cortar**: **Cortar no cursor** divide o item em dois.
 - **Desfazer e refazer**: botões no topo ou `Ctrl+Z` e `Ctrl+Shift+Z`. Um pedido com várias operações é desfeito de uma vez, e o histórico sobrevive ao reinício.
+- **Prévia**: acima da timeline, desenhada pelo mesmo motor da exportação ([ADR 0019](docs/adr/0019-motor-de-composicao-html-deterministico.md)) em 720p ou menos. Parada, mostra o quadro exato do cursor (digite um instante em **Instante (s)**); **Tocar** usa o relógio do som. Itens sem mídia aparecem como esboço de mídia, e um vídeo também, enquanto seus quadros são preparados.
+- **Efeitos**: no painel do item, posição, escala, rotação, opacidade, brilho, contraste, saturação, desfoque, zoom e panorâmica têm um valor no estilo e podem ganhar **pontos no tempo** (instante, valor e curva linear, suave ou degrau), que continuam editáveis. **Transições** escolhem corte seco, fade ou fusão nos visuais, fade nos áudios, e subir, surgir, digitar, descer ou sumir nos textos. Nos clipes, **Velocidade** e **Congelar quadro no cursor** mudam o tempo que o clipe ocupa; os itens seguintes ficam onde estão. Máscaras, chroma key e LUTs ficam fora desta versão.
+- **Exportações**: **Exportar revisão N** congela a revisão atual e gera, no worker, um MP4 H.264/AAC 48 kHz chamado `<título>-r<revisão>.mp4`. Dá para continuar editando durante a exportação: o arquivo não muda. As exportações ficam em `.data/exports` até **Remover**. A exportação usa um Chromium sem janela: o da cache do Playwright (`pnpm --dir web exec playwright install chromium-headless-shell`), o do sistema ou o indicado em `MYCUT_CHROMIUM`, e codifica com NVENC quando a GPU responde, ou x264.
 
 Toda mudança, sua ou de um agente, é uma operação validada e registrada com autoria; uma operação com revisão desatualizada ou alvo inválido é recusada sem alterar nada. Os arquivos importados em **Importar recurso** vão para um acervo em `.data/resources`, identificado pelo hash do conteúdo: o mesmo arquivo em dois projetos ocupa espaço uma vez. **Espaço do projeto** mostra o que o projeto referencia e quanto **Apagar histórico** realmente libera: só o conteúdo que nenhum outro projeto, documento ou histórico ainda usa. Nada é apagado sem essa escolha. O editor de Shorts continua como antes.
 
@@ -370,6 +373,7 @@ PYTHONPATH=backend .venv-app/bin/python -m unittest discover -s backend/tests -v
 python3 -m unittest discover -s scripts -p 'test_ports.py' -v
 npm --prefix web run build
 npm --prefix web run test:navigation
+npm --prefix web run test:engine
 docker compose config --quiet
 ```
 

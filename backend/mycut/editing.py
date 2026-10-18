@@ -13,16 +13,19 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from . import store
 from .models import ElevenSettings
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 # Contents of the timeline (ADR 0006); a project starts with one track of each.
 TRACKS = {'visual': 'Visuais', 'text': 'Textos', 'narration': 'Narração', 'music': 'Música', 'effects': 'Efeitos'}
 AUDIO = {'narration', 'music', 'effects'}
 # What an item shows until it has its own choice; templates (MYC-25) will be the source of these values (Q65).
+LOOK = {'scale': 1.0, 'rotation': 0.0, 'brightness': 1.0, 'contrast': 1.0, 'saturation': 1.0, 'blur': 0.0}
 TEMPLATE = {
-    'visual': {'opacity': 1.0, 'fit': 'cover'},
-    'text': {'opacity': 1.0, 'color': '#ffffff', 'font_family': 'Manrope', 'font_size': 64, 'align': 'center'},
+    'visual': {'opacity': 1.0, 'fit': 'cover', **LOOK, 'zoom': 1.0, 'pan_x': 0.0, 'pan_y': 0.0},
+    'text': {'opacity': 1.0, 'color': '#ffffff', 'font_family': 'Manrope', 'font_size': 64, 'align': 'center', **LOOK},
     'audio': {'volume': 1.0},
 }
+# Properties that change over an item through points in time (Q22); x and y move the item's box in the space.
+ANIMATED = {'visual': ('x', 'y', 'opacity', *LOOK, 'zoom', 'pan_x', 'pan_y'), 'text': ('x', 'y', 'opacity', *LOOK), 'audio': ()}
 # Composition space (Q64): items may sit past the frame, but not at absurd distances.
 SPACE_LIMIT = 100_000
 LONGEST = 6 * 3600 * 1000
@@ -107,6 +110,24 @@ class RemoveTrack(Strict):
     track_id: EntityId
 
 
+class Transition(Strict):
+    """How an item enters or leaves; no transition is a cut (corte seco)."""
+    kind: Literal['fade', 'dissolve', 'rise', 'pop', 'type', 'sink']
+    duration_ms: Annotated[int, Field(ge=1, le=60_000)]
+
+
+# Which transitions each kind of content accepts: a dissolve (fusão) crosses into the item before it on the track.
+TRANSITIONS = {'visual': {'enter': {'fade', 'dissolve'}, 'exit': {'fade'}},
+               'text': {'enter': {'fade', 'rise', 'pop', 'type'}, 'exit': {'fade', 'sink', 'pop'}},
+               'audio': {'enter': {'fade'}, 'exit': {'fade'}}}
+
+
+class Freeze(Strict):
+    """A frame held on screen: at this moment of the item the clip stops for duration_ms, then plays on."""
+    at_ms: Ms
+    duration_ms: Length
+
+
 class ItemFields(Strict):
     track_id: EntityId | None = None
     scene_id: EntityId | None = None
@@ -119,6 +140,11 @@ class ItemFields(Strict):
     geometry: Geometry | None = None
     text: Text | None = None
     resource: Hash | None = None
+    enter: Transition | None = None
+    exit: Transition | None = None
+    # Speed of the clip's media; with the held frame, it sets how long the clip occupies the timeline.
+    speed: Annotated[float, Field(ge=0.25, le=4, allow_inf_nan=False)] | None = None
+    freeze: Freeze | None = None
 
 
 class NewItem(ItemFields):
@@ -127,6 +153,22 @@ class NewItem(ItemFields):
     start_ms: Ms
     duration_ms: Length
     style: dict[str, Any] = Field(default_factory=dict)
+
+
+class Keyframe(Strict):
+    # Relative to the item's start, so moving the item takes its points along.
+    at_ms: Ms
+    value: float = Field(allow_inf_nan=False)
+    # How the value travels from this point to the next one.
+    easing: Literal['linear', 'ease', 'hold'] = 'linear'
+
+
+class SetKeyframes(Strict):
+    """All the points of one property; null removes them and the property goes back to its single value."""
+    op: Literal['set_keyframes']
+    item_id: EntityId
+    property: Annotated[str, StringConstraints(max_length=20)]
+    points: list[Keyframe] | None = Field(default=None, max_length=200)
 
 
 class AddItem(Strict):
@@ -182,7 +224,7 @@ class UpdateProject(Strict):
 
 
 Operation = Annotated[Union[AddScene, UpdateScene, MoveScene, RemoveScene, AddTrack, RemoveTrack, AddItem, UpdateItem,
-                            SetStyle, SplitItem, RemoveItem, AddResource, RemoveResource, UpdateProject],
+                            SetStyle, SetKeyframes, SplitItem, RemoveItem, AddResource, RemoveResource, UpdateProject],
                       Field(discriminator='op')]
 
 
@@ -212,13 +254,15 @@ class CreateRequest(Strict):
 LABELS = {'add_scene': 'Adicionar cena', 'update_scene': 'Alterar cena', 'move_scene': 'Mover cena',
           'remove_scene': 'Remover cena', 'add_track': 'Adicionar faixa', 'remove_track': 'Remover faixa',
           'add_item': 'Inserir item', 'update_item': 'Alterar item', 'set_style': 'Alterar estilo',
+          'set_keyframes': 'Alterar pontos no tempo',
           'split_item': 'Cortar item', 'remove_item': 'Remover item', 'add_resource': 'Importar recurso',
           'remove_resource': 'Remover recurso', 'update_project': 'Alterar projeto'}
 COLLECTIONS = {'scene': 'scenes', 'track': 'tracks', 'item': 'items', 'resource': 'resources'}
 PROJECT_FIELDS = ('title', 'format', 'channel_name', 'brand', 'voice')
 FIELD_NAMES = {'track_id': 'a faixa', 'scene_id': 'a cena', 'start_ms': 'o início', 'duration_ms': 'a duração',
                'source_start_ms': 'o recorte', 'layer': 'a ordem visual', 'geometry': 'a posição e o tamanho',
-               'text': 'o texto', 'resource': 'a mídia'}
+               'text': 'o texto', 'resource': 'a mídia', 'enter': 'a entrada', 'exit': 'a saída',
+               'speed': 'a velocidade', 'freeze': 'o congelamento'}
 
 
 def blank(title, format, channel_id):
@@ -247,10 +291,22 @@ def dump(value):
     return json.dumps(value, ensure_ascii=False)
 
 
+# What an item has before any effect is chosen; documents and history from schema 1 gain these on reading.
+EFFECTS = {'keyframes': {}, 'enter': None, 'exit': None, 'speed': 1.0, 'freeze': None}
+
+
+def upgrade(document):
+    for item in document['items']:
+        for name, value in EFFECTS.items():
+            item.setdefault(name, copy.deepcopy(value))
+    document['schema_version'] = SCHEMA_VERSION
+    return document
+
+
 def row_document(row):
     if row is None:
         raise store.Missing('Projeto não encontrado.')
-    return json.loads(row['document'])
+    return upgrade(json.loads(row['document']))
 
 
 def load(db, project_id):
@@ -372,10 +428,19 @@ def history(project_id):
                          'created_at': row['created_at']} for row in rows]}
 
 
+def within(low, high):
+    return lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and low <= v <= high
+
+
+# Ranges of every number an item can show, as a single value or at a point in time.
+RANGES = {'x': within(-SPACE_LIMIT, SPACE_LIMIT), 'y': within(-SPACE_LIMIT, SPACE_LIMIT), 'opacity': within(0, 1),
+          'scale': within(0.01, 20), 'rotation': within(-3600, 3600), 'brightness': within(0, 3), 'contrast': within(0, 3),
+          'saturation': within(0, 3), 'blur': within(0, 100), 'zoom': within(0.1, 10), 'pan_x': within(-1, 1),
+          'pan_y': within(-1, 1)}
 STYLE_RULES = {
-    'opacity': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1,
-    'volume': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 2,
-    'font_size': lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and 8 <= v <= 400,
+    **RANGES,
+    'volume': within(0, 2),
+    'font_size': within(8, 400),
     'fit': lambda v: v in ('cover', 'contain'),
     'align': lambda v: v in ('left', 'center', 'right'),
     'color': lambda v: isinstance(v, str) and len(v) == 7 and v[0] == '#' and all(c in '0123456789abcdefABCDEF' for c in v[1:]),
@@ -440,7 +505,8 @@ class Draft:
             item['human'] = sorted({*item['human'], field})
         elif field in item['human']:
             if not self.replace_human:
-                name = FIELD_NAMES.get(field) or f'o estilo {field.removeprefix("style.")}'
+                name = FIELD_NAMES.get(field) or (f'os pontos no tempo de {field.removeprefix("keyframes.")}'
+                                                  if field.startswith('keyframes.') else f'o estilo {field.removeprefix("style.")}')
                 raise store.Conflict(f'O autor escolheu {name} do item {item["id"]}. Para substituir, faça um pedido explícito.')
             item['human'] = [f for f in item['human'] if f != field]
 
@@ -456,7 +522,19 @@ class Draft:
             raise ValueError('Itens visuais e de texto precisam de posição e tamanho.')
         if item['text'] is not None and kind != 'text':
             raise ValueError('Somente itens de texto têm texto.')
+        if kind != 'visual' and (item['speed'] != 1 or item['freeze']):
+            raise ValueError('Velocidade e congelamento valem para clipes da faixa de visuais.')
+        if item['freeze'] and item['freeze']['at_ms'] > item['duration_ms'] - item['freeze']['duration_ms']:
+            raise ValueError('O quadro congelado precisa cair dentro do clipe.')
+        for side in ('enter', 'exit'):
+            if item[side] and item[side]['kind'] not in TRANSITIONS[style_group(kind)][side]:
+                raise ValueError(f'Itens desta faixa não {"entram" if side == "enter" else "saem"} com {item[side]["kind"]}.')
         return kind
+
+    def check_transitions(self, item, sides):
+        for side in sides:
+            if item[side] and item[side]['duration_ms'] > item['duration_ms']:
+                raise ValueError('A transição não pode durar mais que o item.')
 
     def check_style(self, kind, name, value):
         if name not in TEMPLATE[style_group(kind)]:
@@ -501,12 +579,14 @@ class Draft:
 
     def add_item(self, op):
         given = op.item.model_dump(exclude={'id', 'style'})
-        item = {**given, 'id': self.new_id(op.item.id), 'source_start_ms': op.item.source_start_ms or 0,
+        effects = {name: given[name] if given.get(name) is not None else copy.deepcopy(value) for name, value in EFFECTS.items()}
+        item = {**given, **effects, 'id': self.new_id(op.item.id), 'source_start_ms': op.item.source_start_ms or 0,
                 'layer': op.item.layer or 0, 'style': {}, 'last_author': self.author, 'human': []}
         if item['geometry'] is None and self.track_kind(item['track_id']) not in AUDIO:
             # The frame is the default framing (Q64).
             item['geometry'] = {'x': 0, 'y': 0, 'width': self.doc['format']['width'], 'height': self.doc['format']['height']}
         kind = self.check_item(item)
+        self.check_transitions(item, ('enter', 'exit'))
         for name, value in op.item.style.items():
             self.check_style(kind, name, value)
             if value is not None:
@@ -519,14 +599,23 @@ class Draft:
     def update_item(self, op):
         _, item = self.find('item', op.item_id)
         before = self.track_kind(item['track_id'])
+        span, speed = media_span(item), item['speed']
         for field in sorted(op.changes.model_fields_set):
             value = getattr(op.changes, field)
-            if value is None and field not in ('scene_id', 'geometry', 'text', 'resource'):
+            if value is None and field not in ('scene_id', 'geometry', 'text', 'resource', 'enter', 'exit', 'freeze'):
                 raise ValueError(f'Informe {FIELD_NAMES[field]} do item.')
             self.claim(item, field)
             item[field] = value.model_dump() if isinstance(value, BaseModel) else value
+        if {'speed', 'freeze'} & op.changes.model_fields_set and 'duration_ms' not in op.changes.model_fields_set:
+            # The clip keeps the same stretch of media; only the time it occupies changes (the next items stay put).
+            self.claim(item, 'duration_ms')
+            if item['freeze'] and 'freeze' not in op.changes.model_fields_set:
+                # The held frame stays on the same moment of the media.
+                item['freeze'] = {**item['freeze'], 'at_ms': round(item['freeze']['at_ms'] * speed / item['speed'])}
+            item['duration_ms'] = max(1, round(span / item['speed'])) + hold(item)
         if style_group(self.check_item(item)) != style_group(before):
             raise ValueError('Um item só muda para uma faixa do mesmo tipo de conteúdo.')
+        self.check_transitions(item, {'enter', 'exit'} & op.changes.model_fields_set)
 
     def set_style(self, op):
         _, item = self.find('item', op.item_id)
@@ -539,6 +628,21 @@ class Draft:
             else:
                 item['style'][name] = value
 
+    def set_keyframes(self, op):
+        _, item = self.find('item', op.item_id)
+        if op.property not in ANIMATED[style_group(self.track_kind(item['track_id']))]:
+            raise ValueError(f'A propriedade {op.property} não muda no tempo em itens desta faixa.')
+        self.claim(item, f'keyframes.{op.property}')
+        if op.points is None:
+            item['keyframes'].pop(op.property, None)
+            return
+        points = sorted((p.model_dump() for p in op.points), key=lambda p: p['at_ms'])
+        if len({p['at_ms'] for p in points}) != len(points):
+            raise ValueError('Dois pontos no tempo da mesma propriedade não podem cair no mesmo instante.')
+        if not points or not all(RANGES[op.property](p['value']) for p in points):
+            raise ValueError(f'Valor inválido num ponto no tempo de {op.property}.')
+        item['keyframes'][op.property] = points
+
     def split_item(self, op):
         _, item = self.find('item', op.item_id)
         end = item['start_ms'] + item['duration_ms']
@@ -546,9 +650,23 @@ class Draft:
             raise ValueError('Corte o item num instante entre o início e o fim dele.')
         self.claim(item, 'duration_ms')
         rest = copy.deepcopy(item)
-        item['duration_ms'] = op.at_ms - item['start_ms']
+        cut = op.at_ms - item['start_ms']
+        item['duration_ms'] = cut
         rest.update(id=self.new_id(op.new_id), start_ms=op.at_ms, duration_ms=end - op.at_ms,
-                    source_start_ms=item['source_start_ms'] + item['duration_ms'])
+                    source_start_ms=round(source_at(rest, cut)))
+        # A held frame stays with the part it falls in, or is shared when the cut crosses it.
+        frozen = item['freeze']
+        if frozen:
+            item['freeze'] = {'at_ms': frozen['at_ms'], 'duration_ms': min(frozen['duration_ms'], cut - frozen['at_ms'])} \
+                if frozen['at_ms'] < cut else None
+            remaining = frozen['at_ms'] + frozen['duration_ms'] - max(cut, frozen['at_ms'])
+            rest['freeze'] = {'at_ms': max(0, frozen['at_ms'] - cut), 'duration_ms': remaining} if remaining > 0 else None
+        # The entrance stays with the first part and the exit with the second; a ramp goes on across the cut.
+        item['exit'], rest['enter'] = None, None
+        for name, points in item['keyframes'].items():
+            at_cut = {**next((p for p in reversed(points) if p['at_ms'] <= cut), points[0]), 'value': value_at(points, cut)}
+            item['keyframes'][name] = [p for p in points if p['at_ms'] < cut] + [{**at_cut, 'at_ms': cut}]
+            rest['keyframes'][name] = [{**at_cut, 'at_ms': 0}] + [{**p, 'at_ms': p['at_ms'] - cut} for p in points if p['at_ms'] > cut]
         if self.author['kind'] == 'agent':
             rest['human'] = [f for f in rest['human'] if f not in ('start_ms', 'source_start_ms')]
         self.insert('item', rest)
@@ -591,6 +709,36 @@ class Draft:
                 result.append({'kind': kind, 'id': entity_id, 'before': copy.deepcopy(before), 'after': copy.deepcopy(after),
                                'index_before': index_before, 'index_after': index_after})
         return result
+
+
+def hold(item):
+    return item['freeze']['duration_ms'] if item['freeze'] else 0
+
+
+def media_span(item):
+    """How much of the media the clip shows, in ms of the media."""
+    return (item['duration_ms'] - hold(item)) * item['speed']
+
+
+def source_at(item, local_ms):
+    """Moment of the media shown at local_ms of the item, as the composition resolves it (web/src/engine/timeline.ts)."""
+    played = local_ms
+    if item['freeze']:
+        at, length = item['freeze']['at_ms'], item['freeze']['duration_ms']
+        played = local_ms if local_ms < at else max(at, local_ms - length)
+    return item['source_start_ms'] + played * item['speed']
+
+
+def value_at(points, local):
+    """A property at local ms between its points in time, as the composition interpolates it (timeline.ts)."""
+    if local <= points[0]['at_ms']:
+        return points[0]['value']
+    if local >= points[-1]['at_ms']:
+        return points[-1]['value']
+    a, b = next((a, b) for a, b in zip(points, points[1:]) if b['at_ms'] > local)
+    p = (local - a['at_ms']) / (b['at_ms'] - a['at_ms'])
+    eased = 0 if a['easing'] == 'hold' else p * p * (3 - 2 * p) if a['easing'] == 'ease' else p
+    return round(a['value'] + (b['value'] - a['value']) * eased, 6)
 
 
 def restore(document, changes, side):
@@ -682,7 +830,7 @@ def walk(project_id, body: HistoryRequest, kind):
 
 
 def references(db):
-    """Who still needs each content: a project's document or its preserved history (ADR 0015)."""
+    """Who still needs each content: a project's document, its preserved history or an export to render (ADR 0015)."""
     found = {}
     for row in db.execute('SELECT id, document FROM edit_projects'):
         for resource in json.loads(row['document'])['resources']:
@@ -690,6 +838,10 @@ def references(db):
     for row in db.execute('SELECT project_id, resources FROM edit_history'):
         for digest in json.loads(row['resources']):
             found.setdefault(digest, {}).setdefault(row['project_id'], set()).add('history')
+    # An export still to render reads the media of its frozen revision (Q47).
+    for row in db.execute("SELECT project_id, document FROM edit_exports WHERE state IN ('queued','running')"):
+        for resource in json.loads(row['document'])['resources']:
+            found.setdefault(resource['hash'], {}).setdefault(row['project_id'], set()).add('export')
     return found
 
 

@@ -9,9 +9,10 @@ RUN npm run build
 FROM python:3.12-slim-bookworm AS app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app/backend \
     MYCUT_DATA_DIR=/data MYCUT_WEB_DIR=/app/web/dist HF_HOME=/models \
+    MYCUT_CHROMIUM=/usr/bin/chromium MYCUT_CHROMIUM_NO_SANDBOX=1 \
     HF_HUB_DISABLE_TELEMETRY=1
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core fonts-dejavu-extra fonts-noto-color-emoji \
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg chromium fonts-dejavu-core fonts-dejavu-extra fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 studio \
     && mkdir /data /models && chown studio:studio /data /models

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, LoaderCircle, MonitorPlay, Plus } from "lucide-react";
 import { request } from "./api";
 import { useChannels } from "./ChannelSettings";
-import { HUMAN, clock } from "./EditTimeline";
+import { HUMAN, clock } from "./EditFields";
 import type { EditProject, EditSummary } from "./types";
 import "./EditTimeline.css";
 

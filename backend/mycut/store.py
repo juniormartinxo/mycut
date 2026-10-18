@@ -111,6 +111,12 @@ def initialize():
             -- Content-addressed files shared by every project (ADR 0015); references live in documents and history.
             CREATE TABLE IF NOT EXISTS resources (
                 hash TEXT PRIMARY KEY, size INTEGER NOT NULL, media_type TEXT NOT NULL, created_at REAL NOT NULL);
+            -- Each export keeps the frozen revision it renders (Q47); rows and files stay until the author removes them.
+            CREATE TABLE IF NOT EXISTS edit_exports (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES edit_projects(id) ON DELETE CASCADE,
+                revision INTEGER NOT NULL, state TEXT NOT NULL, progress INTEGER NOT NULL, message TEXT NOT NULL,
+                name TEXT NOT NULL, size INTEGER, author TEXT NOT NULL, document TEXT NOT NULL,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL);
         ''')
         now = time.time()
         db.execute('INSERT OR IGNORE INTO channels VALUES(?,?,?,?)',
